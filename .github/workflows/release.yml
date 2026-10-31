@@ -127,7 +127,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: DeepSeek-Bot-win-x64
-          path: app/dist-pack/DeepSeek-Bot-*-win-x64.exe
+          path: |
+            app/dist-pack/DeepSeek-Bot-*-win-x64.exe
+            app/dist-pack/DeepSeek-Bot-*-win-x64.exe.blockmap
+            app/dist-pack/latest.yml
           retention-days: 7
           if-no-files-found: error
           compression-level: 0
@@ -176,6 +179,7 @@ jobs:
           path: |
             app/dist-pack/DeepSeek-Bot-*-linux-x86_64.AppImage
             app/dist-pack/DeepSeek-Bot-*-linux-amd64.deb
+            app/dist-pack/latest-linux.yml
           retention-days: 7
           if-no-files-found: error
           compression-level: 0
