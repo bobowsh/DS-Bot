@@ -4,6 +4,13 @@ All notable changes to DS Bot are listed here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+## [0.2.5-rc1] - 2026-10-31
+
+### Changed
+
+- The release workflow publishes to npm only from the upstream Fei2411/DS-Bot repository, so forks can run it without a failed publish step.
+- The macOS desktop builds are dropped: releases carry the Windows installer and the Linux packages only.
+
 ## [0.2.4] - 2026-10-29
 
 ### Added
