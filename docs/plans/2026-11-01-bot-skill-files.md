@@ -88,6 +88,13 @@ if (item.kind === 'skill') {
 - 放在 bot 专属目录或用户指定目录
 - 通过 `locator` 指向技能目录
 
+### 群 Session 也挂该 bot 的技能
+
+按 bot 挂载后，该 bot 的**群 Session** 同样会挂上它的技能（例如主 Bot 的 `room-chief` 也拿到）。原因是技能与 MCP 能力包走同一条 `reconcileAgent` / `botOfSession` 路径，而群 Session 在 `store.js` 的 `groupOwners` 里就归该 bot（`selfOf` 解析回它的 botId），所以同一个 bot 的私人会话和群 Session 一起挂。
+
+- 这是**既有机制**，本次改动（`4241e4e`）没有碰它；行为与 MCP 能力包一致，**不改代码**。
+- 「其他 bot 看不到」依然成立：挂给谁只由 `bot.capabilities` 决定，别的 bot 的私人会话和群 Session 都拿不到。
+
 ## 不做什么
 
 - 不修改 dsh-chat-import 插件的源码
@@ -103,3 +110,4 @@ if (item.kind === 'skill') {
 
 - 2026-11-01：初稿，方案已定（技能放文件系统，单独目录，capabilities 按bot挂载）。
 - 2026-11-01：实施。`locator` 是技能目录（其下放 `SKILL.md` 与 `scripts/`），挂载时每次从文件读正文并带 `resourceBase`；目录不存在时该技能挂载失败、状态报 error。`save_capability` 工具加了 `locator` 入参。
+- 2026-11-01：补群 Session 口径。技能按 bot 挂载，该 bot 的私人会话与它参与的每个群 Session 都挂（小镊子（软件测试）实测 `room-chief` 同样拿到）。由既有 `reconcileAgent` / `botOfSession` 路径决定，本次改动未碰，行为与 MCP 能力包一致；无需改代码。
