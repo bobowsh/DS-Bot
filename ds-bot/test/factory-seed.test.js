@@ -24,7 +24,7 @@ const chief = factoryId => ({
 })
 const helper = factoryId => ({ factoryId, name: 'Helper', role: 'Support', instructions: 'You help.' })
 
-async function start({ state, seed, dshHome }) {
+async function start({ state, seed, dshHome, bundledSeed }) {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'ds-bot-seed-')))
   const dsh = dshHome ?? join(root, 'dsh')
   const home = join(dsh, 'bot')
@@ -34,6 +34,14 @@ async function start({ state, seed, dshHome }) {
     mkdirSync(join(dsh, 'factory'), { recursive: true })
     writeFileSync(join(dsh, 'factory', 'factory-team.json'), JSON.stringify(seed))
   }
+  // A packaged app also points at its own resources directory, read when the copy has not landed.
+  const previousResources = process.env.DS_BOT_FACTORY_RESOURCES
+  if (bundledSeed) {
+    const res = join(root, 'resources')
+    mkdirSync(join(res, 'factory'), { recursive: true })
+    writeFileSync(join(res, 'factory', 'factory-team.json'), JSON.stringify(bundledSeed))
+    process.env.DS_BOT_FACTORY_RESOURCES = res
+  } else delete process.env.DS_BOT_FACTORY_RESOURCES
   const previousHome = process.env.DSH_HOME
   process.env.DSH_HOME = dsh
   let count = 0
@@ -74,6 +82,8 @@ async function start({ state, seed, dshHome }) {
     await ctx.dispose()
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
+    if (previousResources === undefined) delete process.env.DS_BOT_FACTORY_RESOURCES
+    else process.env.DS_BOT_FACTORY_RESOURCES = previousResources
     rmSync(root, { recursive: true, force: true, maxRetries: 5 })
   }
   return { rt, ctx, root, dsh, home, stateOf, stop }
@@ -178,4 +188,21 @@ test('a seed capability item gets its relative locator resolved under the data h
   const item = env.stateOf().capabilities.items['review-skill']
   assert.equal(item.kind, 'skill')
   assert.equal(item.locator, join(env.dsh, 'skills-repo', 'review-skill'))
+})
+
+test('a first start whose seed copy has not landed reads the packaged resources instead', async (t) => {
+  // The app copies the seed off its ready path, so a first boot can beat that copy. The
+  // packaged resources directory then supplies the team.
+  const env = await start({
+    state: { ...userTeam(), mainBotIds: [], bots: {} },
+    seed: null,
+    bundledSeed: seedFile('7', [chief('factory-chief')]),
+  })
+  t.after(env.stop)
+  await env.rt.bootstrap()
+  const state = env.stateOf()
+  const seeded = Object.values(state.bots).filter(bot => bot.factoryId === 'factory-chief')
+  assert.equal(seeded.length, 1)
+  assert.equal(seeded[0].name, 'Navigator')
+  assert.equal(state.factorySeedVersion, '7')
 })

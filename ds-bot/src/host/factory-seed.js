@@ -11,27 +11,35 @@ export function install(rt) {
   const { state, dshHome } = rt
 
   // The seed file lives under the data directory the app fixed on first run (rt.dshHome),
-  // copied there by the app before ds-bot ever starts. Absent means no team to seed (an
-  // upgrade from a build without the factory feature, or a hand-run test): do nothing.
+  // copied there by the app before ds-bot ever starts. When the app's copy has not landed yet
+  // (it runs off the ready path, so a first boot can beat it), the packaged resources directory
+  // named by DS_BOT_FACTORY_RESOURCES is read directly: the team still ships on first launch.
   const seedPath = () => join(dshHome, 'factory', 'factory-team.json')
+  const bundledSeedPath = () => {
+    const dir = process.env.DS_BOT_FACTORY_RESOURCES?.trim()
+    return dir ? join(dir, 'factory', 'factory-team.json') : undefined
+  }
 
   function readSeed() {
-    let text
-    try {
-      text = readFileSync(seedPath(), 'utf8')
-    } catch (error) {
-      if (error?.code !== 'ENOENT') rt.warn('ds-bot: factory seed could not be read: %s', error?.message ?? error)
-      return null
+    for (const path of [seedPath(), bundledSeedPath()]) {
+      if (!path) continue
+      let text
+      try {
+        text = readFileSync(path, 'utf8')
+      } catch (error) {
+        if (error?.code !== 'ENOENT') rt.warn('ds-bot: factory seed could not be read: %s', error?.message ?? error)
+        continue
+      }
+      let seed
+      try {
+        seed = JSON.parse(text)
+      } catch (error) {
+        rt.warn('ds-bot: factory seed is not valid JSON: %s', error?.message ?? error)
+        continue
+      }
+      if (seed && Array.isArray(seed.bots) && seed.bots.length > 0) return seed
     }
-    let seed
-    try {
-      seed = JSON.parse(text)
-    } catch (error) {
-      rt.warn('ds-bot: factory seed is not valid JSON: %s', error?.message ?? error)
-      return null
-    }
-    if (!seed || !Array.isArray(seed.bots) || seed.bots.length === 0) return null
-    return seed
+    return null
   }
 
   // A seed capability item, with a relative locator resolved against the data directory so

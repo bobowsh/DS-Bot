@@ -1,7 +1,7 @@
-// The first run's places and the decoupled import offer: a packaged Windows install keeps
-// its data beside the program folder without asking, and the offer for the team of the user's
-// own DSH follows any data folder until it is copied or declined once. Electron is the test
-// double (test/helpers/loader.mjs), so no display and no data of the user are touched.
+// The first run's places: a packaged Windows install keeps its data beside the program folder
+// without asking, and a first start elsewhere picks and saves. The team is not copied or asked
+// about — it is seeded by the factory (src/factory.mjs, ds-bot's factory-seed). Electron is the
+// test double (test/helpers/loader.mjs), so no display and no data of the user are touched.
 import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -19,7 +19,7 @@ const write = (path, text) => {
 }
 const locationsFile = join(paths.userData, 'locations.json')
 
-// A user's DSH home with one Bot: enough for the offer to find a team.
+// A user's DSH home with one Bot: once the offer's source, now only noise the first run ignores.
 function dshHomeWithTeam() {
   const home = mkdtempSync(join(tmpdir(), 'ds-bot-fr-dsh-'))
   write(join(home, 'bot', 'state.json'), JSON.stringify({ version: 1, bots: { 'session-a': { id: 'session-a', name: 'Chief' } }, rooms: {} }))
@@ -50,13 +50,13 @@ describe('the packaged Windows install', () => {
 
   test('fixes the folders beside the program folder and asks nothing', { skip: process.platform !== 'win32' && 'the fixed places are a Windows install rule' }, async () => {
     state.packaged = true
-    process.env.DSH_HOME = dshHomeEmpty()
+    process.env.DSH_HOME = dshHomeWithTeam()
     const signal = new AbortController().signal
     const where = await chooseLocations(signal)
     const install = dirname(dirname(paths.exe))
     assert.equal(where.dataDir, join(install, 'data'))
     assert.equal(where.workspace, join(install, 'workspace'))
-    assert.equal(state.dialogs.length, 0, 'no welcome box and no pickers')
+    assert.equal(state.dialogs.length, 0, 'no welcome box, no pickers and no import offer')
     assert.equal(existsSync(where.dataDir), true, 'the data folder is made')
     assert.equal(existsSync(where.workspace), true, 'the workspace folder is made')
     const saved = JSON.parse(readFileSync(locationsFile, 'utf8'))
@@ -76,57 +76,26 @@ describe('the packaged Windows install', () => {
     assert.deepEqual(where, { quit: true })
   })
 
-  test('an existing locations.json keeps its places and offers a waiting team', async () => {
+  test('an existing locations.json keeps its places and asks nothing about the team', async () => {
     state.packaged = true
     const data = mkdtempSync(join(tmpdir(), 'ds-bot-fr-data-'))
     const workspace = join(data, 'workspace')
     mkdirSync(workspace, { recursive: true })
     write(locationsFile, JSON.stringify({ dataDir: data, workspace }))
     process.env.DSH_HOME = dshHomeWithTeam()
-    state.dialogAnswer = { response: 0 } // Copy
     const where = await chooseLocations(new AbortController().signal)
     assert.equal(where.dataDir, data, 'the saved places stand')
-    assert.equal(where.import?.from, process.env.DSH_HOME)
-    assert.equal(state.dialogs.length, 1, 'only the offer, no welcome')
-    assert.match(state.dialogs[0].message, /Copy it into DeepSeek Bot/)
+    assert.deepEqual(where, { dataDir: data, workspace }, 'no import offer comes back')
+    assert.equal(state.dialogs.length, 0, 'the first start asks nothing')
   })
 
-  test('declining the offer is remembered and the next start asks nothing', async () => {
+  test('no import-declined marker is ever written — the offer is gone', async () => {
     state.packaged = true
     const data = mkdtempSync(join(tmpdir(), 'ds-bot-fr-data-'))
     write(locationsFile, JSON.stringify({ dataDir: data, workspace: join(tmpdir(), 'ds-bot-fr-ws-') }))
     process.env.DSH_HOME = dshHomeWithTeam()
-    state.dialogAnswer = { response: 1 } // Do not copy
     await chooseLocations(new AbortController().signal)
-    assert.equal(existsSync(join(data, 'bot', 'import-declined')), true, 'the decline is kept in the data')
-    state.dialogs.length = 0
-    const where = await chooseLocations(new AbortController().signal)
-    assert.equal(state.dialogs.length, 0, 'the offer does not return')
-    assert.equal(where.import, undefined)
-  })
-
-  test('a quit during the offer leaves no decline behind', async () => {
-    state.packaged = true
-    const data = mkdtempSync(join(tmpdir(), 'ds-bot-fr-data-'))
-    write(locationsFile, JSON.stringify({ dataDir: data, workspace: join(tmpdir(), 'ds-bot-fr-ws-') }))
-    process.env.DSH_HOME = dshHomeWithTeam()
-    const controller = new AbortController()
-    // The answer arrives together with the request to quit: the dialog closes as Cancel.
-    state.dialogAnswer = () => { controller.abort(); return { response: 0 } }
-    const where = await chooseLocations(controller.signal)
-    assert.deepEqual(where, { quit: true })
-    assert.equal(existsSync(join(data, 'bot', 'import-declined')), false, 'a quit does not count')
-  })
-
-  test('a data folder that already holds a team is not offered another', async () => {
-    state.packaged = true
-    const data = mkdtempSync(join(tmpdir(), 'ds-bot-fr-data-'))
-    write(join(data, 'bot', 'state.json'), JSON.stringify({ version: 1, bots: { x: { id: 'x' } }, rooms: {} }))
-    write(locationsFile, JSON.stringify({ dataDir: data, workspace: join(tmpdir(), 'ds-bot-fr-ws-') }))
-    process.env.DSH_HOME = dshHomeWithTeam()
-    const where = await chooseLocations(new AbortController().signal)
-    assert.equal(state.dialogs.length, 0)
-    assert.equal(where.import, undefined)
+    assert.equal(existsSync(join(data, 'bot', 'import-declined')), false)
   })
 })
 

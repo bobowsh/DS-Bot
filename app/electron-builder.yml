@@ -8,6 +8,10 @@ files:
   - package.json
   - src/**
   - assets/**
+  # The factory seed team and the bundled skills repo: the first run copies both under the
+  # data location (src/factory.mjs). They travel with the app so an offline install still has
+  # a team and its skills.
+  - resources/**
 # The Host runs pnpm as a separate Node process to install plugins, and the Office payload's
 # plain Node runs the LibreOffice Kit CLI: both must be plain files outside the asar.
 asarUnpack:

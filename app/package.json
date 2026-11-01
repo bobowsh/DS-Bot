@@ -61,6 +61,7 @@
     "deep-view": "0.1.0",
     "ds-bot": "file:../ds-bot",
     "electron-updater": "6.8.10",
+    "isomorphic-git": "1.44.8",
     "pnpm": "11.7.0",
     "ws": "8.18.3",
     "yaml": "2.9.1"
