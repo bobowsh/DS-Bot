@@ -110,6 +110,37 @@ describe('the DSH_HOME variable', () => {
     })
     assert.deepEqual(result.removed, [])
   })
+
+  test('the running programs are told that the environment changed', () => {
+    let broadcast = 0
+    removeDshHomeVariable({
+      read: () => 'C:\\somewhere\\.dsh',
+      remove: () => {},
+      broadcast: () => { broadcast += 1; return true },
+    })
+    assert.equal(broadcast, 1)
+  })
+
+  test('nothing is told when no variable was removed', () => {
+    let broadcast = 0
+    removeDshHomeVariable({
+      read: () => undefined,
+      remove: () => {},
+      broadcast: () => { broadcast += 1; return true },
+    })
+    assert.equal(broadcast, 0)
+  })
+
+  test('the variable that is removed can be named', () => {
+    const removed = []
+    removeDshHomeVariable({
+      name: 'DSH_HOME_PROBE',
+      read: () => 'C:\\somewhere\\.dsh',
+      remove: (name, level) => removed.push([name, level]),
+      broadcast: () => true,
+    })
+    assert.deepEqual(removed, [['DSH_HOME_PROBE', 'user'], ['DSH_HOME_PROBE', 'machine']])
+  })
 })
 
 describe('the notice for a variable that could not be removed', () => {

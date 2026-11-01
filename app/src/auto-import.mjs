@@ -75,26 +75,28 @@ export function hasSessions(from = userHome()) {
 /**
  * Remove the variable that points at the user's DSH home, at both levels. The machine level
  * needs administrator rights: without them the removal is skipped and reported, never fatal.
- * @param {{ read?: (name: string) => string | undefined, remove?: (name: string, level: 'user' | 'machine') => void }} [io]
- *   read: read one value; remove: remove one value at one level
+ * @param {{ read?: (name: string) => string | undefined, remove?: (name: string, level: 'user' | 'machine') => void, broadcast?: () => boolean, name?: string }} [io]
+ *   read: read one value; remove: remove one value at one level; broadcast: tell the running
+ *   programs that the environment changed; name: the variable to remove
  * @returns {{ removed: ('user' | 'machine')[], skipped: ('user' | 'machine')[], failed: ('user' | 'machine')[] }}
  */
 export function removeDshHomeVariable(io = {}) {
   const removed = []
   const skipped = []
   const failed = []
+  const name = io.name ?? DSH_HOME_VARIABLE
   for (const level of ['user', 'machine']) {
     const read = io.read ?? (level === 'user' ? defaultUserValue : defaultMachineValue)
     const remove = io.remove ?? (level === 'user' ? defaultUserRemove : defaultMachineRemove)
     let value
     try {
-      value = read(DSH_HOME_VARIABLE)
+      value = read(name)
     } catch {
       value = undefined
     }
     if (value === undefined || value === '') continue
     try {
-      remove(DSH_HOME_VARIABLE, level)
+      remove(name, level)
       removed.push(level)
     } catch (error) {
       // The machine level without administrator rights is the expected case: it is reported,
@@ -103,6 +105,9 @@ export function removeDshHomeVariable(io = {}) {
       else failed.push(level)
     }
   }
+  // The programs that are running now keep the old environment until they start again; the
+  // broadcast is what lets them see the change right away.
+  if (removed.length > 0) (io.broadcast ?? broadcastEnvironmentChange)()
   return { removed, skipped, failed }
 }
 
@@ -114,7 +119,7 @@ export function removeDshHomeVariable(io = {}) {
  * @returns {Promise<{ removed: ('user' | 'machine')[], skipped: ('user' | 'machine')[], failed: ('user' | 'machine')[] }>}
  */
 export async function removeDshHomeVariableWithNotice(io = {}) {
-  const result = removeDshHomeVariable({ read: io.read, remove: io.remove })
+  const result = removeDshHomeVariable({ read: io.read, remove: io.remove, broadcast: io.broadcast, name: io.name })
   if (result.skipped.length === 0 && result.failed.length === 0) return result
   const show = io.show
   if (typeof show === 'function') {
@@ -159,4 +164,34 @@ function defaultUserRemove(name) {
 function defaultMachineRemove(name) {
   const result = spawnSync(registryCommand(['delete', 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment', '/v', name, '/f']), { encoding: 'utf8', windowsHide: true })
   if (result.status !== 0) throw new Error(result.stderr ?? 'the variable could not be removed')
+}
+
+// The environment of the running programs is a copy of the registry taken when they started.
+// Without this broadcast a program that is already running keeps the old value until it starts
+// again, so the variable would still point at the old home for everything that is open now.
+const WM_SETTINGCHANGE = 0x1A
+const HWND_BROADCAST = '0xffff'
+const SMTO_ABORTIFHUNG = 0x0002
+
+/**
+ * Tell the running programs that the environment changed. The call is best-effort: a failure
+ * only means the programs keep the old value until they start again, so it is never fatal.
+ */
+export function broadcastEnvironmentChange() {
+  if (process.platform !== 'win32') return false
+  const script = `
+$signature = @'
+using System;
+using System.Runtime.InteropServices;
+public static class DsBotEnvironmentBroadcast {
+  [DllImport("user32.dll", SetLastError=true, CharSet=CharSet.Auto)]
+  public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint flags, uint timeout, out UIntPtr result);
+}
+'@
+Add-Type -TypeDefinition $signature -ErrorAction SilentlyContinue
+$outcome = [UIntPtr]::Zero
+[void][DsBotEnvironmentBroadcast]::SendMessageTimeout([IntPtr]0xffff, 0x1A, [UIntPtr]::Zero, 'Environment', 2, 5000, [ref]$outcome)
+`
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], { encoding: 'utf8', windowsHide: true, timeout: 15_000 })
+  return result.status === 0
 }
