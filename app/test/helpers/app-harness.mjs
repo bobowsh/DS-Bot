@@ -29,6 +29,9 @@ export const startApp = async ({ packaged = true } = {}) => {
   mkdirSync(paths.userData, { recursive: true })
   writeFileSync(join(paths.userData, 'locations.json'), JSON.stringify({ dataDir: home, workspace }))
   writeFileSync(join(paths.userData, 'tray-close-acknowledged'), '')
+  // The offer for a team in the user's own DSH now looks there on every start; the test
+  // names a home without one, so the app asks nothing. Never point it at the user's real DSH.
+  process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'ds-bot-main-dsh-'))
   hold()
   await import('../../src/main.mjs')
   // The app is a packaged one, so that it has an updater. The flag comes after the start,

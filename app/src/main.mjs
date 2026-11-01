@@ -2,13 +2,12 @@
 // The window loads the Host's loopback address as DSH Web does: DSH's sign-in sends the page's
 // origin as the address the browser comes back to, and accepts only a loopback one.
 import { app, BrowserWindow, WebContentsView, dialog, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, session, shell as electronShell, Tray } from 'electron'
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { readFile, rm } from 'node:fs/promises'
 import { release } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
-import { getDshRuntimeVersion } from '@deepseek-ai/dsh-app-boot'
 import electronUpdater from 'electron-updater'
 import { BotBrowserGuests, partitionOf } from './bot-browser.mjs'
 import { BotViews, isBotId } from './bot-views.mjs'
@@ -18,11 +17,13 @@ import { parseCookieFile } from './cookie-parse.mjs'
 import { downloadSaver } from './downloads.mjs'
 import { canonicalExecPath } from './canonical-path.mjs'
 import { chooseLocations, localeText, programFolder, saveLocations, text } from './first-run.mjs'
+import { removeDshHomeVariableWithNotice } from './auto-import.mjs'
+import { installFactoryResources, pullSkillsRepo } from './factory.mjs'
 import { hostPort } from './host-port.mjs'
 import { HostProcess } from './host-process.mjs'
-import { copySessions, findTeam, importTeam, teamInUse, userDshHome } from './import.mjs'
+import { teamInUse, userDshHome } from './import.mjs'
 import { copyData, moveProblem } from './move-data.mjs'
-import { CHECK_PROFILE, PROFILE } from './profile.mjs'
+import { PROFILE } from './profile.mjs'
 import { createShell, SHELL_TEXT } from './shell.mjs'
 import { UPDATE_TEXT, watchReleases, watchUpdates } from './updates.mjs'
 import { createDeferredPrompt } from './update-prompt.mjs'
@@ -180,36 +181,40 @@ async function start() {
   const pnpm = join(app.getAppPath(), 'node_modules', 'pnpm', 'bin', 'pnpm.mjs')
   const profileDir = join(where.dataDir, 'profiles', PROFILE)
   mkdirSync(profileDir, { recursive: true })
+  const resourcesDir = () => (app.isPackaged && process.resourcesPath ? process.resourcesPath : join(here, '..', 'resources'))
   const newHost = () => new HostProcess({
     entry: join(here, 'host.mjs'),
     cwd: profileDir,
-    env: { ...process.env, DSH_HOME: where.dataDir, DS_BOT_PORT: String(port), DS_BOT_APP: '1', DS_BOT_USER_DSH_HOME: userDshHome(), DS_BOT_RUNTIME_DIR: app.isPackaged ? process.resourcesPath : join(here, '..', 'build', 'runtime'), ...(where.workspace ? { DS_BOT_WORKSPACE: where.workspace } : {}) },
+    env: { ...process.env, DSH_HOME: where.dataDir, DS_BOT_PORT: String(port), DS_BOT_APP: '1', DS_BOT_USER_DSH_HOME: userDshHome(), ...(where.firstRun ? { DS_BOT_AUTO_IMPORT: '1' } : {}), DS_BOT_FACTORY_RESOURCES: resourcesDir(), DS_BOT_RUNTIME_DIR: app.isPackaged ? process.resourcesPath : join(here, '..', 'build', 'runtime'), ...(where.workspace ? { DS_BOT_WORKSPACE: where.workspace } : {}) },
     pnpm,
     onFailure: fail,
   })
-  // A failed check is not a failed start: start() rejects, and the copy goes on unchecked.
-  const newCheck = (home, list) => {
-    const cwd = join(home, 'profiles', CHECK_PROFILE)
-    mkdirSync(cwd, { recursive: true })
-    return new HostProcess({ entry: join(here, 'host.mjs'), cwd, env: { ...process.env, DSH_HOME: home, DS_BOT_CHECK: list }, pnpm, onFailure: () => {} })
-  }
   const ready = (async () => {
-    let copied
-    if (where.import) {
-      copying = copyTeam(where, newHost, newCheck, copyAbort.signal)
-      copied = await copying
-      copying = undefined
-    }
-    if (copied === 'quit') app.exit(0)
-    // The window may be waiting for the Host; it goes away with the app.
-    if (copied !== undefined) return new Promise(() => {})
+    // The factory seed and the bundled skills repo land before the Host starts: ds-bot builds
+    // the seeded team at its startup, and reads the seed file from the data location. It runs
+    // off the ready path so a slow disk or a shared folder can never hold the window back;
+    // ds-bot waits for the seed file itself (it retries on the first Bot start).
+    setImmediate(() => {
+      void installFactoryResources({ dataDir: where.dataDir, resourcesDir: resourcesDir() })
+        .catch(error => { console.error('DeepSeek Bot: the factory resources were not put in place:', error) })
+    })
     // Not during the import, which a restart would cut short; before the Host, so that an
     // update can still come when this version's Host does not start.
     updates = startUpdates()
     updates?.subscribe((state) => { mainWindow?.webContents.send(IPC.appUpdateChanged, state) })
     host = newHost()
     host.onMessage(message => {
-      if (message?.type !== 'ds-bot:browser-endpoint' || typeof message.id !== 'string' || !isBotId(message.botId)) return
+      // The first start brought in the sessions of the user's own DSH. The variable that points
+      // at that home is removed now, so a later DSH run uses its own home again; the home
+      // itself stays where it is.
+      if (message?.type === 'ds-bot:auto-import-done') {
+        // The variable is removed only when the import itself went through: when it failed the
+        // variable stays, so a later start can try again with the user's home still pointed at.
+        if ((message.result?.failed ?? 0) === 0) {
+          void removeDshHomeVariableWithNotice({ show: options => dialog.showMessageBox(options) })
+        }
+        return
+      }      if (message?.type !== 'ds-bot:browser-endpoint' || typeof message.id !== 'string' || !isBotId(message.botId)) return
       const downloadRoots = message.downloadRoots
       if (!Array.isArray(downloadRoots) || downloadRoots.length > 4 || !Array.from(downloadRoots).every(root => typeof root === 'string' && isAbsolute(root))) {
         host?.send({ type: 'ds-bot:browser-endpoint-response', id: message.id, error: 'Could not create the browser endpoint.' })
@@ -219,7 +224,10 @@ async function start() {
         host?.send({ type: 'ds-bot:browser-endpoint-response', id: message.id, url })
       }).catch(() => host?.send({ type: 'ds-bot:browser-endpoint-response', id: message.id, error: 'Could not create the browser endpoint.' }))
     })
-    return host.start()
+    const started = await host.start()
+    // The skills repo updates itself in the background; a failure only skips the update.
+    setImmediate(() => { void pullSkillsRepo({ dataDir: where.dataDir, resourcesDir: resourcesDir() }) })
+    return started
   })()
   ready.catch(fail)
   // A throwaway run (DS_BOT_HOME) keeps its folders where it was told.
@@ -367,83 +375,6 @@ async function start() {
     hostReady = true
     return true
   })().catch(() => false)
-}
-
-// The Host starts once on the new data location first: DSH then sets up its project list
-// without the copied Sessions' folders, so the old team's folders are not offered as projects.
-// Before that, the app's own DSH reads every chat of the team once: a newer DSH can write
-// records that this one refuses while the log format stays the same. Such a chat stops the
-// copy, as a newer log format does; 'quit' means the user updates DeepSeek Bot first, and
-// 'stopped' that the app quit during the copy.
-async function copyTeam(where, newHost, newCheck, signal) {
-  const unreadable = await checkTeam(where, newCheck, signal)
-  if (signal.aborted) return 'stopped'
-  if (unreadable > 0) {
-    const t = text()
-    const { response } = await dialog.showMessageBox({ type: 'warning', title: 'DeepSeek Bot', noLink: true, message: t.newer(unreadable), buttons: [t.quit, t.startEmpty], defaultId: 0, cancelId: 0, signal })
-    if (signal.aborted) return 'stopped'
-    if (response === 0) return 'quit'
-    saveLocations(where)
-    return undefined
-  }
-  const warm = newHost()
-  host = warm
-  const stopWarm = () => { void warm.stop() }
-  signal.addEventListener('abort', stopWarm, { once: true })
-  try {
-    await warm.start()
-    if (signal.aborted) return 'stopped'
-    mainWindow?.setProgressBar(2)
-    await warm.stop()
-    host = undefined
-    const summary = await importTeam({ ...where.import, to: where.dataDir, workspace: where.workspace, dsh: getDshRuntimeVersion(), signal })
-    console.log(`DeepSeek Bot: copied ${String(summary.bots)} Bots and ${String(summary.sessions)} Sessions from ${summary.from}`)
-  } catch (error) {
-    if (signal.aborted) return 'stopped'
-    console.error(error)
-    await dialog.showMessageBox({ type: 'warning', title: 'DeepSeek Bot', message: text().failed(error instanceof Error ? error.message : String(error)), signal })
-    if (signal.aborted) return 'stopped'
-  } finally {
-    signal.removeEventListener('abort', stopWarm)
-    mainWindow?.setProgressBar(-1)
-  }
-  saveLocations(where)
-  return undefined
-}
-
-// A copy of the chats in a DSH home of its own, so that nothing of the check stays in the data.
-async function checkTeam(where, newCheck, signal) {
-  // A run that was killed can leave its temporary check home behind.
-  for (const name of readdirSync(where.dataDir).filter(entry => /^\.import-check-\d+$/u.test(entry))) {
-    await rm(join(where.dataDir, name), { recursive: true, force: true }).catch((error) => { console.error(error) })
-  }
-  const home = join(where.dataDir, `.import-check-${String(Date.now())}`)
-  try {
-    const found = findTeam(where.import.from)
-    const ids = found === undefined ? [] : await copySessions(where.import.from, found.team, home, signal)
-    if (ids.length === 0) return 0
-    mainWindow?.setProgressBar(2)
-    const list = join(home, 'check.json')
-    writeFileSync(list, JSON.stringify(ids))
-    const check = newCheck(home, list)
-    const stop = () => { void check.stop() }
-    signal.addEventListener('abort', stop, { once: true })
-    try {
-      signal.throwIfAborted()
-      const { unreadable } = await check.start()
-      if (unreadable.length > 0) console.warn(`DeepSeek Bot: this DSH cannot read ${unreadable.join(', ')}`)
-      return unreadable.length
-    } finally {
-      signal.removeEventListener('abort', stop)
-      await check.stop()
-    }
-  } catch (error) {
-    if (!signal.aborted) console.error('DeepSeek Bot: the chats were not checked before the copy:', error)
-    return 0
-  } finally {
-    mainWindow?.setProgressBar(-1)
-    await rm(home, { recursive: true, force: true, maxRetries: 5 }).catch((error) => { console.error(error) })
-  }
 }
 
 // The data moves as a copy while the Host is stopped, and the app starts again on the new
