@@ -21,7 +21,9 @@ async function copyTree(from, to, signal) {
 
 async function loadGit() {
   try {
-    return await import('isomorphic-git')
+    // The network layer exports its http client as default: clone/fetch/pull take it as `http`.
+    const [git, httpModule] = await Promise.all([import('isomorphic-git'), import('isomorphic-git/http/node')])
+    return { ...git, http: httpModule.default ?? httpModule }
   } catch (error) {
     console.warn(`DeepSeek Bot: skills updates are unavailable without the isomorphic-git package (${error instanceof Error ? error.message : String(error)})`)
     return undefined
@@ -54,7 +56,7 @@ export async function installFactoryResources({ dataDir, resourcesDir, signal, e
       try {
         signal?.throwIfAborted()
         await rm(target, { recursive: true, force: true, maxRetries: 5 })
-        await git.clone({ fs: nodeFs, dir: target, url, singleBranch: true, depth: 1 })
+        await git.clone({ fs: nodeFs, http: git.http, dir: target, url, singleBranch: true, depth: 1 })
         result.repo = 'cloned'
         return result
       } catch (error) {
@@ -85,8 +87,8 @@ export async function pullSkillsRepo({ dataDir, resourcesDir, env = process.env 
     if (url === '') return
     const git = await loadGit()
     if (git === undefined) return
-    await git.fetch({ fs: nodeFs, dir: target, url, singleBranch: true, depth: 1 })
-    await git.pull({ fs: nodeFs, dir: target, url, singleBranch: true, fastForwardOnly: true })
+    await git.fetch({ fs: nodeFs, http: git.http, dir: target, url, singleBranch: true, depth: 1 })
+    await git.pull({ fs: nodeFs, http: git.http, dir: target, url, singleBranch: true, fastForwardOnly: true })
   } catch (error) {
     console.warn(`DeepSeek Bot: the skills repo was not updated: ${error instanceof Error ? error.message : String(error)}`)
   }
