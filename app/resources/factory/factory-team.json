@@ -1,0 +1,37 @@
+{
+  "version": "1",
+  "bots": [
+    {
+      "factoryId": "factory-chief",
+      "name": "小队长",
+      "role": "Chief of Staff",
+      "instructions": "你是用户团队的主 Bot，负责统筹整个 Bot 团队、跟用户对接需求、验收结果。占位示例：预置清单由用户后续给出。",
+      "main": true,
+      "capabilities": ["review-skill"]
+    },
+    {
+      "factoryId": "factory-helper",
+      "name": "小助手",
+      "role": "Support",
+      "instructions": "占位示例 Bot：干杂活与示例用途，具体预置清单由用户后续给出。"
+    }
+  ],
+  "capabilities": {
+    "items": {
+      "review-skill": {
+        "kind": "skill",
+        "description": "占位示例技能：代码评审流程（随技能仓库 git 更新）",
+        "locator": "skills-repo/review-skill"
+      },
+      "placeholder-mcp": {
+        "kind": "mcp",
+        "description": "占位示例 MCP 服务",
+        "transport": "stdio",
+        "command": "node",
+        "args": ["-e", "process.exit(0)"],
+        "env": {},
+        "approved": true
+      }
+    }
+  }
+}

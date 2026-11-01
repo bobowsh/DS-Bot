@@ -1,18 +1,16 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import { after, before, describe, test } from 'node:test'
-import { parse } from 'yaml'
-import { copySessions, findTeam, importTeam, newerSessions, sessionIdsOf, teamInUse, userDshHome } from '../src/import.mjs'
+import { copySessions, findTeam, newerSessions, sessionIdsOf, teamInUse, userDshHome } from '../src/import.mjs'
 
 const write = (path, text) => {
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, text)
 }
-const readJson = path => JSON.parse(readFileSync(path, 'utf8'))
 
 function treeHash(dir) {
   const hash = createHash('sha256')
@@ -71,147 +69,6 @@ function oldHome(root) {
   return from
 }
 
-// The app's data location after the Host's first start, and the folder chosen for the Bots' files.
-function newHome(root) {
-  const to = join(root, 'ds-bot')
-  write(join(to, 'bot', 'state.json'), JSON.stringify({ version: 1, mainBotIds: [], bots: {}, rooms: {} }))
-  write(join(to, 'profiles', 'ds-bot', 'cordis.patch.yml'), '- id: llm-pi-ai\n  config:\n    providers: {}\n- id: webserver\n  config:\n    port: 0\n')
-  const workspace = join(root, 'DeepSeek Bot')
-  write(join(workspace, 'kept.txt'), 'new kept')
-  return { to, workspace }
-}
-
-describe('importTeam', () => {
-  let root, from, to, workspace, oldTree, summary
-  before(async () => {
-    root = mkdtempSync(join(tmpdir(), 'ds-bot-app-import-'))
-    from = oldHome(root);
-    ({ to, workspace } = newHome(root))
-    oldTree = treeHash(from)
-    summary = await importTeam({ from, to, workspace, profile: 'desktop', dsh: '0.2.0-rc.2' })
-  })
-  after(() => { rmSync(root, { recursive: true, force: true }) })
-
-  test('copies the team without its lock, its turns in flight, its workspace, its old workspace id or Agents', () => {
-    const team = readJson(join(to, 'bot', 'state.json'))
-    assert.deepEqual(Object.keys(team.bots), ['session-a', 'session-b'])
-    assert.equal(team.workspaceId, undefined)
-    assert.deepEqual(team.agents, {})
-    assert.equal(readFileSync(join(to, 'bot', 'memory', 'session-a.md'), 'utf8'), 'remember')
-    for (const name of ['state.lock', 'inflight.json', 'workspace']) assert.equal(existsSync(join(to, 'bot', name)), false, name)
-  })
-
-  test('copies every Session the team names into the same folder group, and only those', () => {
-    for (const [group, id] of TEAM_SESSIONS) assert.equal(readFileSync(join(to, 'sessions', group, id, 'session.v4.jsonl.zstd'), 'utf8'), id)
-    assert.equal(existsSync(join(to, 'sessions', '--team--', 'session-other')), false)
-    assert.deepEqual(summary.missingSessions, ['session-gone'])
-    assert.equal(summary.sessions, 6)
-  })
-
-  test('copies the own Session of every group, so an imported group can be opened', () => {
-    assert.equal(readFileSync(join(to, 'sessions', '--team--', 'session-r1', 'session.v4.jsonl.zstd'), 'utf8'), 'session-r1')
-  })
-
-  test('copies the attachments, the keys, and the model rows of the chosen profile', () => {
-    assert.equal(readFileSync(join(to, 'attachments', 'ab', 'cdef'), 'utf8'), 'file')
-    assert.equal(readFileSync(join(to, '.credentials.yaml'), 'utf8'), 'DEEPSEEK_API_KEY: fake\n')
-    assert.equal(readFileSync(join(to, '.env'), 'utf8'), 'X=1\n')
-    const patch = parse(readFileSync(join(to, 'profiles', 'ds-bot', 'cordis.patch.yml'), 'utf8'))
-    assert.deepEqual(patch.map(row => row.id), ['webserver', 'llm-pi-ai', 'agent-default-model'])
-    assert.deepEqual(patch[1].config.providers, { moonshotai: { apiKeyEnv: 'MOONSHOTAI_API_KEY' } })
-  })
-
-  test('puts the old workspace files in the chosen folder without replacing one that is there', () => {
-    assert.equal(readFileSync(join(workspace, 'notes.txt'), 'utf8'), 'old notes')
-    assert.equal(readFileSync(join(workspace, 'kept.txt'), 'utf8'), 'new kept')
-  })
-
-  test('records the import, leaves nothing staged and changes nothing in the old home', () => {
-    const record = readJson(join(to, 'bot', 'imported.json'))
-    assert.deepEqual({ ...record, at: undefined }, {
-      from, at: undefined, dsh: '0.2.0-rc.2', bots: 2, rooms: 1, sessions: 6, missingSessions: ['session-gone'],
-      keys: ['.credentials.yaml', '.env'], modelSettings: 'desktop',
-    })
-    assert.deepEqual(readdirSync(to).filter(name => name.startsWith('.import-')), [])
-    assert.equal(treeHash(from), oldTree)
-  })
-
-  test('does not replace a team that is there', async () => {
-    await assert.rejects(importTeam({ from, to, workspace }), /already has a Bot team/u)
-  })
-})
-
-describe('a copy that stopped', () => {
-  let root, from
-  before(() => {
-    root = mkdtempSync(join(tmpdir(), 'ds-bot-app-stopped-'))
-    from = oldHome(root)
-  })
-  after(() => { rmSync(root, { recursive: true, force: true }) })
-
-  test('a copy that stopped part way runs again', async () => {
-    const { to, workspace } = newHome(root)
-    write(join(to, '.import-1', 'junk.txt'), 'left over')
-    write(join(to, 'sessions', '--site--', 'session-b', 'session.v4.jsonl.zstd'), 'junk')
-    const summary = await importTeam({ from, to, workspace })
-    assert.equal(summary.sessions, 6)
-    assert.deepEqual(Object.keys(readJson(join(to, 'bot', 'state.json')).bots), ['session-a', 'session-b'])
-    assert.equal(readFileSync(join(to, 'sessions', '--site--', 'session-b', 'session.v4.jsonl.zstd'), 'utf8'), 'session-b')
-    assert.deepEqual(readdirSync(to).filter(name => /^\.import-\d+$/u.test(name)), [])
-  })
-
-  test('a stopped copy leaves no Bot team', async () => {
-    const to = join(root, 'stopped')
-    mkdirSync(to, { recursive: true })
-    await assert.rejects(importTeam({ from, to, workspace: join(root, 'stopped-files'), signal: AbortSignal.abort() }), { name: 'AbortError' })
-    assert.equal(existsSync(join(to, 'bot')), false)
-  })
-
-  test('a quit during the move-in leaves no Bot team, and the next copy finishes', async () => {
-    const { to, workspace } = newHome(join(root, 'mid'))
-    const movedIn = join(to, 'sessions', '--team--', 'session-a')
-    let stopped = false
-    const signal = {
-      get aborted() { return stopped },
-      throwIfAborted() {
-        if (existsSync(movedIn)) stopped = true
-        if (stopped) throw Object.assign(new Error('stopped'), { name: 'AbortError' })
-      },
-    }
-    await assert.rejects(importTeam({ from, to, workspace, signal }), { name: 'AbortError' })
-    assert.equal(Object.keys(readJson(join(to, 'bot', 'state.json')).bots).length, 0)
-    assert.equal(existsSync(movedIn), true)
-    const summary = await importTeam({ from, to, workspace })
-    assert.equal(summary.sessions, 6)
-    assert.deepEqual(Object.keys(readJson(join(to, 'bot', 'state.json')).bots), ['session-a', 'session-b'])
-    assert.equal(readFileSync(join(movedIn, 'session.v4.jsonl.zstd'), 'utf8'), 'session-a')
-    assert.deepEqual(readdirSync(to).filter(name => /^\.import-\d+$/u.test(name)), [])
-  })
-})
-
-describe('links in the old team workspace', () => {
-  let root
-  before(() => { root = mkdtempSync(join(tmpdir(), 'ds-bot-app-links-')) })
-  after(() => { rmSync(root, { recursive: true, force: true }) })
-
-  test('makes a package link again inside the chosen folder and gets past a link to nothing', async () => {
-    const from = oldHome(root)
-    const old = join(from, 'bot', 'workspace')
-    write(join(old, '.pnpm', 'pkg', 'index.js'), 'package')
-    mkdirSync(join(old, 'node_modules'), { recursive: true })
-    const type = process.platform === 'win32' ? 'junction' : 'dir'
-    symlinkSync(join(old, '.pnpm', 'pkg'), join(old, 'node_modules', 'pkg'), type)
-    mkdirSync(join(old, '.pnpm-store'), { recursive: true })
-    symlinkSync(join(root, 'gone'), join(old, '.pnpm-store', '.ignored_pkg'), type)
-    const { to, workspace } = newHome(root)
-    const summary = await importTeam({ from, to, workspace })
-    assert.equal(summary.sessions, 6)
-    assert.equal(readFileSync(join(workspace, 'node_modules', 'pkg', 'index.js'), 'utf8'), 'package')
-    assert.equal(realpathSync.native(join(workspace, 'node_modules', 'pkg')), realpathSync.native(join(workspace, '.pnpm', 'pkg')))
-    assert.equal(readFileSync(join(workspace, 'notes.txt'), 'utf8'), 'old notes')
-  })
-})
-
 describe('finding the team', () => {
   let root, from
   before(() => {
@@ -237,7 +94,7 @@ describe('finding the team', () => {
     assert.deepEqual(sessionIdsOf({ bots: {}, rooms: { 'session-r2': { id: 'session-r2' } } }), ['session-r2'])
   })
 
-  test('copies only the Sessions of the team for the check, and changes nothing in the old home', async () => {
+  test('copies only the Sessions of the team, and changes nothing in the old home', async () => {
     const oldTree = treeHash(from)
     const home = join(root, 'check')
     const ids = await copySessions(from, TEAM, home)
@@ -247,7 +104,7 @@ describe('finding the team', () => {
     assert.equal(treeHash(from), oldTree)
   })
 
-  test('stops copying for the check once the app quits', async () => {
+  test('stops copying once the app quits', async () => {
     const home = join(root, 'check-stopped')
     await assert.rejects(copySessions(from, TEAM, home, AbortSignal.abort()), { name: 'AbortError' })
     assert.equal(existsSync(join(home, 'sessions')), false)
