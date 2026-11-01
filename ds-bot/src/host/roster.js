@@ -75,7 +75,8 @@ export function install(rt) {
   }
 
   // `dir` is a working folder outside the team workspace. Such a Session is made by cwd
-  // alone, so it joins no DSH workspace and the user's own project lists stay as they are.
+  // alone, so it joins no DSH workspace and the user's own project lists stay as they are —
+  // unless the folder is already registered as a workspace, which it then joins (#710).
   async function createSession(title, { dir } = {}) {
     // A Bot's tools run here too; while another dsh holds the team, a new Session would
     // belong to no saved Bot.
@@ -83,7 +84,8 @@ export function install(rt) {
     if (readOnly !== undefined) throw new Error(readOnly)
     const usable = dir !== undefined && await rt.isFolder(dir)
     if (dir !== undefined && !usable) rt.warn('ds-bot: the working folder %s is gone; %s starts in the team workspace', dir, title)
-    const place = usable ? { cwd: dir } : { workspaceId: await ensureWorkspace() }
+    const known = usable ? await ctx.workspaceRegistry.resolveByPath(dir) : undefined
+    const place = known !== undefined ? { workspaceId: known.id } : usable ? { cwd: dir } : { workspaceId: await ensureWorkspace() }
     const { sessionId } = await ctx.sessionController.create({ ...place, ...await botPreset() })
     const agent = await rt.resolveAgent(sessionId)
     await ctx.sessionTitle.rename(agent.session, title)
@@ -378,7 +380,12 @@ export function install(rt) {
 
   const roomBusy = id => [...rt.roomProgress.values()].some(round => round.roomId === id)
   const autoRoomName = members => ['You', ...members.map(id => rt.botOf(id)?.name).filter(Boolean)].join(', ')
-  const cleanNotice = text => String(text ?? '').trim().slice(0, ROOM_NOTICE_MAX)
+  // A notice past the limit is refused rather than silently cut (#710).
+  const cleanNotice = (text) => {
+    const notice = String(text ?? '').trim()
+    if (notice.length > ROOM_NOTICE_MAX) throw new Error(`A group's notice can hold at most ${ROOM_NOTICE_MAX} characters; this one has ${notice.length}`)
+    return notice
+  }
 
   function cleanRoomName(text, selfId) {
     const next = unquote(text).replace(/\s+/g, ' ').slice(0, ROOM_NAME_MAX)
@@ -536,11 +543,9 @@ export function install(rt) {
       room.notice = notice
       changes.push(notice ? 'updated the notice' : 'cleared the notice')
     }
-    // The group's own Session takes the folder at once, since that is what its file panel
-    // shows; its members' conversations move on to a fresh part there, an idle one now and
-    // the others at their next turn there.
-    const movedFolder = moving && workDir !== room.workDir
-    if (movedFolder) {
+    // Members' group conversations move on to the folder at their next turn there.
+    if (moving && workDir !== room.workDir) {
+      delete room.folderNotice
       if (workDir === undefined) delete room.workDir
       else room.workDir = workDir
       changes.push(workDir ? `every member now works in ${workDir} here` : 'every member works in its own folder again')
@@ -564,9 +569,6 @@ export function install(rt) {
       await retitleRoom(room)
     }
     await rt.save()
-    // The group's own Session takes the folder now, and any member idle here with it; a
-    // member mid-turn moves at its next turn there.
-    if (movedFolder) void rt.followRoomFolder?.(room.id)
     return { room, changes }
   }
 
