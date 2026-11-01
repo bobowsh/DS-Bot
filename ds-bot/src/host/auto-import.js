@@ -1,0 +1,108 @@
+// Auto-import of the user's own DSH sessions on the app's first start.
+// The app points DS_BOT_AUTO_IMPORT at the user's DSH home when the app starts for the first
+// time. This module then asks the import plugin (dsh-chat-import) to bring those sessions into
+// the app's own home, and tells the app that it is done so the app can remove the DSH_HOME
+// variable that points at the old home.
+//
+// The import plugin's service lives in this process (the Host), so the plugin reads it from the
+// DSH context rather than the app calling across the process boundary. Nothing here may stop
+// the start: a failure is logged and the app goes on.
+import { join } from 'node:path'
+
+// The formats the import plugin reads the user's DSH sessions in: the current log revision and
+// the older ones. Both are scanned, so a home written by an earlier DSH is read as well.
+const FORMATS = ['dsh', 'dsh4']
+
+/**
+ * The user's DSH home, as the app named it for this start.
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {string | undefined} the home, when the app asked for an import
+ */
+export function requestedHome(env = process.env) {
+  if (env.DS_BOT_AUTO_IMPORT !== '1') return undefined
+  const home = env.DS_BOT_USER_DSH_HOME?.trim()
+  return home ? home : undefined
+}
+
+/**
+ * Scan the user's DSH home and import what it holds.
+ *
+ * The scan is asked for one format at a time: the plugin's default roots follow the DSH_HOME of
+ * this process, which is the app's own home, not the user's. The path is therefore always given
+ * explicitly, so the scan reads the user's home and nothing else.
+ * @param {object} ctx - the DSH context
+ * @param {object} [options]
+ * @param {string} [options.home] - the user's DSH home
+ * @param {(message: string) => void} [options.onProgress] - called with the progress of the import
+ * @returns {Promise<{ imported: number, failed: number, skipped: number, formats: string[] }>}
+ */
+export async function importUserSessions(ctx, { home = requestedHome(), service = ctx.get?.('chatImport'), onProgress } = {}) {
+  const result = { imported: 0, failed: 0, skipped: 0, formats: [] }
+  if (!home) return result
+  if (!service) return result
+  const root = join(home, 'sessions')
+  for (const format of FORMATS) {
+    let scan
+    try {
+      scan = await service.scanDiscover({ format, path: root })
+    } catch (error) {
+      // One format that cannot be read must not stop the others.
+      onProgress?.(`ds-bot: the ${format} sessions could not be scanned: ${error?.message ?? error}`)
+      result.failed += 1
+      continue
+    }
+    const sessions = Array.isArray(scan?.sessions) ? scan.sessions : []
+    if (sessions.length === 0) continue
+    result.formats.push(format)
+    onProgress?.(`ds-bot: importing ${sessions.length} ${format} sessions…`)
+    let summary
+    try {
+      summary = await service.importAll({ format, path: root })
+    } catch (error) {
+      onProgress?.(`ds-bot: the ${format} sessions could not be imported: ${error?.message ?? error}`)
+      result.failed += sessions.length
+      continue
+    }
+    result.imported += Number(summary?.imported ?? 0)
+    result.skipped += Number(summary?.skipped ?? 0)
+    result.failed += Number(summary?.failed ?? 0)
+  }
+  return result
+}
+
+export function install(rt) {
+  const { ctx } = rt
+
+  // The import plugin's service may not be applied yet when this module is installed, so it is
+  // taken with an injection: the callback runs when the service is there. A DSH without the
+  // plugin never calls back, and nothing is imported.
+  let service
+  const attach = (sub) => {
+    const own = sub.chatImport
+    service = own
+    sub.effect(() => () => { if (service === own) service = undefined }, 'ds-bot: chat import service')
+  }
+  if (typeof ctx.inject === 'function') ctx.inject(['chatImport'], attach)
+  else if (ctx.get?.('chatImport') !== undefined) attach({ chatImport: ctx.get('chatImport'), effect: (execute, label) => ctx.effect(execute, label) })
+
+  /**
+   * Run the import, when the app asked for it, and report the outcome to the app. The app
+   * removes the DSH_HOME variable after this message, so a failure keeps the variable and the
+   * user can try again.
+   */
+  async function runAutoImport() {
+    const home = requestedHome()
+    if (!home) return undefined
+    const result = await importUserSessions(ctx, { home, service, onProgress: message => rt.warn('%s', message) })
+    // The app listens for this message; a Host without an app (the plugin runs on its own)
+    // has no channel, and the import is still done.
+    if (typeof process.send === 'function') {
+      process.send({ type: 'ds-bot:auto-import-done', result }, () => {})
+    }
+    return result
+  }
+
+  // The import runs off the start path: a large home takes a while, and the window must open.
+  Object.assign(rt, { runAutoImport })
+  setImmediate(() => { void runAutoImport().catch(() => {}) })
+}

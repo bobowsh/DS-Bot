@@ -118,7 +118,7 @@ export function saveLocations({ dataDir, workspace }) {
 /**
  * Where the app keeps its data and the Bots' files, asked at the first start.
  * A run on throwaway folders (DS_BOT_HOME, for development and tests) asks nothing.
- * @returns {Promise<{ dataDir: string, workspace?: string, quit?: true }>}
+ * @returns {Promise<{ dataDir: string, workspace?: string, quit?: true, firstRun?: boolean }>}
  */
 export async function chooseLocations(signal) {
   if (process.env.DS_BOT_HOME) return { dataDir: process.env.DS_BOT_HOME, workspace: process.env.DS_BOT_WORKSPACE || undefined }
@@ -158,5 +158,7 @@ export async function chooseLocations(signal) {
     throw error
   }
   saveLocations({ dataDir, workspace })
-  return { dataDir, workspace }
+  // The first start: the app has no place of its own yet, so this is the one start that may
+  // bring in the sessions of a DSH the user already has.
+  return { dataDir, workspace, firstRun: true }
 }
