@@ -149,10 +149,11 @@ function ApprovalCard({ approval, bot, actions }) {
         h('button', { type: 'button', className: 'bt-q-btn', onClick: () => actions.openSession(bot.id) }, t("Open {name}'s chat", { name: bot.name }))))
 }
 
-// A member's second line in the group's details: what it is doing and where, or its role.
-export function MemberState({ entry, bot, room, roster }) {
+// A member's second line in the group's details: what it is doing and where. The member's
+// label is not repeated here: it rides the name's line, so this line stays free for work.
+export function MemberState({ entry, room, roster }) {
   if (entry?.state === 'ask') return stateLine('bt-member-state bt-mw-ask', entry.approvals[0].at, t('Waiting for your approval'))
-  if (entry?.state !== 'work') return bot.role ? stateLine('bt-member-state', undefined, bot.role) : null
+  if (entry?.state !== 'work') return null
   const where = entry.doing.roomId === room.id ? ''
     : entry.doing.roomId ? t('in {name}', { name: roster.roomsById[entry.doing.roomId]?.name ?? t('a group chat') })
       : t('in its own chat')

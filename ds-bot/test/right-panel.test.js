@@ -162,3 +162,34 @@ test('a group keeps only the column tabs, and nothing when they are absent', () 
 test('a non-team surface shows no `···`', () => {
   assert.equal(moreButton(drawer('plain', { canOpenTerminal: () => true })), null)
 })
+
+// A member's label rides the line its name is on, so the line under it stays about the work.
+test('a group member carries its label beside its name', () => {
+  // The overview, its rows and the state line are function components: run just those, so
+  // the member row's own vnodes are in the tree without building the rest of the drawer.
+  const expanded = ['GroupOverview', 'MemberRow', 'MemberState']
+  const expand = (node) => {
+    if (Array.isArray(node)) return node.map(expand)
+    if (node === null || typeof node !== 'object') return node
+    if (typeof node.type === 'function' && expanded.includes(node.type.name)) return expand(node.type(node.props))
+    return { ...node, children: (node.children ?? []).map(expand) }
+  }
+  const lineOf = (node) => {
+    if (Array.isArray(node)) return node.map(lineOf).find(Boolean) ?? null
+    if (node === null || typeof node !== 'object') return null
+    if (node.props?.className === 'bt-member-line') return node
+    for (const child of node.children ?? []) {
+      const found = lineOf(child)
+      if (found) return found
+    }
+    return null
+  }
+  const classesOf = line => line.children.map(child => child?.props?.className).filter(Boolean)
+  const textOf = node => (node === null || node === undefined ? '' : typeof node === 'string' ? node
+    : Array.isArray(node) ? node.map(textOf).join('') : textOf(node.children))
+  const labelled = lineOf(expand(drawer('g', {}, { ...roster, byId: { a: { ...bot, role: 'Chief of Staff' } } })))
+  assert.deepEqual(classesOf(labelled), ['bt-member-name', 'bt-tag'])
+  assert.equal(textOf(labelled.children[1]), 'Chief of Staff')
+  // A member without a label shows only its name: no empty tag is left behind.
+  assert.deepEqual(classesOf(lineOf(expand(drawer('g', {})))), ['bt-member-name'])
+})

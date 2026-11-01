@@ -249,6 +249,56 @@ test('a sidebar row shows its name on hover when the name is hidden or cut', () 
   assert.equal(wide.BotRow.props.onMouseEnter, wide.RoomRow.props.onMouseEnter)
 })
 
+// The Bot's label rides its name's line, and the line under it keeps the preview.
+test('a sidebar row shows the Bot\'s label beside its name, and nowhere else', () => {
+  viewport.innerWidth = 1280
+  const partsOf = (role) => {
+    const bot = { id: 'writer', name: 'Writer', role, createdAt: 1 }
+    const roster = { bots: [bot], rooms: [], agents: [], byId: { writer: bot }, ready: true, exchangeTurns: {} }
+    const rows = []
+    const walk = (node) => {
+      if (Array.isArray(node)) { node.forEach(walk); return }
+      if (!node || typeof node !== 'object') return
+      if (node.type?.name === 'BotRow') rows.push(node)
+      walk(node.props?.children)
+    }
+    walk(TeamSidebar({
+      wide: true,
+      actions: Object.fromEntries(['openSession', 'openAgent', 'openAgentSession', 'newAgentSession', 'openMenu', 'openPalette', 'openNewChat', 'toggleSidebar', 'clearUnread'].map(name => [name, () => {}])),
+      useRoster: pick => pick(roster), useUi: pick => pick({ unread: {} }), useRegistry: pick => pick({}),
+      useSessions: pick => pick({ ids: [], byId: {} }), useUpdate: () => ({}),
+      useSessionStatus: pick => pick(new Map()), useSessionRetainInfo: () => null,
+      useActivity: pick => pick({}), useWork: pick => pick({ waiting: {}, rooms: {}, approvals: [] }),
+    }))
+    const expand = (node) => {
+      if (Array.isArray(node)) return node.map(expand)
+      if (!node || typeof node !== 'object') return node
+      if (typeof node.type === 'function') return expand(node.type(node.props))
+      return { ...node, props: { ...node.props, children: expand(node.props.children) } }
+    }
+    const found = {}
+    const collect = (node) => {
+      if (Array.isArray(node)) { node.forEach(collect); return }
+      if (!node || typeof node !== 'object') return
+      if (['bt-row-name', 'bt-row-preview'].includes(node.props?.className)) found[node.props.className] = node
+      collect(node.props?.children)
+    }
+    collect(expand(rows[0].type(rows[0].props)))
+    return found
+  }
+  const text = node => (node === null || node === undefined || typeof node === 'boolean' ? ''
+    : typeof node === 'string' || typeof node === 'number' ? String(node)
+      : Array.isArray(node) ? node.map(text).join('') : text(node.props?.children))
+  const classesOf = line => line.props.children.map(child => child?.props?.className).filter(Boolean)
+  const labelled = partsOf('DSH 开发')
+  assert.deepEqual(classesOf(labelled['bt-row-name']), ['bt-row-title', 'bt-tag'])
+  assert.equal(text(labelled['bt-row-name'].props.children.find(child => child?.props?.className === 'bt-tag')), 'DSH 开发')
+  // No label: the name stands alone, and an absent one never leaves an empty tag.
+  assert.deepEqual(classesOf(partsOf(undefined)['bt-row-name']), ['bt-row-title'])
+  // The preview line never carries it.
+  assert.deepEqual(classesOf(partsOf('DSH 开发')['bt-row-preview'] ?? { props: { children: [] } }).filter(name => name === 'bt-tag'), [])
+})
+
 test('preparing sidebar navigation leaves actions elsewhere unchanged', () => {
   viewport.innerWidth = 390
   const { actions, calls } = navigationSidebar(true)

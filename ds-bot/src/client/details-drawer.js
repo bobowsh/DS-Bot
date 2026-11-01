@@ -142,6 +142,8 @@ function MemberRow({ member, entry, room, roster, actions }) {
         h('span', { className: 'bt-member-text' },
           h('span', { className: 'bt-member-line' },
             h('span', { className: 'bt-member-name' }, member.name),
+            // The member's label rides the name's line, the way the sidebar shows a Bot's.
+            member.role ? h('span', { className: 'bt-tag' }, member.role) : null,
             room.admin === member.id ? h('span', { className: 'bt-tag' }, t('Admin')) : null),
           h(MemberState, { entry, bot: member, room, roster }))),
       h(StopMemberWork, { entry, bot: member, room, actions })),
