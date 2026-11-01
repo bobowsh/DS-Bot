@@ -53,3 +53,6 @@
 | [消息布局和宽度](2026-10-22-message-layout.md) | 气泡 / 平铺两种布局；平铺时 Bot 的话带头像、名字、时间；气泡宽度和平铺正文宽度各用一个滑块，按正文列的百分比调 |
 | [手机 App](2026-10-24-mobile-app.md) | iOS 和 Android 远程操控电脑上的 Bot 团队：手机不跑 Agent；扫码配对、端到端加密、电脑只往外连；完整功能，高权限操作要解锁手机 |
 | [Office 文档](2026-10-27-office-documents.md) | Bot 离线处理 .docx/.pptx/.xlsx：应用带的 payload、`office.js` 命令行、office 路由换成带 `office-tools` 的版本 |
+| [固定数据位置与导入提示](2026-11-01-fixed-data-location.md) | 打包 Windows 应用首启把数据固定到安装目录上一级的 `data`（app 自己写 `locations.json`，不硬编码路径、不动安装器）；导入提示与首跑解耦：数据里没团队、用户 DSH 里有团队且没拒绝过就问一次，拒绝过写标记 |
+| [关掉 DSH 自带的欢迎、登录与 API key 界面](2026-11-01-hide-dsh-account-ui.md) | 三个界面同属 `ui-settings-account` 一行；用行级 `disabled` 的第三个 reconcile 补丁（`own-ui-patch.mjs`）禁 UI，服务端行和模型链路不动 |
+| [按 bot 挂载文件技能](2026-11-01-bot-skill-files.md) | 技能存文件系统单独目录（`SKILL.md` + `scripts/`）；capabilities 条目加 `locator` 指向目录，挂载时从文件读正文并带 `resourceBase`，按 `bot.capabilities` 只挂给指定 Bot |

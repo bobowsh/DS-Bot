@@ -97,6 +97,19 @@ async function pick(title, current, signal) {
 
 export const programFolder = () => installFolder(app.getPath('exe'))
 
+// The Windows install keeps its data beside the program folder, so the uninstaller leaves it
+// alone: an install at <root>\app puts <root>\data and <root>\workspace. Nothing is hardcoded,
+// and the first run finds the places preset instead of asking. Other platforms keep the first
+// start's own picking: on macOS the program folder is the .app bundle, whose sealed contents
+// the data must not enter. A parent that is a drive root, or missing, is not fixed either.
+function fixedPlaces() {
+  if (!app.isPackaged || process.platform !== 'win32') return undefined
+  const program = programFolder()
+  const root = dirname(program)
+  if (root === program || root === dirname(root)) return undefined
+  return { dataDir: join(root, 'data'), workspace: join(root, 'workspace') }
+}
+
 function placeProblem(t, dataDir, workspace) {
   const dsh = userDshHome()
   const program = programFolder()
@@ -117,6 +130,17 @@ function hasTeam(dataDir) {
   }
 }
 
+// The user was offered the team of their own DSH once and chose not to copy it: the offer goes
+// away until the offer is wanted again elsewhere, while a fresh data folder asks again.
+const declinedFile = dataDir => join(dataDir, 'bot', 'import-declined')
+const declined = dataDir => existsSync(declinedFile(dataDir))
+
+function markDeclined(dataDir) {
+  const file = declinedFile(dataDir)
+  mkdirSync(dirname(file), { recursive: true })
+  writeFileSync(file, `${JSON.stringify({ at: new Date().toISOString() }, null, 2)}\n`)
+}
+
 async function offerImport(t, dataDir, signal) {
   const from = userDshHome()
   let found
@@ -126,13 +150,17 @@ async function offerImport(t, dataDir, signal) {
     console.error(error)
   }
   if (found === undefined) return undefined
-  if (await ask({ type: 'question', message: t.found(found.bots, found.rooms), detail: t.foundDetail(from), buttons: [t.copy, t.skip], defaultId: 0, cancelId: 1 }, signal) === 1) return undefined
+  // Seen the team and passed on it once: remember so the offer does not return, a quit does not count.
+  const decline = () => { markDeclined(dataDir); return undefined }
+  if (await ask({ type: 'question', message: t.found(found.bots, found.rooms), detail: t.foundDetail(from), buttons: [t.copy, t.skip], defaultId: 0, cancelId: 1 }, signal) === 1) return decline()
   while (teamInUse(from)) {
-    if (await ask({ type: 'warning', message: t.inUse, buttons: [t.retry, t.skip], defaultId: 0, cancelId: 1 }, signal) === 1) return undefined
+    if (await ask({ type: 'warning', message: t.inUse, buttons: [t.retry, t.skip], defaultId: 0, cancelId: 1 }, signal) === 1) return decline()
   }
   const newer = newerSessions(from, found.team)
   if (newer.length > 0) {
     if (await ask({ type: 'warning', message: t.newer(newer.length), buttons: [t.quit, t.startEmpty], defaultId: 0, cancelId: 0 }, signal) === 0) return { quit: true }
+    // Starting without the team is not a refusal: the box asks for a newer app to read them,
+    // and after that update the offer must come back.
     return undefined
   }
   const { profiles } = found
@@ -160,25 +188,47 @@ export async function chooseLocations(signal) {
   const file = locationsFile()
   if (existsSync(file)) {
     const saved = JSON.parse(readFileSync(file, 'utf8'))
-    return { dataDir: saved.dataDir, workspace: saved.workspace }
+    const where = { dataDir: saved.dataDir, workspace: saved.workspace }
+    // The places were preset by an earlier start or moved in the Settings, but the team may
+    // still wait in the user's own DSH: the offer follows the data folder until it is copied
+    // or declined once.
+    const t = text()
+    try {
+      const imported = declined(saved.dataDir) ? undefined : await offerImport(t, saved.dataDir, signal)
+      if (imported?.quit) return { quit: true }
+      if (imported !== undefined) where.import = imported
+    } catch (error) {
+      if (error instanceof Quit) return { quit: true }
+      throw error
+    }
+    return where
   }
   const t = text()
-  let dataDir = join(homedir(), '.ds-bot')
-  let workspace = join(homedir(), 'DeepSeek Bot')
+  // A packaged Windows install fixes the folders beside the program folder and asks nothing;
+  // elsewhere the first start still picks, and placeProblem() checks the picks.
+  const preset = fixedPlaces()
+  let dataDir = preset?.dataDir ?? join(homedir(), '.ds-bot')
+  let workspace = preset?.workspace ?? join(homedir(), 'DeepSeek Bot')
   try {
-    for (;;) {
-      const choice = await ask({ type: 'info', message: t.welcome, detail: t.places(dataDir, workspace), buttons: [t.start, t.change, t.quit], defaultId: 0, cancelId: 2 }, signal)
-      if (choice === 2) return { quit: true }
-      if (choice === 1) {
-        dataDir = await pick(t.pickData, dataDir, signal)
-        workspace = await pick(t.pickWorkspace, workspace, signal)
-        continue
+    if (preset === undefined) {
+      for (;;) {
+        const choice = await ask({ type: 'info', message: t.welcome, detail: t.places(dataDir, workspace), buttons: [t.start, t.change, t.quit], defaultId: 0, cancelId: 2 }, signal)
+        if (choice === 2) return { quit: true }
+        if (choice === 1) {
+          dataDir = await pick(t.pickData, dataDir, signal)
+          workspace = await pick(t.pickWorkspace, workspace, signal)
+          continue
+        }
+        const problem = placeProblem(t, dataDir, workspace)
+        if (problem === undefined) break
+        await ask({ type: 'warning', message: problem, buttons: ['OK'] }, signal)
       }
-      const problem = placeProblem(t, dataDir, workspace)
-      if (problem === undefined) break
-      await ask({ type: 'warning', message: problem, buttons: ['OK'] }, signal)
+    } else {
+      // The fixed folders may not exist yet on a fresh install: make them before the Host runs.
+      mkdirSync(dataDir, { recursive: true })
+      mkdirSync(workspace, { recursive: true })
     }
-    const imported = await offerImport(t, dataDir, signal)
+    const imported = declined(dataDir) ? undefined : await offerImport(t, dataDir, signal)
     if (imported?.quit) return { quit: true }
     if (imported !== undefined) return { dataDir, workspace, import: imported }
   } catch (error) {
