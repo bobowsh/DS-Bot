@@ -838,3 +838,26 @@ test('a Bot changes back to the team workspace when the team workspace is known 
   assert.equal(state().bots.b.workDir, undefined)
   assert.equal(requests.length, 0)
 })
+
+// 需求十复现（小镊子）：群设了自己的工作目录后，**群自身的会话**（`room.id`）永远留在总工作区。
+// 这条对上用户第一个表象：右侧栏 files 标签跟随**当前会话**，看群时当前会话就是 `room.id`
+// （`actions.openFiles()` 只是打开 DSH 的 files 标签，见 src/client/index.js:737-743），
+// 所以侧栏显示总目录而不是群目录。
+// 机制：`roster.js:433` 的 `createRoom` 给群自身会话建会话时**不传 dir**（注释说明是有意的：
+// "The group's own Session only relays, so it stays in the team workspace; the group's folder is
+// for its members' Sessions."）；`groupOwners` 只映射成员会话（`store.js:375`），
+// 群自身会话 `room.id` 不在其中，`folders.js:48-53 sessionFolder` 对它只能落回 `teamFolder()`；
+// `parts.js:1061 folderMove` 开头 `place === undefined` 也直接返回，所以它永远不会搬。
+test('需求十复现：群设了工作目录，群自身的会话立即拿到群目录（侧栏因此显示群目录）', async (t) => {
+  const { sets, service } = folderService()
+  const { call, project, state, stop } = await start({ services: { workingDirectory: service } })
+  t.after(stop)
+  // 设群目录：state 里确实存下来了（设置→存储这环是好的）
+  assert.equal((await call('update-room', { id: 'r1', workDir: project })).ok, true)
+  assert.equal(state().rooms.r1.workDir, project)
+  // 群自身会话（id 就是 room.id = 'r1'）应**立即**被 DSH 的 workingDirectory.set 接到群目录。
+  // 修复前：updateRoom 不触发、sessionFolder 不认 room.id，sets 永远为空 → 此断言失败（复现 bug）。
+  // 修复后：followRoomFolder 立即 set(['r1', project])。
+  await until(() => sets.length >= 1)
+  assert.deepEqual(sets, [['r1', project]])
+})
