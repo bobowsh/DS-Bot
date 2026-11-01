@@ -1,16 +1,56 @@
 # 需求五「出厂预制团队 + 技能仓库 + 删导入」验收报告
 
 - 验收人：小镊子（软件测试）
-- 日期：2026-11-01（实测 17:40–17:58 +08:00）
-- 被测：主工作区 dev HEAD `4353b17`（含 `ac7dee1` ds-bot 种子机制、`2f85ad6` app 侧种子复制/技能仓库/删导入、`e0072bb` 文档）
-- 环境：Windows，node v24.14.1。开工与收工各核现场：分支 dev、HEAD 4353b17、status 仅未跟踪 docs/tmp、stash 未动，未 commit / 未 push / 未改分支
-- 独立用例：`F:\DS-Bot\tmp\miemie-req5.test.mjs`（C1–C4）
+- 日期：2026-11-01（初测 17:40–17:58；复核 18:05；**方案改写后复测 18:25–18:45**）
+- 被测：主工作区 dev HEAD **`6c720d6`**（方案改写：首启只复制不 clone、之后只 pull；前序 `4353b17`/`37bbe5b`/`d65ee40`）
+- 环境：Windows，node v24.14.1。开工与收工各核现场：分支 dev、status 仅未跟踪 docs/tmp、未 commit / 未 push / 未改分支、未动 worktree `F:\DS-Bot-req3`
+- 独立用例：`tmp\miemie-req5.test.mjs`（C1–C4）、`tmp\miemie-req5-recheck*.test.mjs`（R1–R4）、**`tmp\miemie-req5-git.test.mjs`（G1–G5）、`tmp\miemie-req5-git2.test.mjs`（G6）**
 
-## 结论（2026-11-01 18:05 复核 dev `d65ee40` 后更新）
+## 结论（2026-11-01 18:45 复测 dev `6c720d6` 后更新）
 
-- **缺陷 1（isomorphic-git 没进 lockfile）已修复、复核通过**（`37bbe5b`，R1–R3）。
-- **缺陷 2（git.clone/fetch/pull 缺 `http` 参数）已修复、复核通过**（`d65ee40`，R1 确证进到网络层）；唯一残留：**真实远端 clone 的端到端成功受本机 node TLS 信任库环境所限未能演示**（系统 git 能 clone、裸 node https 报同种证书错 → 判定为环境非代码）。换到 node 可验 github 证书的机器可补验，或打包后在小年糕（升级维护）实机验。
-- **需求五 8 条验收标准全部通过，予以放行。** 两处 lockfile/http 代码缺陷均已修；技能在线 clone/pull 的代码路径正确，真实成功仅差一个可联网的验证环境。
+- **git 链路方案改写后，全部复测通过 ✅**，原先「真实 clone/pull 端到端未演示」的缺口**已补齐**：
+  - 首启只复制不 clone、零网络：G1/G1b/G1c ✔
+  - remote 解析顺序（env → `.git/config` → 空）：G2 ✔
+  - **真实 pull 端到端成功**：G3（内网 Gitea，本地 HEAD == 远端 `git ls-remote` 交叉印证）✔；**G6 强判据**——把本地回退到旧提交 `4e5faa6`（只有 README.md）后 pull，HEAD 前进到 `09298f96`、`review-skill/SKILL.md` 真的出现、工作区干净 ✔
+  - 无 remote / 无 `.git` 时静默跳过：G4/G5 ✔
+  - 打包配置路径一致（extraResources → `process.resourcesPath`）：见「打包配置」✔
+  - 回归：app **219/218/1**（唯一失败既有 move-data EPERM）、ds-bot **1310/1309/0**、lint 39w/0e、check exit 0 ✔
+- **历史两处缺陷均已修并复核**：缺陷 1 lockfile（`37bbe5b`）、缺陷 2 缺 http 参数（`d65ee40`）。
+- **需求五 8 条验收标准全部通过，予以放行；本次复测新增 0 条缺陷。**
+
+## 复测：方案改写后的 git 链路（dev `6c720d6`，小镊子 18:25–18:45）
+
+方案变化（`6c720d6`「Ship the skills repo with its git history and only pull it」，7 文件 +233/−81）：不再首启 clone，内置 `app/resources/skills-repo/` 本身是带 `.git` 的完整仓库（`app/scripts/skills-repo-git.mjs` 在 `beforePack` 生成、`.git` 进 `.gitignore`），首启只**复制**；日常只 `pull`，remote 从 `DS_BOT_SKILLS_REPO` → 仓库 `.git/config`；pull 补了 `author` identity（isomorphic-git 快进也要）。
+
+独立脚本 `tmp\miemie-req5-git.test.mjs`（G1–G5，**7/7 pass**）+ `tmp\miemie-req5-git2.test.mjs`（G6，**1/1 pass**），**不复用队长的 verify-pull-e2e.mjs**：
+
+| 用例 | 结果 | 关键输出 |
+|---|---|---|
+| G1 首启只复制、仓库带 `.git` | ✔ | `result={"seedCopied":true,"repo":"copied"}`、`warns=0`、复制后 `.git/config` remote = `http://192.168.1.10:3000/wangsh/skills-repo.git`、`review-skill/SKILL.md` 在 |
+| G1b 首启零网络 | ✔ | 复制路径不读 remote、不建连接，`repo='copied'` |
+| G1c 源码级无 clone | ✔ | `installFactoryResources` 函数体内无 `git.clone`/`.clone(`、连 `loadGit()` 都不调用 |
+| G2 remote 解析顺序 | ✔ | 仓库配置→Gitea 地址；`DS_BOT_SKILLS_REPO` 覆盖生效；两者都无→`''` |
+| **G3 真实 pull 端到端** | ✔ | `warns=[]`；`HEAD=09298f96` == `refs/remotes/origin/main` == `git ls-remote` 的远端真实头（三值一致，交叉印证）；`review-skill/SKILL.md` 内容为远端版 |
+| **G6 落后时 pull 真前进（强判据）** | ✔ | 回退到 `4e5faa6`（该提交只有 `README.md`）→ pull 后 `HEAD=09298f96`、`review-skill/SKILL.md` 真的出现、`git status --porcelain` 为空 |
+| G4 无 remote 静默 | ✔ | `warns=[]`，本地文件不动 |
+| G5 无 `.git` 直接返回 | ✔ | `warns=[]`，不崩 |
+
+**G6 是最硬的一条**：它排除了「本地本来就一致所以看不出变化」的可能——先真退到没有该技能的旧提交，pull 后文件才出现。
+
+### 打包配置（`electron-builder.yml`）
+
+- `6c720d6` 把 `files: resources/**`（会塞进 asar、`process.resourcesPath` 对不上）改成 `extraResources` 两条：`from: resources/factory → to: factory`、`from: resources/skills-repo → to: skills-repo`，落在 asar 之外的 resources 根。
+- `app/src/main.mjs:183`：`resourcesDir = () => (app.isPackaged && process.resourcesPath ? process.resourcesPath : join(here,'..','resources'))` —— 打包后读 `process.resourcesPath`，与 extraResources 的目标目录**一致**（`resourcesDir/factory/...`、`resourcesDir/skills-repo`）。
+- `.gitignore:14` 实测 `/app/resources/skills-repo/.git/` 被忽略（`git check-ignore -v` 有输出），即 `.git` 是构建产物、不进版本库，靠 `beforePack` 生成。**提醒保留**：不打 `beforePack` 直接打包会得到无 `.git` 的副本（首启仍能复制技能，但 pull 不生效）。
+
+### 回归（`6c720d6` 上实测）
+
+- `cd app && npm test` → **219 tests / 218 pass / 1 fail**，唯一失败为既有 `move-data.test.mjs:160` EPERM（日志 `tmp\miemie-req5b-app.log`）。
+- `cd ds-bot && npm test` → **1310 / 1309 pass / 0 fail / 1 skip**；`npm run lint` → 39 warnings / 0 errors；`node scripts/build-client.mjs --check` → exit 0。
+
+### 本次复测的自我修正（与被测代码无关）
+
+G3 初版用 `git rev-parse FETCH_HEAD` 判断拉到没有，报错——因为 **isomorphic-git 的 fetch 不写 `FETCH_HEAD` 文件**（它写 `refs/remotes/origin/<branch>`）。改用 `refs/remotes/origin/main` + `git ls-remote` 交叉印证后通过；G6 又补了「退到旧提交再拉」的强判据。G4 初版写文件前没建目录，也是脚本问题，已修。
 
 ## 已验证通过
 
