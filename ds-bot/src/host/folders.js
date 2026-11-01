@@ -49,7 +49,9 @@ export function install(rt) {
     const reported = session?.header === undefined ? undefined : ctx.get?.('workingDirectory')?.get?.(session) ?? session.header.cwd
     if (reported !== undefined) return reported
     const id = session?.id
-    return workDirOf({ botId: rt.selfOf?.(id), roomId: rt.groupOwners?.get(id)?.roomId }) ?? teamFolder()
+    // A group's own Session speaks for the group, so its folder is the group's: that is what
+    // the group's file panel reads.
+    return workDirOf({ botId: rt.selfOf?.(id), roomId: rt.groupOwners?.get(id)?.roomId ?? rt.roomOf?.(id)?.id }) ?? teamFolder()
   }
 
   // The desktop app runs its own DSH and names the user's, which Bots must not write either.
