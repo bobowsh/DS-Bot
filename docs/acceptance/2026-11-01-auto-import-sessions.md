@@ -1,76 +1,57 @@
 # 需求三「自动导入系统中已有 dsh 的会话数据」验收报告
 
 - 验收人：小饼干（前端开发）
-- 日期：2026-11-01（开发 18:25–19:20；E 盘复跑回归 19:28–19:32）
-- 被测：`E:\dsbot-work\DS-Bot` dev HEAD **`b289357`**（含需求三提交 `25ea261`（ds-bot 侧）、`cb5c3c9`（app 侧）；合并提交 `1aeda59`）
+- 日期：2026-11-01（开发 18:25–19:20；E 盘复跑回归 19:28–19:32；方案按用户拍板改为保留 UI 后重做，20:13–20:20）
+- 被测：`E:\dsbot-work\DS-Bot` dev HEAD **`d4bb5c1`**（需求三提交：`bccc71f` 插件作为 bundle 挂载、UI 保留 + 成功日志 + 去 BOM；`dfa6827` 版本对齐；`8d75c33` 设计文档入库；`d4bb5c1` 发版版本号清单。前序提交 `25ea261`/`cb5c3c9`/`1aeda59` 为初版）
 - 环境：Windows，node v24.14.1，E 盘本地工作区
 - 设计文档：`docs/plans/2026-11-01-auto-import-sessions.md`
-- 独立验证脚本：worktree 期 `tmp\verify-headless.mjs`（包装模块对照实验）；测试文件 `ds-bot/test/auto-import.test.js`（7 条）、`app/test/auto-import.test.mjs`（13 条）
+- 独立验证脚本：`tmp\verify-mount2.mjs`（真实 profile 装载验证）；测试文件 `ds-bot/test/auto-import.test.js`（8 条）、`app/test/auto-import.test.mjs`（18 条）
 
 ## 结论
 
-**需求三 8 条验收标准中 6 条已验证通过，2 条留待装机环节验证**（真机端到端导入、系统环境变量真删）。UI 关闭方案经**对照实验**证明可行，是本次最关键的一关。
+**需求三 8 条验收标准中 6 条已验证通过，2 条留待装机环节验证**（真机端到端导入、系统环境变量真删）。插件的挂载方式在实施中按用户拍板改过一次：最终是**作为 bundle 挂载、UI 保留**，验收标准相应改为「工具与 UI 都在」。
 
 | # | 标准 | 状态 |
 |---|---|---|
 | 1 | dsh-chat-import 打进 app（package.json + lock 都有、BUNDLES 有） | ✅ 通过 |
-| 2 | UI 关闭但 `import_chat` 工具可用（**实测**） | ✅ 通过（对照实验） |
+| 2 | 插件作为 bundle 挂载，`import_chat` 工具可用，UI 保留（**实测**） | ✅ 通过 |
 | 3 | 首启检测到会话数据自动导入，不弹框 | ⚠️ 链路已实现并单测覆盖；**真机端到端待装机验证** |
 | 4 | 导入显示进度、失败不阻塞启动 | ✅ 通过 |
 | 5 | 用户级 + 系统级 DSH_HOME 都删（权限不够跳过并提示） | ⚠️ 逻辑已单测覆盖四种分支；**注册表真删待装机验证** |
 | 6 | `~/.dsh` 目录本身不动 | ✅ 通过 |
 | 7 | 无回归 | ✅ 通过 |
-| 8 | 新增测试覆盖上述行为 | ✅ 通过（新增 20 条） |
+| 8 | 新增测试覆盖上述行为 | ✅ 通过（新增 26 条） |
 
 ## 已验证通过
 
 ### 1. dsh-chat-import 打进 app ✅
 
-- `app/package.json` dependencies 新增 `"dsh-chat-import": "0.26.3"`；`app/src/profile.mjs` 的 `BUNDLES` 引入 headless 包装模块。
+- `app/package.json` dependencies 新增 `"dsh-chat-import": "0.26.3"`；`app/src/profile.mjs` 的 `BUNDLES` 加 `'dsh-chat-import'`。
 - **`package-lock.json` 已同步提交**，增量干净：仅新增 `node_modules/dsh-chat-import` 与 `node_modules/fzstd` 两条，**零删包**（`git diff --stat` = +30/−1，唯一删除是某包的 `"dev": true` 标记）。
 
 > **踩坑记录（重要，流程已更新）**：`npm install --legacy-peer-deps` 虽能装上（npm 对预发布版本号的比较有 bug，`>=0.1.5-rc.1` 不接受 `0.2.1-rc.4`），但它会**重新求解整棵树**，把 `@electron/windows-sign`、`electron-winstaller` 等 17 个打包必需依赖从 lock 里剔掉，直接毁掉打包。正确做法：**装包**可用 `--legacy-peer-deps`，**更新 lock 必须** `npm install --package-lock-only`。此结论由本人在实测中发现并拦下，经核对 lockfile diff 确认。
 
-### 2. UI 关闭但 `import_chat` 工具可用（对照实验）✅
+### 2. 插件作为 bundle 挂载，UI 与工具都在 ✅
 
-**这是需求三最难的一关。** 先排除了一条看起来可行的路：小柚（DSH开发）核实 `cordis-plugin-loader` 的 `refresh()` 在 `disabled` 时直接 return（`lib/index.js:363`），`dsh-client-modules` 那边 `entry.disabled` 也整行跳过（`lib/index.js:855`）——**行级 `disabled` 会把 `import_chat` 工具一起关掉**，不可用。
+**最终采用的方案**：插件直接进 `BUNDLES`，走和 ds-bot 完全相同的路径——bundle → 插件自带的 `cordis.patch.yml` 插入 `import-claude` 行 → 服务端 apply → 客户端 UI 一并加载。
 
-采用方向：**不声明 `dsh.client` 的包装模块**承载同一份服务端插件。
-
-实现 `app/src/chat-import-headless.mjs`（仅一行，未改插件源码）：
-
-```js
-export { apply, inject, name, Config } from 'dsh-chat-import'
-```
-
-原理：`dsh-client-modules` 的 `locatePkgJson()` 沿模块路径**向上查找 `package.json` 里的 `dsh.client` 声明**。包装模块位于 `app/src/` 下，命中 `app/package.json`，而该文件没有 `dsh.client` → 无 UI 可加载；服务端插件照常 apply。
-
-**对照实验**（真实 profile 启动，临时 `DSH_HOME`，全程未触碰真实 `~/.dsh`）：
-
-| 挂载方式 | `import_chat` 工具 | `client-modules` 中有 chat-import（=UI 会加载） |
-|---|---|---|
-| 直接挂原包（对照组） | ✅ 有 | ✅ **有** |
-| 挂包装模块 | ✅ **有** | ❌ **无** |
-
-原始输出关键行：
+实测（真实 profile 启动，临时 `DSH_HOME`，全程未触碰真实 `~/.dsh`）：
 
 ```
-RESULT row_found: true
-RESULT row_fiber: true              ← 插件真的 apply 了
-RESULT has_import_chat: true        ← 工具注册成功
-RESULT client_packages_count: 71
-RESULT client_has_chat_import: false ← UI 未加载
+RESULT row_name: dsh-chat-import        ← 插件行在
+RESULT row_fiber: true                   ← 插件真的 apply 了
+RESULT has_import_chat: true             ← import_chat 工具注册成功
+RESULT client_has_chat_import: true      ← UI 也加载了（手动导入按钮可用）
+RESULT client_package_count: 72
 ```
 
-对照组同一脚本（`ROW_TARGET=raw`）：
+**方案演进（重要，别按旧方案验收）**：本项最初的做法是「关掉插件的 UI、只留 `import_chat` 工具」，实现上需要一个不声明 `dsh.client` 的包装模块承载同一份服务端插件。
 
-```
-RESULT row_fiber: true
-RESULT has_import_chat: true
-RESULT client_has_chat_import: true   ← 原包确实会加载 UI
-```
+- 先排除了一条看起来可行的路：小柚（DSH开发）核实 `cordis-plugin-loader` 的 `refresh()` 在 `disabled` 时直接 return（`lib/index.js:363`），`dsh-client-modules` 那边 `entry.disabled` 也整行跳过（`lib/index.js:855`）——**行级 `disabled` 会把 `import_chat` 工具一起关掉**，不可用。
+- 包装模块方案实测可行（对照实验：挂原包时 UI 加载、挂包装模块时 UI 不加载，工具都在）。
+- **但用户 2026-11-01 拍板保留 UI**：界面上有现成的导入按钮，用户看着也放心，没必要藏起来。于是包装模块与 app 侧的 overlay patch 全部废弃，改回标准 bundle 模式（提交 `bccc71f`）。
 
-**有对照组才说明包装模块起作用**：原包挂上时 UI 确实会加载，证明 `client_has_chat_import: false` 不是因为环境本身缺插件。
+**当前代码里已无任何 headless 包装或 overlay patch**：`app/src/chat-import-headless.mjs`、`app/src/chat-import-patch.mjs`、`app/vendor/` 与 `app/packages/` 均已删除，`host.mjs` 相对该提交零改动。验收时按 bundle 模式判定：插件行在、工具在、**UI 在**。
 
 ### 3. 首启检测 + 自动导入（链路已实现）⚠️
 
@@ -124,8 +105,8 @@ main.mjs 首启 → 传 DS_BOT_AUTO_IMPORT=1 + DS_BOT_USER_DSH_HOME
 
 | 项 | 结果 | 基线对照 |
 |---|---|---|
-| `app/` npm test | **232 / 231 / 1** | 219 + 13 条新增；唯一失败为既有 `move-data.test.mjs:160` EPERM |
-| `ds-bot/` npm test | **1317 / 1316 / 0** | 1310 + 7 条新增；零失败 |
+| `app/` npm test | **237 / 236 / 1** | 219 + 18 条新增；唯一失败为既有 `move-data.test.mjs:160` EPERM |
+| `ds-bot/` npm test | **1318 / 1317 / 0** | 1310 + 8 条新增；零失败 |
 | `ds-bot/` npm run lint | **39 warnings / 0 errors** | 与基线一致 |
 | `node scripts/build-client.mjs --check` | **exit 0** | 一致 |
 
@@ -133,15 +114,15 @@ main.mjs 首启 → 传 DS_BOT_AUTO_IMPORT=1 + DS_BOT_USER_DSH_HOME
 
 | 位置 | 条数 | 覆盖 |
 |---|---|---|
-| `ds-bot/test/auto-import.test.js` | 7 | 请求判定、扫描→导入链路、路径显式传递、格式失败隔离、失败不抛 |
-| `app/test/auto-import.test.mjs` | 13 | 会话检测（含 dsh/dsh4 格式识别）、home 重定向、环境变量四级分支、提示逻辑 |
-| 合计 | **20** | 合计后 app 219→232（+13）、ds-bot 1310→1317（+7） |
+| `ds-bot/test/auto-import.test.js` | 8 | 请求判定、扫描→导入链路、路径显式传递、格式失败隔离、失败不抛、成功日志 |
+| `app/test/auto-import.test.mjs` | 18 | 会话检测（含 dsh/dsh4 格式识别）、home 重定向、环境变量四级分支、广播、提示逻辑、成功日志 |
+| 合计 | **26** | 合计后 app 219→237（+18）、ds-bot 1310→1318（+8） |
 
 ## 未验证（留待装机环节）
 
 这两条**没有在真机上跑过**，不能算已验证：
 
-1. **首启真实自动导入的端到端**：已用 mock 的 `chatImport` 服务测了 ds-bot 侧链路（scanDiscover → importAll → 失败不阻塞），也用**真实 profile**测了包装模块装载与 `import_chat` 工具注册；但「用户真实 `~/.dsh` → 真的导入出**可继续对话**的会话」这条完整链路未跑——**未使用真实用户数据做此测试**。
+1. **首启真实自动导入的端到端**：已用 mock 的 `chatImport` 服务测了 ds-bot 侧链路（scanDiscover → importAll → 失败不阻塞），也用**真实 profile**测了插件作为 bundle 的装载、`import_chat` 工具注册与 UI 加载；但「用户真实 `~/.dsh` → 真的导入出**可继续对话**的会话」这条完整链路未跑——**未使用真实用户数据做此测试**。
 2. **`DSH_HOME` 环境变量的真删**：已用注入的 `read`/`remove` 覆盖全部四种分支，但**没有真的删过注册表里的真实变量**（会改动开发机的系统环境）。
 
 → **建议在总包装机后补验**：装到干净测试环境 → 首启确认自动导入真的产出可继续的会话 → 确认用户级与系统级 `DSH_HOME` 真被删除、系统级权限不足时弹提示而不阻塞。
@@ -152,6 +133,8 @@ main.mjs 首启 → 传 DS_BOT_AUTO_IMPORT=1 + DS_BOT_USER_DSH_HOME
 2. **会话日志格式的正则容易写错**：DSH 的会话日志是 `session[.vN].jsonl[.zstd]`，版本号在 `jsonl` **之前**。本人初版写成 `session.jsonl.v4` 形式，被单测直接抓出，已照抄插件真实正则 `^session(?:\.v([1-9][0-9]*))?\.jsonl(?:\.zstd)?$`（`dsh-chat-import/lib/sources/dsh.mjs:12`）。
 3. **跨进程边界易被忽略**：`chatImport` 只在 Host 进程，app 主进程拿不到。本实现选择把导入逻辑放进 ds-bot 插件，而非在 `main.mjs` 里另造 HTTP 通道——前者能拿到真实进度，也不需要新接口。
 4. **`ctx.get` 的时序坑**：可选服务应统一用 `ctx.inject([...], cb)`，否则服务未就绪时静默失败。
+5. **预发布版本号会打破诊断页的断言**：`ds-bot/test/diagnostics.test.js` 里诊断报告的版本行用 `\| DS Bot \| \d+\.\d+\.\d+ \|` 匹配，而 `0.2.5-rc2` 带后缀，匹配不上。这是升到 `-rc2` 后才出现的（由版本对齐提交 `dfa6827` 引出），已把正则放宽为允许可选的预发布后缀。**版本号断言不要只写死数字部分**。
+6. **`file:` 依赖在 `node_modules` 里是复制，不是链接**：改了 `ds-bot/package.json` 的版本后，`app/node_modules/ds-bot` 还是旧的，打包打的就是旧内容。必须跑一次 `npm ci` 让它重新复制。这条已写进 `docs/dev/release-checklist.md` 的「改版本号」一节。
 
 ## 自我修正记录
 
@@ -159,7 +142,9 @@ main.mjs 首启 → 传 DS_BOT_AUTO_IMPORT=1 + DS_BOT_USER_DSH_HOME
 - 首版 `removeDshHomeVariable` 用了 ESM 中不可用的 `require()`，改为顶层 `import { spawnSync }`。
 - 首版 `detectSessions` 的会话日志正则写错，由新增单测发现并修正。
 - 首版 `importUserSessions` 直接 `ctx.get('chatImport')`，改为 `ctx.inject` 取服务并允许注入，便于单测。
+- 首版的挂载验证只在裸目录里手动插 patch 行，**真实 app 走的是 `BUNDLES`，两者不是同一条路**——插件当时根本没进 `BUNDLES`，会静默不加载。发现后改为按 bundle 模式验证（真实 profile 装载），这条写进了「新发现问题」。
+- 方案随用户拍板改为保留 UI，headless 包装模块与 app overlay patch 全部废弃；本文档已按最终实现改写。
 
 ## 结论
 
-需求三的开发与单测层面**已完成并通过**，UI 关闭方案经对照实验证实可行，无回归。两项真机行为（端到端导入、注册表真删）明确标注**待装机验证**，已移交小年糕（升级维护）列入装机验收清单。
+需求三的开发与单测层面**已完成并通过**，插件作为 bundle 挂载、工具与 UI 都在（实测），无回归。两项真机行为（端到端导入、注册表真删）明确标注**待装机验证**，已移交小年糕（升级维护）列入装机验收清单。
