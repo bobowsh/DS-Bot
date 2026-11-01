@@ -781,6 +781,20 @@ test('in a group with a folder of its own a member stays inside it; without one 
   assert.equal(state().rooms.r1.workDir, undefined)
 })
 
+test('a group takes the folder it is given: its own Session now, an idle member with it', async (t) => {
+  const { sets, service } = folderService()
+  const { call, agentOf, project, state, stop } = await start({ services: { workingDirectory: service } })
+  t.after(stop)
+  assert.equal((await call('update-room', { id: 'r1', workDir: project })).ok, true)
+  assert.equal(state().rooms.r1.workDir, project)
+  // The group's own Session is what its file panel reads, so it takes the folder at once.
+  await until(() => sets.some(([id, path]) => id === 'r1' && path === project))
+  // An idle member's conversation in the group moves on to a fresh part there.
+  await until(() => state().rooms.r1.sessions.b !== 'gb')
+  const moved = state().rooms.r1.sessions.b
+  await until(() => agentOf(moved).session.header.cwd === project)
+})
+
 test('Sessions that are not a Bot\'s keep DSH\'s own working_directory', async (t) => {
   const { service } = folderService()
   const { requests, services } = approvalServices('rejected')

@@ -550,8 +550,11 @@ export function install(rt) {
       room.notice = notice
       changes.push(notice ? 'updated the notice' : 'cleared the notice')
     }
-    // Members' group conversations move on to the folder at their next turn there.
-    if (moving && workDir !== room.workDir) {
+    // The group's own Session takes the folder at once, since that is what its file panel
+    // shows; its members' conversations move on to a fresh part there, an idle one now and
+    // the others at their next turn there.
+    const movedFolder = moving && workDir !== room.workDir
+    if (movedFolder) {
       if (workDir === undefined) delete room.workDir
       else room.workDir = workDir
       changes.push(workDir ? `every member now works in ${workDir} here` : 'every member works in its own folder again')
@@ -575,6 +578,9 @@ export function install(rt) {
       await retitleRoom(room)
     }
     await rt.save()
+    // The group's own Session takes the folder now, and any member idle here with it; a
+    // member mid-turn moves at its next turn there.
+    if (movedFolder) void rt.followRoomFolder?.(room.id)
     return { room, changes }
   }
 

@@ -94,6 +94,7 @@ test('apply registers listeners, tools, and effects in a fixed order', (t) => {
     'on agent/request-error (prepend)',
     'on agent/request-error (prepend)',
     'effect ds-bot: hand on input kept in earlier parts',
+    'effect ds-bot: groups take their working folders',
     'on agent/status',
     'on llm/stream',
     'on llm/stream',
