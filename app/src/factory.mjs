@@ -14,7 +14,7 @@ import { join } from 'node:path'
 const seedFile = dataDir => join(dataDir, 'factory', 'factory-team.json')
 const repoDir = dataDir => join(dataDir, 'skills-repo')
 // The identity a pull authors with when it cannot fast-forward; the shipped repo has none.
-const GIT_IDENTITY = { name: 'DeepSeek Bot', email: 'ds-bot@localhost' }
+const GIT_IDENTITY = { name: 'LinkBot', email: 'ds-bot@localhost' }
 
 async function copyTree(from, to, signal) {
   await mkdir(to, { recursive: true })
@@ -27,7 +27,7 @@ async function loadGit() {
     const [git, httpModule] = await Promise.all([import('isomorphic-git'), import('isomorphic-git/http/node')])
     return { ...git, http: httpModule.default ?? httpModule }
   } catch (error) {
-    console.warn(`DeepSeek Bot: skills updates are unavailable without the isomorphic-git package (${error instanceof Error ? error.message : String(error)})`)
+    console.warn(`LinkBot: skills updates are unavailable without the isomorphic-git package (${error instanceof Error ? error.message : String(error)})`)
     return undefined
   }
 }
@@ -89,6 +89,6 @@ export async function pullSkillsRepo({ dataDir, env = process.env }) {
     // carries none; the merge itself never authors anything under fastForwardOnly.
     await git.pull({ fs: nodeFs, http: git.http, dir: target, url, singleBranch: true, fastForwardOnly: true, author: GIT_IDENTITY })
   } catch (error) {
-    console.warn(`DeepSeek Bot: the skills repo was not updated: ${error instanceof Error ? error.message : String(error)}`)
+    console.warn(`LinkBot: the skills repo was not updated: ${error instanceof Error ? error.message : String(error)}`)
   }
 }

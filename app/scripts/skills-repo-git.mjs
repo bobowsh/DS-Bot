@@ -42,7 +42,7 @@ function cloneMirror(dir, url, warn) {
     cpSync(staging, dir, { recursive: true })
     return true
   } catch (error) {
-    warn(`DeepSeek Bot: the skills repo was not cloned from ${url}: ${error instanceof Error ? error.message : String(error)}`)
+    warn(`LinkBot: the skills repo was not cloned from ${url}: ${error instanceof Error ? error.message : String(error)}`)
     return false
   } finally {
     rmSync(staging, { recursive: true, force: true })
@@ -56,11 +56,11 @@ function cloneMirror(dir, url, warn) {
  */
 export function ensureSkillsRepoGit({ dir = SKILLS_REPO, env = process.env, warn = console.warn } = {}) {
   if (!existsSync(dir)) {
-    warn('DeepSeek Bot: no bundled skills repo to prepare')
+    warn('LinkBot: no bundled skills repo to prepare')
     return false
   }
   if (git(['--version'], dir) === undefined) {
-    warn('DeepSeek Bot: git is not installed, so the shipped skills repo has no git information')
+    warn('LinkBot: git is not installed, so the shipped skills repo has no git information')
     return false
   }
   const url = env.DS_BOT_SKILLS_REPO?.trim() ?? ''
@@ -76,8 +76,8 @@ export function ensureSkillsRepoGit({ dir = SKILLS_REPO, env = process.env, warn
   commitAll(dir)
   if (url !== '') setRemote(dir, url)
   warn(url === ''
-    ? 'DeepSeek Bot: no DS_BOT_SKILLS_REPO, so the shipped skills repo has no remote to pull from'
-    : `DeepSeek Bot: the skills repo is not a clone of ${url}, so its history cannot be updated by a pull`)
+    ? 'LinkBot: no DS_BOT_SKILLS_REPO, so the shipped skills repo has no remote to pull from'
+    : `LinkBot: the skills repo is not a clone of ${url}, so its history cannot be updated by a pull`)
   return true
 }
 

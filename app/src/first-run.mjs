@@ -10,50 +10,50 @@ import { installFolder } from './move-data.mjs'
 
 const TEXT = {
   en: {
-    welcome: 'Welcome to DeepSeek Bot',
+    welcome: 'Welcome to LinkBot',
     places: (data, workspace) => `Data: ${data}\nTeam workspace: ${workspace}`,
     start: 'Start', change: 'Change…',
-    pickData: 'Folder for DeepSeek Bot data', pickWorkspace: 'Folder for the team workspace',
+    pickData: 'Folder for LinkBot data', pickWorkspace: 'Folder for the team workspace',
     dataInWorkspace: 'The data folder cannot be inside the team workspace.',
     workspaceInData: 'The team workspace cannot be inside the data folder.',
     inDsh: home => `Choose a folder outside the DeepSeek Harness data (${home}).`,
     inProgram: 'Choose a folder outside the program folder: uninstalling removes it.',
-    pickMove: 'New folder for DeepSeek Bot data',
+    pickMove: 'New folder for LinkBot data',
     moveDrive: 'Choose a folder, not a whole drive.',
     moveNested: 'Choose a folder outside the current data folder.',
     moveWorkspace: 'The data folder and the team workspace cannot hold each other.',
     moveNotEmpty: 'Choose an empty folder or a new one.',
-    moveConfirm: to => `Move DeepSeek Bot's data to ${to}?`,
-    moveDetail: from => `DeepSeek Bot copies its data there and starts again. ${from} stays as it is; you can delete it once everything works.`,
+    moveConfirm: to => `Move LinkBot's data to ${to}?`,
+    moveDetail: from => `LinkBot copies its data there and starts again. ${from} stays as it is; you can delete it once everything works.`,
     move: 'Move and restart', cancel: 'Cancel',
-    moving: 'Copying DeepSeek Bot\'s data…',
-    starting: 'Starting DeepSeek Bot…',
+    moving: 'Copying LinkBot\'s data…',
+    starting: 'Starting LinkBot…',
     moveInUse: 'Another DeepSeek Harness is using this data, so it was not moved. Close it, then try again.',
-    moveFailed: message => `The data could not be copied: ${message}\n\nDeepSeek Bot goes on with its data where it was.`,
-    notStarted: 'DeepSeek Bot could not start.',
+    moveFailed: message => `The data could not be copied: ${message}\n\nLinkBot goes on with its data where it was.`,
+    notStarted: 'LinkBot could not start.',
   },
   zh: {
-    welcome: '欢迎使用 DeepSeek Bot',
+    welcome: '欢迎使用 LinkBot',
     places: (data, workspace) => `数据：${data}\n总工作区：${workspace}`,
     start: '开始使用', change: '更改位置…',
-    pickData: '选择 DeepSeek Bot 的数据文件夹', pickWorkspace: '选择总工作区的文件夹',
+    pickData: '选择 LinkBot 的数据文件夹', pickWorkspace: '选择总工作区的文件夹',
     dataInWorkspace: '数据文件夹不能放在总工作区里面。',
     workspaceInData: '总工作区不能放在数据文件夹里面。',
     inDsh: home => `请选择 DeepSeek Harness 数据（${home}）以外的文件夹。`,
     inProgram: '请选择程序文件夹以外的位置：卸载时会删掉程序文件夹。',
-    pickMove: '选择 DeepSeek Bot 数据的新文件夹',
+    pickMove: '选择 LinkBot 数据的新文件夹',
     moveDrive: '请选择一个文件夹，不要选整个磁盘。',
     moveNested: '请选择现在的数据文件夹以外的位置。',
     moveWorkspace: '数据文件夹和总工作区不能互相包含。',
     moveNotEmpty: '请选择一个空文件夹，或者新建一个。',
-    moveConfirm: to => `把 DeepSeek Bot 的数据移到 ${to} 吗？`,
-    moveDetail: from => `DeepSeek Bot 会把数据复制过去，然后重新启动。${from} 会原样保留，确认一切正常后可以自己删掉。`,
+    moveConfirm: to => `把 LinkBot 的数据移到 ${to} 吗？`,
+    moveDetail: from => `LinkBot 会把数据复制过去，然后重新启动。${from} 会原样保留，确认一切正常后可以自己删掉。`,
     move: '移动并重启', cancel: '取消',
-    moving: '正在复制 DeepSeek Bot 的数据…',
-    starting: '正在启动 DeepSeek Bot…',
+    moving: '正在复制 LinkBot 的数据…',
+    starting: '正在启动 LinkBot…',
     moveInUse: '另一个 DeepSeek Harness 正在使用这份数据，所以没有移动。请先关掉它，再重试。',
-    moveFailed: message => `数据没有复制成功：${message}\n\nDeepSeek Bot 会继续使用原来位置的数据。`,
-    notStarted: 'DeepSeek Bot 没能启动。',
+    moveFailed: message => `数据没有复制成功：${message}\n\nLinkBot 会继续使用原来位置的数据。`,
+    notStarted: 'LinkBot 没能启动。',
   },
 }
 export const localeText = table => (app.getLocale().toLowerCase().startsWith('zh') ? table.zh : table.en)
@@ -65,7 +65,7 @@ const locationsFile = () => join(app.getPath('userData'), 'locations.json')
 class Quit extends Error {}
 
 async function ask(options, signal) {
-  const { response } = await dialog.showMessageBox({ title: 'DeepSeek Bot', noLink: true, ...options, signal })
+  const { response } = await dialog.showMessageBox({ title: 'LinkBot', noLink: true, ...options, signal })
   // A quit that arrived while a synchronous macOS box was open gets to run first.
   await new Promise(resolve => setImmediate(resolve))
   if (signal.aborted) throw new Quit()
@@ -133,7 +133,7 @@ export async function chooseLocations(signal) {
   // elsewhere the first start still picks, and placeProblem() checks the picks.
   const preset = fixedPlaces()
   let dataDir = preset?.dataDir ?? join(homedir(), '.ds-bot')
-  let workspace = preset?.workspace ?? join(homedir(), 'DeepSeek Bot')
+  let workspace = preset?.workspace ?? join(homedir(), 'LinkBot')
   try {
     if (preset === undefined) {
       for (;;) {

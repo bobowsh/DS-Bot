@@ -196,7 +196,7 @@ async function start() {
     // ds-bot waits for the seed file itself (it retries on the first Bot start).
     setImmediate(() => {
       void installFactoryResources({ dataDir: where.dataDir, resourcesDir: resourcesDir() })
-        .catch(error => { console.error('DeepSeek Bot: the factory resources were not put in place:', error) })
+        .catch(error => { console.error('LinkBot: the factory resources were not put in place:', error) })
     })
     // Not during the import, which a restart would cut short; before the Host, so that an
     // update can still come when this version's Host does not start.
@@ -291,7 +291,7 @@ async function start() {
   ipcMain.handle(IPC.browserImportLive, async (event, sourceId, close) => {
     assertWindow(event)
     const source = (await listSources()).find((item) => item.id === sourceId)
-    if (!source) throw new Error('DeepSeek Bot: an unknown browser profile')
+    if (!source) throw new Error('LinkBot: an unknown browser profile')
     let outcome
     try {
       outcome = await importFromBrowser(source, { close: close === true })
@@ -308,9 +308,9 @@ async function start() {
   })
   ipcMain.handle(IPC.browserImportApply, async (event, key, id) => {
     assertWindow(event)
-    if (typeof key !== 'string' || !key.startsWith('bot:')) throw new Error('DeepSeek Bot: a Bot storage key is required')
+    if (typeof key !== 'string' || !key.startsWith('bot:')) throw new Error('LinkBot: a Bot storage key is required')
     const pending = cookieImports.take(typeof id === 'string' ? id : '')
-    if (!pending) throw new Error('DeepSeek Bot: this import is no longer pending')
+    if (!pending) throw new Error('LinkBot: this import is no longer pending')
     const storage = session.fromPartition(partitionOf(key))
     return applyCookies(storage, pending.cookies)
   })
@@ -392,13 +392,13 @@ async function moveData(workspace) {
     for (const current of new Set([workspace, places.workspace])) {
       const problem = moveProblem({ from: places.dataDir, to, workspace: current, dshHome, program: app.isPackaged ? programFolder() : undefined })
       if (problem === undefined) continue
-      await dialog.showMessageBox(owner, { type: 'warning', title: 'DeepSeek Bot', message: problem === 'dsh' ? t.inDsh(dshHome) : t[MOVE_PROBLEMS[problem]], buttons: ['OK'] })
+      await dialog.showMessageBox(owner, { type: 'warning', title: 'LinkBot', message: problem === 'dsh' ? t.inDsh(dshHome) : t[MOVE_PROBLEMS[problem]], buttons: ['OK'] })
       return true
     }
     return false
   }
   if (await refused()) return false
-  const { response } = await dialog.showMessageBox(owner, { type: 'question', title: 'DeepSeek Bot', noLink: true, message: t.moveConfirm(to), detail: t.moveDetail(places.dataDir), buttons: [t.move, t.cancel], defaultId: 0, cancelId: 1 })
+  const { response } = await dialog.showMessageBox(owner, { type: 'question', title: 'LinkBot', noLink: true, message: t.moveConfirm(to), detail: t.moveDetail(places.dataDir), buttons: [t.move, t.cancel], defaultId: 0, cancelId: 1 })
   if (response !== 0 || stopping || await refused()) return false
   const signal = copyAbort.signal
   copying = (async () => {
@@ -412,7 +412,7 @@ async function moveData(workspace) {
     }
     // Another DSH on the same data would go on writing while the copy is made.
     if (teamInUse(places.dataDir)) {
-      await dialog.showMessageBox({ type: 'warning', title: 'DeepSeek Bot', message: t.moveInUse })
+      await dialog.showMessageBox({ type: 'warning', title: 'LinkBot', message: t.moveInUse })
       app.relaunch()
       return
     }
@@ -429,7 +429,7 @@ async function moveData(workspace) {
     } catch (error) {
       if (signal.aborted) return
       console.error(error)
-      await dialog.showMessageBox({ type: 'warning', title: 'DeepSeek Bot', message: t.moveFailed(error instanceof Error ? error.message : String(error)) })
+      await dialog.showMessageBox({ type: 'warning', title: 'LinkBot', message: t.moveFailed(error instanceof Error ? error.message : String(error)) })
     } finally {
       mainWindow?.setProgressBar(-1)
     }
@@ -462,7 +462,7 @@ function startUpdates() {
     const debArch = { x64: 'amd64', arm64: 'arm64' }[process.arch] ?? process.arch
     return watchReleases({
       current: app.getVersion(), arch: process.arch, feed, ask: throwaway ? undefined : (version) => downloadPrompt.prompt(version), open: url => electronShell.openExternal(url),
-      asset: version => `DeepSeek-Bot-${version}-linux-${debArch}.deb`,
+      asset: version => `LinkBot-${version}-linux-${debArch}.deb`,
     })
   }
   if (process.platform === 'win32' || process.platform === 'linux') {
@@ -486,7 +486,7 @@ async function askRestartNow(version) {
   // After a failed start, fail() installs the update itself.
   if (failed) return false
   const t = localeText(UPDATE_TEXT)
-  const options = { type: 'info', title: 'DeepSeek Bot', message: t.ready(version), detail: t.readyDetail, buttons: [t.restart, t.later], defaultId: 0, cancelId: 1, noLink: true }
+  const options = { type: 'info', title: 'LinkBot', message: t.ready(version), detail: t.readyDetail, buttons: [t.restart, t.later], defaultId: 0, cancelId: 1, noLink: true }
   const { response } = await (mainWindow ? dialog.showMessageBox(mainWindow, options) : dialog.showMessageBox(options))
   return response === 0
 }
@@ -494,7 +494,7 @@ async function askRestartNow(version) {
 async function askDownloadNow(version) {
   if (failed) return false
   const t = localeText(UPDATE_TEXT)
-  const options = { type: 'info', title: 'DeepSeek Bot', message: t.available(version), detail: t.availableDetail, buttons: [t.download, t.later], defaultId: 0, cancelId: 1, noLink: true }
+  const options = { type: 'info', title: 'LinkBot', message: t.available(version), detail: t.availableDetail, buttons: [t.download, t.later], defaultId: 0, cancelId: 1, noLink: true }
   const { response } = await (mainWindow ? dialog.showMessageBox(mainWindow, options) : dialog.showMessageBox(options))
   return response === 0
 }
@@ -525,7 +525,7 @@ function createWindow() {
     // The window never squeezes the chat: RAIL_WIDTH + MIN_CHAT from ds-bot's
     // src/client/frame-layout.js is the avatar rail plus the smallest chat column.
     width: 1320, height: 860, minWidth: 508, minHeight: 480,
-    title: 'DeepSeek Bot', show: false, icon: iconFile,
+    title: 'LinkBot', show: false, icon: iconFile,
     backgroundColor: mica ? '#00000000' : dark ? '#1b1b1c' : '#ffffff',
     // Frameless as in DSH Desktop: the caption buttons overlay the page's band. They keep the
     // sidebar's colors until the page sends the colors of the surface under them.
@@ -697,7 +697,7 @@ function setMenu() {
 function assertWindow(event) {
   const contents = mainWindow?.webContents
   if (contents === undefined || event.sender !== contents || event.senderFrame !== contents.mainFrame
-    || !event.senderFrame.url.startsWith(`${origin}/`)) throw new Error('DeepSeek Bot: rejected IPC from an unknown page')
+    || !event.senderFrame.url.startsWith(`${origin}/`)) throw new Error('LinkBot: rejected IPC from an unknown page')
 }
 
 function fromWindow(event) {
@@ -717,7 +717,7 @@ async function fail(error) {
   const throwaway = Boolean(process.env.DS_BOT_HOME)
   const t = localeText(UPDATE_TEXT)
   const next = found ? `\n\n${found.page ? t.onFailurePage(found.version) : t.onFailure(found.version)}` : ''
-  dialog.showErrorBox('DeepSeek Bot', `${text().notStarted}\n\n${error instanceof Error ? error.message : String(error)}${next}`)
+  dialog.showErrorBox('LinkBot', `${text().notStarted}\n\n${error instanceof Error ? error.message : String(error)}${next}`)
   if (found?.page) {
     if (!throwaway) await electronShell.openExternal(found.page)
     app.quit()

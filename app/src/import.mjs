@@ -63,7 +63,7 @@ function modelProfiles(from) {
       patch = parse(readFileSync(file, 'utf8'))
     } catch (error) {
       // An unreadable profile has no model settings to copy; the team is still there.
-      console.warn(`DeepSeek Bot: skipped the model settings in ${file}: ${error instanceof Error ? error.message : String(error)}`)
+      console.warn(`LinkBot: skipped the model settings in ${file}: ${error instanceof Error ? error.message : String(error)}`)
       return []
     }
     const rows = Array.isArray(patch) ? patch.filter(row => MODEL_ROWS.includes(row?.id)) : []

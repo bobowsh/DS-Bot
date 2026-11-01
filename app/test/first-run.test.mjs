@@ -45,7 +45,7 @@ describe('the packaged Windows install', () => {
     // A packaged layout of its own: <install>\app holds the exe, so the fixed folders land
     // under <install>, not in the temp root the shared fake path sits in.
     const install = mkdtempSync(join(tmpdir(), 'ds-bot-fr-install-'))
-    paths.exe = join(install, 'app', 'DeepSeek Bot.exe')
+    paths.exe = join(install, 'app', 'LinkBot.exe')
   })
 
   test('fixes the folders beside the program folder and asks nothing', { skip: process.platform !== 'win32' && 'the fixed places are a Windows install rule' }, async () => {
@@ -68,11 +68,11 @@ describe('the packaged Windows install', () => {
     process.env.DSH_HOME = dshHomeEmpty()
     // An exe at a drive root makes the program folder itself the root: its "parent" is a
     // whole drive, not a place for one app's data. The path only computes; nothing is made there.
-    paths.exe = 'C:\\DeepSeek Bot.exe'
+    paths.exe = 'C:\\LinkBot.exe'
     state.dialogAnswer = { response: 2 } // Quit at the welcome box: nothing beyond it is asked
     const where = await chooseLocations(new AbortController().signal)
     assert.equal(state.dialogs.length, 1, 'the first start asks instead of fixing')
-    assert.match(state.dialogs[0].message, /Welcome to DeepSeek Bot/)
+    assert.match(state.dialogs[0].message, /Welcome to LinkBot/)
     assert.deepEqual(where, { quit: true })
   })
 
@@ -106,7 +106,7 @@ describe('a run that is not a packaged Windows install', () => {
     state.dialogAnswer = { response: 0 } // Start with the shown places
     const where = await chooseLocations(new AbortController().signal)
     assert.equal(state.dialogs.length, 1)
-    assert.match(state.dialogs[0].message, /Welcome to DeepSeek Bot/)
+    assert.match(state.dialogs[0].message, /Welcome to LinkBot/)
     const saved = JSON.parse(readFileSync(locationsFile, 'utf8'))
     assert.deepEqual(saved, { dataDir: where.dataDir, workspace: where.workspace })
   })
@@ -116,6 +116,6 @@ describe('a run that is not a packaged Windows install', () => {
     process.env.DSH_HOME = dshHomeEmpty()
     state.dialogAnswer = { response: 0 }
     await chooseLocations(new AbortController().signal)
-    assert.match(state.dialogs[0].message, /Welcome to DeepSeek Bot/, 'not the fixed places')
+    assert.match(state.dialogs[0].message, /Welcome to LinkBot/, 'not the fixed places')
   })
 })

@@ -60,8 +60,8 @@ test('the new data location is an empty or new folder apart from the data, the t
 })
 
 test('the program folder is the whole app bundle on macOS', () => {
-  assert.equal(installFolder('/Applications/DeepSeek Bot.app/Contents/MacOS/DeepSeek Bot', 'darwin'), '/Applications/DeepSeek Bot.app')
-  assert.equal(installFolder(join('C:', 'Programs', 'DeepSeek Bot', 'DeepSeek Bot.exe'), 'win32'), join('C:', 'Programs', 'DeepSeek Bot'))
+  assert.equal(installFolder('/Applications/LinkBot.app/Contents/MacOS/LinkBot', 'darwin'), '/Applications/LinkBot.app')
+  assert.equal(installFolder(join('C:', 'Programs', 'LinkBot', 'LinkBot.exe'), 'win32'), join('C:', 'Programs', 'LinkBot'))
 })
 
 test('the data is copied whole, without the lock and the temporary folders, and the old folder stays', async (t) => {

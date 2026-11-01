@@ -13,7 +13,7 @@ export const paths = {
   root,
   userData: join(root, 'userData'),
   downloads: join(root, 'downloads'),
-  exe: join(root, 'DeepSeek Bot.exe'),
+  exe: join(root, 'LinkBot.exe'),
   // The folder of the app itself: the Host's pnpm lives in it.
   appPath: join(root, 'app'),
 }
@@ -100,7 +100,7 @@ class FakeWebContents extends EventEmitter {
     this.mainFrame = {}
     this.isDestroyed = () => this.win.destroyed
     this.getURL = () => this.win.url
-    this.getTitle = () => 'DeepSeek Bot'
+    this.getTitle = () => 'LinkBot'
     this.send = () => {}
     this.setWindowOpenHandler = () => {}
     this.insertCSS = async () => {}
@@ -112,7 +112,7 @@ class FakeWebContents extends EventEmitter {
 class FakeApp extends EventEmitter {
   constructor() {
     super()
-    this.name = 'DeepSeek Bot'
+    this.name = 'LinkBot'
     this.getVersion = () => '0.2.2'
     this.getLocale = () => 'en-US'
     this.getPath = (name) => paths[name] ?? join(root, String(name))
