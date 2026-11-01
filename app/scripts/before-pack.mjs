@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { preparePrimaryRuntime, runtimeTarget } from './prepare-runtime.mjs'
 import { ensureSkillsRepoGit } from './skills-repo-git.mjs'
+import { prepareBundledPlugins } from './bundled-plugin.mjs'
 
 const WHERE = {
   darwin: { x64: 'on an Intel Mac, or under Rosetta with an x64 Node', arm64: 'on a Mac with Apple silicon' },
@@ -42,7 +43,7 @@ export function officeRuntimeRequest(context) {
   }
 }
 
-export async function beforePack(context, prepare = preparePrimaryRuntime, prepareSkills = ensureSkillsRepoGit) {
+export async function beforePack(context, prepare = preparePrimaryRuntime, prepareSkills = ensureSkillsRepoGit, preparePlugins = prepareBundledPlugins) {
   const targets = []
   for (const archToNames of context.packager?.packagerOptions?.targets?.values() ?? [])
     for (const arch of archToNames.keys()) targets.push(Arch[arch])
@@ -52,4 +53,7 @@ export async function beforePack(context, prepare = preparePrimaryRuntime, prepa
   // The bundled skills repo must be a repository before extraResources copies it; a machine
   // without git, or without the upstream to reach, still ships the skills themselves.
   await prepareSkills()
+  // The plugins the app carries travel as archives; extraResources copies them as they are.
+  const appDir = context.packager.appDir ?? context.packager.projectDir
+  await preparePlugins(appDir, ['dsh-chat-import'])
 }

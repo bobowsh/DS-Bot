@@ -2,7 +2,7 @@
 // The window loads the Host's loopback address as DSH Web does: DSH's sign-in sends the page's
 // origin as the address the browser comes back to, and accepts only a loopback one.
 import { app, BrowserWindow, WebContentsView, dialog, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, session, shell as electronShell, Tray } from 'electron'
-import { mkdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { readFile, rm } from 'node:fs/promises'
 import { release } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
@@ -172,6 +172,28 @@ function stopHost() {
   return hostStop
 }
 
+/**
+ * The plugin archive the installer carries, with the version its file name carries. The name
+ * holds the version so a start that finds nothing to do reads a file name, not the archive.
+ * @param {string} resourcesDir - the app's resources directory
+ * @param {string} name - the plugin's package name
+ * @returns {{ path: string, version: string } | undefined}
+ */
+export function findBundledPlugin(resourcesDir, name) {
+  const dir = join(resourcesDir, 'bundled-plugins')
+  let entries
+  try {
+    entries = readdirSync(dir)
+  } catch {
+    return undefined
+  }
+  const found = entries
+    .map(file => /^(.+)-(\d+\.\d+\.\d+(?:-[\w.]+)?)\.tgz$/u.exec(file))
+    .filter(match => match[1] === name)
+    .sort((a, b) => b[2].localeCompare(a[2], 'en', { numeric: true }))[0]
+  return found === undefined ? undefined : { path: join(dir, `${name}-${found[2]}.tgz`), version: found[2] }
+}
+
 async function start() {
   choosing = new AbortController()
   const where = await chooseLocations(choosing.signal).finally(() => { choosing = undefined })
@@ -192,13 +214,16 @@ async function start() {
   })
   const ready = (async () => {
     // The import plugin belongs to the profile, not to the app: the user may turn it off in the
-    // plugin manager. It travels with the installer and is copied into the profile here, before
+    // plugin manager. It travels with the installer and is unpacked into the profile here, before
     // the Host starts, so the profile already holds it when DSH composes the bundle list.
-    await installImportPlugin({
-      profileDir: join(where.dataDir, 'profiles', PROFILE),
-      sourceDir: join(resourcesDir(), 'dsh-chat-import'),
-      version: app.getVersion(),
-    }).catch(error => { console.error('LinkBot: the import plugin was not put in place:', error) })
+    const plugin = findBundledPlugin(resourcesDir(), 'dsh-chat-import')
+    if (plugin !== undefined) {
+      await installImportPlugin({
+        profileDir: join(where.dataDir, 'profiles', PROFILE),
+        archive: plugin.path,
+        version: plugin.version,
+      }).catch(error => { console.error('LinkBot: the import plugin was not put in place:', error) })
+    }
     // The factory seed and the bundled skills repo land before the Host starts: ds-bot builds
     // the seeded team at its startup, and reads the seed file from the data location. It runs
     // off the ready path so a slow disk or a shared folder can never hold the window back;

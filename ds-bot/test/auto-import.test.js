@@ -55,6 +55,25 @@ test('the sessions of the user home are scanned and imported', async () => {
   assert.equal(result.failed, 0)
 })
 
+test('the reason a session failed is written down', async () => {
+  // The plugin reports why a session failed in that session's result; without this the log
+  // says only how many failed.
+  const service = fakeImportService({
+    sessions: ['a.jsonl'],
+    summary: {
+      imported: 0,
+      failed: 1,
+      results: [{ status: 'failed', error: 'agents.create 失败（host says no）' }],
+      errors: [{ sourcePath: '/a.jsonl', error: 'agents.create 失败（host says no）' }],
+    },
+  })
+  const messages = []
+  const result = await importUserSessions(ctxWith(service), { home: '/home/.dsh', onProgress: m => messages.push(m) })
+  // Both formats hold the session and both fail.
+  assert.equal(result.failed, 2)
+  assert.ok(messages.some(m => m.includes('host says no')), `the reason is in the log: ${messages.join(' | ')}`)
+})
+
 test('a home without sessions is not imported', async () => {
   const service = fakeImportService({ sessions: [] })
   const result = await importUserSessions(ctxWith(service), { home: '/home/.dsh' })

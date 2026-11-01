@@ -66,8 +66,28 @@ export async function importUserSessions(ctx, { home = requestedHome(), service 
     result.imported += Number(summary?.imported ?? 0)
     result.skipped += Number(summary?.skipped ?? 0)
     result.failed += Number(summary?.failed ?? 0)
+    // The plugin reports why a session failed in the result of that session; without this the
+    // log says only how many failed, and the reason is nowhere to be found.
+    for (const failure of failuresOf(summary)) {
+      onProgress?.(`ds-bot: a ${format} session could not be imported: ${failure}`)
+    }
   }
   return result
+}
+
+/** The reasons the plugin gave for the sessions it could not import. */
+function failuresOf(summary) {
+  const reasons = []
+  for (const error of summary?.errors ?? []) {
+    if (typeof error?.error === 'string') reasons.push(error.error)
+    else if (error?.error !== undefined) reasons.push(JSON.stringify(error.error))
+  }
+  for (const item of summary?.results ?? []) {
+    if (item?.status !== 'failed') continue
+    if (typeof item?.error === 'string') reasons.push(item.error)
+    else if (item?.error !== undefined) reasons.push(JSON.stringify(item.error))
+  }
+  return reasons
 }
 
 export function install(rt) {
