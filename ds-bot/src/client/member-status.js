@@ -14,13 +14,14 @@ const NO_WORK = { bots: {}, rooms: {}, approvals: [] }
 const FACES_MAX = 3
 const DOCK_EXIT_MS = 160
 
-// Work in this group wins over the Bot's own chat or another group.
+// Only work in this group counts here; work elsewhere shows on the Bot's own chat
+// (its 'in {group}' capsule and sidebar group tag), not in every group it is in (#473).
 export function memberWork(room, work = NO_WORK) {
   const here = work.rooms?.[room.id] ?? []
   return room.members.map((id) => {
     const approvals = (work.approvals ?? []).filter(entry => entry.botId === id)
     const local = here.find(entry => entry.botId === id)
-    const doing = local ? { ...local, roomId: room.id } : work.bots?.[id]
+    const doing = local ? { ...local, roomId: room.id } : undefined
     return { id, approvals, doing, here: local !== undefined, state: approvals.length > 0 ? 'ask' : doing ? 'work' : 'idle' }
   })
 }
@@ -149,15 +150,12 @@ function ApprovalCard({ approval, bot, actions }) {
         h('button', { type: 'button', className: 'bt-q-btn', onClick: () => actions.openSession(bot.id) }, t("Open {name}'s chat", { name: bot.name }))))
 }
 
-// A member's second line in the group's details: what it is doing and where. The member's
+// A member's second line in the group's details: what it is doing here. The member's
 // label is not repeated here: it rides the name's line, so this line stays free for work.
-export function MemberState({ entry, room, roster }) {
+export function MemberState({ entry }) {
   if (entry?.state === 'ask') return stateLine('bt-member-state bt-mw-ask', entry.approvals[0].at, t('Waiting for your approval'))
   if (entry?.state !== 'work') return null
-  const where = entry.doing.roomId === room.id ? ''
-    : entry.doing.roomId ? t('in {name}', { name: roster.roomsById[entry.doing.roomId]?.name ?? t('a group chat') })
-      : t('in its own chat')
-  return stateLine('bt-member-state', entry.doing.since, h(Shimmer, null, `${workPhrase(entry.doing)}…`), where ? ` ${where}` : '')
+  return stateLine('bt-member-state', entry.doing.since, h(Shimmer, null, `${workPhrase(entry.doing)}…`))
 }
 
 // Work in this group can be stopped from its details, since the user cannot reach the
