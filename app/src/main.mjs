@@ -18,6 +18,7 @@ import { downloadSaver } from './downloads.mjs'
 import { canonicalExecPath } from './canonical-path.mjs'
 import { chooseLocations, localeText, programFolder, saveLocations, text } from './first-run.mjs'
 import { removeDshHomeVariableWithNotice } from './auto-import.mjs'
+import { installImportPlugin } from './import-plugin.mjs'
 import { installFactoryResources, pullSkillsRepo } from './factory.mjs'
 import { hostPort } from './host-port.mjs'
 import { HostProcess } from './host-process.mjs'
@@ -190,6 +191,14 @@ async function start() {
     onFailure: fail,
   })
   const ready = (async () => {
+    // The import plugin belongs to the profile, not to the app: the user may turn it off in the
+    // plugin manager. It travels with the installer and is copied into the profile here, before
+    // the Host starts, so the profile already holds it when DSH composes the bundle list.
+    await installImportPlugin({
+      profileDir: join(where.dataDir, 'profiles', PROFILE),
+      sourceDir: join(resourcesDir(), 'dsh-chat-import'),
+      version: app.getVersion(),
+    }).catch(error => { console.error('LinkBot: the import plugin was not put in place:', error) })
     // The factory seed and the bundled skills repo land before the Host starts: ds-bot builds
     // the seeded team at its startup, and reads the seed file from the data location. It runs
     // off the ready path so a slow disk or a shared folder can never hold the window back;

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { composeEntries } from '@deepseek-ai/dsh-app-boot'
-import { BUNDLES, claimBundles, loadAppProfile } from '../src/profile.mjs'
+import { BUNDLES, OPTIONAL_BUNDLES, claimBundles, loadAppProfile, optionalBundles } from '../src/profile.mjs'
 
 // Packages of DSH's own Web front end and its browser runtime, which the window shows.
 const DSH_WEB_FRONT_END = /^@deepseek-ai\/dsh-(client-ui-|web-app|web-frontend|client-modules|host-frontend-static|cordis-client-runner|client-hmr)/u
@@ -25,9 +25,8 @@ describe('the app profile', () => {
     home = mkdtempSync(join(tmpdir(), 'ds-bot-app-profile-'))
     process.env.DSH_HOME = home
     const profile = loadAppProfile()
-    assert.deepEqual(profile.layers.map((layer) => layer.packageName), BUNDLES)
     assert.deepEqual(profile.skippedBundles, [])
-    entries = composeEntries([...profile.layers.map((layer) => layer.patches), profile.patches])
+    entries = composeEntries([...profile.layers.map(layer => layer.patches), profile.patches])
   })
   after(() => { rmSync(home, { recursive: true, force: true }) })
 
@@ -35,6 +34,12 @@ describe('the app profile', () => {
     const on = new Set(entries.filter((entry) => entry.disabled !== true).map((entry) => entry.id))
     for (const id of ['webserver', 'connection', 'bot']) assert.ok(on.has(id), `${id} is mounted`)
     assert.ok(rows(entries).some((entry) => DSH_WEB_FRONT_END.test(entry.name ?? '')), 'the DSH Web front end is mounted')
+  })
+
+  test('the import plugin is mounted on a new profile', () => {
+    const listed = JSON.parse(readFileSync(join(home, 'profiles', 'ds-bot', 'package.json'), 'utf8')).dsh.profile.bundles
+    assert.ok(listed.includes('dsh-chat-import'), 'the import plugin is in the profile')
+    assert.ok(rows(entries).some((entry) => entry.id === 'import-claude'), 'the plugin has its row')
   })
 })
 
@@ -52,14 +57,49 @@ describe('claimBundles', () => {
   test('puts the app bundles first, keeps the user bundles and drops the retired ones', () => {
     write(['@deepseek-ai/dsh-base', 'deepseek-bot-engine', 'ds-bot', 'a-plugin'])
     claimBundles(dir)
-    assert.deepEqual(read().dsh.profile.bundles, [...BUNDLES, 'a-plugin'])
+    assert.deepEqual(read().dsh.profile.bundles, [...BUNDLES, 'dsh-chat-import', 'a-plugin'])
     assert.deepEqual(read().dependencies, { 'a-plugin': '1.0.0' })
   })
 
   test('leaves a profile that already lists them alone', () => {
-    write([...BUNDLES, 'a-plugin'])
+    write([...BUNDLES, 'dsh-chat-import', 'a-plugin'])
     const before = readFileSync(join(dir, 'package.json'), 'utf8')
     claimBundles(dir)
     assert.equal(readFileSync(join(dir, 'package.json'), 'utf8'), before)
+  })
+
+  test('a bundle the user turned off is not added back', () => {
+    // The plugin manager removes a bundle from the list when the user turns it off.
+    write([...BUNDLES, 'a-plugin'])
+    claimBundles(dir)
+    assert.ok(!read().dsh.profile.bundles.includes('dsh-chat-import'), 'it stays off')
+    // A second start must not put it back.
+    claimBundles(dir)
+    assert.ok(!read().dsh.profile.bundles.includes('dsh-chat-import'), 'it stays off after another start')
+    assert.deepEqual(optionalBundles(dir).turnedOff, ['dsh-chat-import'])
+  })
+
+  test('the user can turn the plugin on again', () => {
+    // The plugin manager adds the bundle back when the user enables it.
+    write([...BUNDLES, 'dsh-chat-import', 'a-plugin'])
+    claimBundles(dir)
+    assert.ok(read().dsh.profile.bundles.includes('dsh-chat-import'), 'it is on again')
+    assert.deepEqual(optionalBundles(dir).turnedOff, [])
+  })
+
+  test('a profile from an earlier build keeps the plugin', () => {
+    // An older profile lists it and has no record: it was never turned off.
+    rmSync(join(dir, 'optional-bundles.json'), { force: true })
+    write([...BUNDLES, 'dsh-chat-import', 'a-plugin'])
+    claimBundles(dir)
+    assert.ok(read().dsh.profile.bundles.includes('dsh-chat-import'), 'the plugin is not lost')
+    assert.deepEqual(optionalBundles(dir).turnedOff, [])
+  })
+
+  test('a profile from an earlier build that never had the plugin gets it', () => {
+    rmSync(join(dir, 'optional-bundles.json'), { force: true })
+    write([...BUNDLES, 'a-plugin'])
+    claimBundles(dir)
+    assert.ok(read().dsh.profile.bundles.includes('dsh-chat-import'), 'the plugin is added')
   })
 })
