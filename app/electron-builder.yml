@@ -8,10 +8,6 @@ files:
   - package.json
   - src/**
   - assets/**
-  # The factory seed team and the bundled skills repo: the first run copies both under the
-  # data location (src/factory.mjs). They travel with the app so an offline install still has
-  # a team and its skills.
-  - resources/**
 # The Host runs pnpm as a separate Node process to install plugins, and the Office payload's
 # plain Node runs the LibreOffice Kit CLI: both must be plain files outside the asar.
 asarUnpack:
@@ -28,6 +24,14 @@ extraResources:
     to: primary-runtime
   - from: build/runtime/office-skills
     to: office-skills
+  # The factory seed team and the bundled skills repo travel as plain directories under the
+  # app's resources, which is where the running app reads them from (src/factory.mjs uses
+  # process.resourcesPath). Both stay outside the asar: the skills repo is a git repository,
+  # and nothing reads a git dir through the archive.
+  - from: resources/factory
+    to: factory
+  - from: resources/skills-repo
+    to: skills-repo
 # node-pty, sharp and koffi ship prebuilt binaries for each platform. A rebuild would compile
 # node-pty from source and needs a C++ toolchain.
 npmRebuild: false

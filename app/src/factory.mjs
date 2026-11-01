@@ -1,18 +1,20 @@
 // The factory seed: the resources the installer ships with are put under the data location
 // on first launch, so a fresh install opens on a ready-made Bot team. ds-bot reads the team
-// from <dataDir>/factory/factory-team.json (src/host/factory-seed.js); the skills live in a
-// git-managed repo at <dataDir>/skills-repo/ that is cloned when online and falls back to the
-// bundled copy offline. isomorphic-git is loaded lazily: an offline machine or a build without
-// the package must still work with the bundled copy, never fail the start.
-import { cp, mkdir, readFile, rm } from 'node:fs/promises'
+// from <dataDir>/factory/factory-team.json (src/host/factory-seed.js); the skills live in the
+// git repository at <dataDir>/skills-repo/, which travels with the installer as a repository
+// of its own and is only copied here — the first run never reaches the network. Later starts
+// update it with `git pull` against the remote the repository carries (or DS_BOT_SKILLS_REPO).
+// isomorphic-git is loaded lazily: an offline machine or a build without the package still
+// works with the copy, and never fails the start.
+import { cp, mkdir } from 'node:fs/promises'
 import * as nodeFs from 'node:fs'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 const seedFile = dataDir => join(dataDir, 'factory', 'factory-team.json')
 const repoDir = dataDir => join(dataDir, 'skills-repo')
-
-const skillsRepoUrlOf = (seed, env = process.env) => env.DS_BOT_SKILLS_REPO?.trim() || (typeof seed?.skillsRepoUrl === 'string' ? seed.skillsRepoUrl.trim() : '')
+// The identity a pull authors with when it cannot fast-forward; the shipped repo has none.
+const GIT_IDENTITY = { name: 'DeepSeek Bot', email: 'ds-bot@localhost' }
 
 async function copyTree(from, to, signal) {
   await mkdir(to, { recursive: true })
@@ -21,22 +23,16 @@ async function copyTree(from, to, signal) {
 
 async function loadGit() {
   try {
-    return await import('isomorphic-git')
+    // The network layer exports its http client as default: clone/fetch/pull take it as `http`.
+    const [git, httpModule] = await Promise.all([import('isomorphic-git'), import('isomorphic-git/http/node')])
+    return { ...git, http: httpModule.default ?? httpModule }
   } catch (error) {
     console.warn(`DeepSeek Bot: skills updates are unavailable without the isomorphic-git package (${error instanceof Error ? error.message : String(error)})`)
     return undefined
   }
 }
 
-async function readSeed(dataDir) {
-  try {
-    return JSON.parse(await readFile(seedFile(dataDir), 'utf8'))
-  } catch {
-    return undefined
-  }
-}
-
-export async function installFactoryResources({ dataDir, resourcesDir, signal, env = process.env }) {
+export async function installFactoryResources({ dataDir, resourcesDir, signal }) {
   const result = { seedCopied: false, repo: 'kept' }
   const bundledSeed = join(resourcesDir, 'factory', 'factory-team.json')
   if (existsSync(bundledSeed) && !existsSync(seedFile(dataDir))) {
@@ -44,49 +40,54 @@ export async function installFactoryResources({ dataDir, resourcesDir, signal, e
     await cp(bundledSeed, seedFile(dataDir), signal)
     result.seedCopied = true
   }
-  const target = repoDir(dataDir)
-  if (existsSync(join(target, '.git'))) return result
-  const seed = await readSeed(dataDir)
-  const url = skillsRepoUrlOf(seed, env)
-  if (url !== '' && !signal?.aborted) {
-    const git = await loadGit()
-    if (git !== undefined) {
-      try {
-        signal?.throwIfAborted()
-        await rm(target, { recursive: true, force: true, maxRetries: 5 })
-        await git.clone({ fs: nodeFs, dir: target, url, singleBranch: true, depth: 1 })
-        result.repo = 'cloned'
-        return result
-      } catch (error) {
-        console.warn(`DeepSeek Bot: the skills repo was not cloned from ${url}: ${error instanceof Error ? error.message : String(error)}`)
-        await rm(target, { recursive: true, force: true, maxRetries: 5 }).catch(() => {})
-      }
-    } else result.reason = 'no isomorphic-git'
-  } else if (url === '') result.reason = 'no skills repo URL'
   const bundledRepo = join(resourcesDir, 'skills-repo')
-  if (existsSync(bundledRepo) && !existsSync(target)) {
+  if (!existsSync(bundledRepo)) {
+    result.reason = 'no bundled skills repo'
+    return result
+  }
+  const target = repoDir(dataDir)
+  // A repository is already in place: it is the user's, and the pull keeps it current.
+  if (existsSync(join(target, '.git'))) return result
+  if (!existsSync(target)) {
+    // The bundled repository ships whole, its .git included, so the installed copy can pull.
     await copyTree(bundledRepo, target, signal)
     result.repo = 'copied'
+    return result
+  }
+  // An install from a build whose bundle was no repository: hand it the shipped .git so the
+  // pull works from here on. The working tree the user has stays as it is.
+  if (existsSync(join(bundledRepo, '.git'))) {
+    await cp(join(bundledRepo, '.git'), join(target, '.git'), { recursive: true, signal })
+    result.repo = 'git-added'
   }
   return result
 }
 
-export async function pullSkillsRepo({ dataDir, resourcesDir, env = process.env }) {
+/** The remote the pull uses: the environment, then the repository's own configuration, else none. */
+export async function skillsRepoRemote(dir, git, env = process.env) {
+  const fromEnv = env.DS_BOT_SKILLS_REPO?.trim()
+  if (fromEnv) return fromEnv
+  try {
+    const url = await git.getConfig({ fs: nodeFs, dir, path: 'remote.origin.url' })
+    return typeof url === 'string' ? url.trim() : ''
+  } catch {
+    return ''
+  }
+}
+
+export async function pullSkillsRepo({ dataDir, env = process.env }) {
   const target = repoDir(dataDir)
   try {
     if (!existsSync(join(target, '.git'))) return
-    const seed = await readSeed(dataDir)
-    let url = skillsRepoUrlOf(seed, env)
-    if (url === '' && !seed) {
-      try {
-        url = skillsRepoUrlOf(JSON.parse(await readFile(join(resourcesDir, 'factory', 'factory-team.json'), 'utf8')), env)
-      } catch {}
-    }
-    if (url === '') return
     const git = await loadGit()
     if (git === undefined) return
-    await git.fetch({ fs: nodeFs, dir: target, url, singleBranch: true, depth: 1 })
-    await git.pull({ fs: nodeFs, dir: target, url, singleBranch: true, fastForwardOnly: true })
+    const url = await skillsRepoRemote(target, git, env)
+    // No remote: nothing to update, and nothing to warn about.
+    if (url === '') return
+    await git.fetch({ fs: nodeFs, http: git.http, dir: target, url, singleBranch: true, depth: 1 })
+    // pull wants an identity even when it only fast-forwards, and the installed repository
+    // carries none; the merge itself never authors anything under fastForwardOnly.
+    await git.pull({ fs: nodeFs, http: git.http, dir: target, url, singleBranch: true, fastForwardOnly: true, author: GIT_IDENTITY })
   } catch (error) {
     console.warn(`DeepSeek Bot: the skills repo was not updated: ${error instanceof Error ? error.message : String(error)}`)
   }

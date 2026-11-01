@@ -8,6 +8,10 @@ node_modules/
 /app/dist-next/
 /app/build/runtime/
 /app/build/runtime-cache/
+# The bundled skills repo is a repository of its own, made by scripts/skills-repo-git.mjs
+# (scripts/before-pack.mjs runs it for every build). Its git dir is build output; the skills
+# in it are the repository's own files.
+/app/resources/skills-repo/.git/
 
 # A DeepSeek Harness checkout for the tests and the test bench.
 /deepseek-harness/
