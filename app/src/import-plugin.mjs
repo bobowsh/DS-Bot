@@ -6,15 +6,15 @@
 // shown as part of the installation and offers no switch, while one the profile owns is a plugin
 // the user may turn off in the plugin manager.
 //
-// The profile keeps the plugin's files, so the copy is refreshed when the installer carries a
-// newer one. A plugin the user turned off is left alone: turning it off stays off.
+// The plugin manager removes a bundle from the profile's bundle list when the user turns it off
+// and leaves the package in the profile's dependencies. The app reads that: a plugin the profile
+// depends on but does not list was turned off, and putting it back would undo the choice.
 //
 // The package is copied, not linked: the profile's node_modules belongs to the profile, and the
 // files inside the asar are read once at the start.
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { optionalBundles } from './profile.mjs'
 
 export const PLUGIN_NAME = 'dsh-chat-import'
 
@@ -61,8 +61,9 @@ export function newerVersion(a, b) {
 /**
  * Put the plugin into the profile and add it to the profile's bundle list.
  *
- * The bundle list is only touched when the plugin is not in it yet: the plugin manager removes a
- * bundle from the list when the user turns it off, and putting it back would undo that.
+ * The bundle list is only touched the first time: the plugin manager removes a bundle from the
+ * list when the user turns it off, and the profile keeps it in its dependencies, so the app can
+ * tell the two apart.
  *
  * @param {object} options
  * @param {string} options.profileDir - the profile directory
@@ -72,10 +73,12 @@ export function newerVersion(a, b) {
 export async function installImportPlugin({ profileDir, sourceDir }) {
   const manifest = await readManifest(profileDir)
   if (manifest === undefined) return { installed: false, updated: false, listed: false }
-  const listed = (manifest.dsh?.profile?.bundles ?? []).includes(PLUGIN_NAME)
-  // A plugin the user turned off in the plugin manager stays off: the app does not put it back
-  // into the list, and does not refresh its files either.
-  const turnedOff = optionalBundles(profileDir).turnedOff.includes(PLUGIN_NAME)
+  const bundles = manifest.dsh?.profile?.bundles ?? []
+  const dependencies = manifest.dependencies ?? {}
+  const known = Object.hasOwn(dependencies, PLUGIN_NAME)
+  const listed = bundles.includes(PLUGIN_NAME)
+  // The profile depends on it but does not list it: the user turned it off.
+  const turnedOff = known && !listed
   const sourceVersion = await packageVersion(sourceDir)
   if (sourceVersion === undefined) return { installed: false, updated: false, listed }
   const target = pluginDir(profileDir)
@@ -90,12 +93,10 @@ export async function installImportPlugin({ profileDir, sourceDir }) {
     await cp(sourceDir, target, { recursive: true })
   }
   // The profile owns the plugin: it is one of the profile's dependencies, not of the app's.
-  const dependencies = { ...(manifest.dependencies ?? {}) }
-  if (dependencies[PLUGIN_NAME] !== sourceVersion) dependencies[PLUGIN_NAME] = sourceVersion
-  if (!listed && !turnedOff) {
-    manifest.dsh = { ...manifest.dsh, profile: { ...manifest.dsh?.profile, bundles: [...(manifest.dsh?.profile?.bundles ?? []), PLUGIN_NAME] } }
+  manifest.dependencies = { ...dependencies, [PLUGIN_NAME]: sourceVersion }
+  if (!known && !listed) {
+    manifest.dsh = { ...manifest.dsh, profile: { ...manifest.dsh?.profile, bundles: [...bundles, PLUGIN_NAME] } }
   }
-  manifest.dependencies = dependencies
   await writeFile(join(profileDir, 'package.json'), `${JSON.stringify(manifest, undefined, 2)}\n`, 'utf8')
-  return { installed: true, updated, listed: !listed && !turnedOff }
+  return { installed: true, updated, listed: !known && !listed }
 }

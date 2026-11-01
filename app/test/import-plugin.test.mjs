@@ -59,16 +59,14 @@ describe('the import plugin in the profile', () => {
   })
 
   test('a bundle the user turned off is not put back', async () => {
-    // The plugin manager removes the bundle from the list when the user turns it off, and the
-    // app records that it was turned off.
+    // The plugin manager removes the bundle from the list when the user turns it off, and keeps
+    // the package in the profile's dependencies.
     const current = manifest()
     current.dsh.profile.bundles = current.dsh.profile.bundles.filter(name => name !== PLUGIN_NAME)
     writeFileSync(join(profileDir, 'package.json'), `${JSON.stringify(current, undefined, 2)}\n`)
-    writeFileSync(join(profileDir, 'optional-bundles.json'), `${JSON.stringify({ managed: [PLUGIN_NAME], turnedOff: [PLUGIN_NAME] }, undefined, 2)}\n`)
     const result = await installImportPlugin({ profileDir, sourceDir })
     assert.equal(result.listed, false)
     assert.ok(!manifest().dsh.profile.bundles.includes(PLUGIN_NAME), 'it stays off')
-    rmSync(join(profileDir, 'optional-bundles.json'), { force: true })
   })
 
   test('an installation without the plugin does not fail the start', async () => {
