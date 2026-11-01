@@ -45,16 +45,19 @@ test('the import states the host session format version', async () => {
   const home = oldSession(mkdtempSync(join(tmpdir(), 'ds-bot-old-home-')))
   const service = fakeService('tool')
   const seen = []
-  const runWithVersion = async (ctx, version, fn) => {
-    seen.push(version)
-    return fn()
+  const importer = {
+    importOne: async () => ({ status: 'imported' }),
+    withVersion: async (ctx, version, fn) => {
+      seen.push(version)
+      return fn()
+    },
   }
-  await importUserSessions(fakeCtx(service), { home, service, runWithVersion })
+  await importUserSessions(fakeCtx(service), { home, service, importer })
   assert.deepEqual(seen, [HOST_SESSION_VERSION, HOST_SESSION_VERSION], 'both formats state the version')
   assert.equal(HOST_SESSION_VERSION, 4, 'the host writes version 4')
 })
 
-test('without the helper the import still runs', async () => {
+test('without the plugin importer the service does the import', async () => {
   const home = oldSession(mkdtempSync(join(tmpdir(), 'ds-bot-old-home-')))
   const service = fakeService('user')
   const result = await importUserSessions(fakeCtx(service), { home, service })

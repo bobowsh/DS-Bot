@@ -1,7 +1,21 @@
 import assert from 'node:assert/strict'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { importUserSessions, install, requestedHome } from '../src/host/auto-import.js'
+
+// A profile directory with the import plugin in it, so the plugin's own importer can be
+// loaded the way the app loads it: by its path inside the package.
+async function fakePluginDir(files) {
+  const dir = await mkdtemp(join(tmpdir(), 'ds-bot-auto-import-'))
+  await writeFile(join(dir, 'package.json'), JSON.stringify({ name: 'profile', version: '0.0.0' }))
+  const plugin = join(dir, 'node_modules', 'dsh-chat-import')
+  await mkdir(join(plugin, 'lib'), { recursive: true })
+  await writeFile(join(plugin, 'package.json'), JSON.stringify({ name: 'dsh-chat-import', version: '0.0.0' }))
+  for (const [name, content] of Object.entries(files)) await writeFile(join(plugin, ...name.split('/')), content)
+  return dir
+}
 
 // The import plugin's service, in memory: it records what it was asked to scan and import.
 function fakeImportService({ sessions = [], summary = {}, failScan, failImport } = {}) {
@@ -133,4 +147,55 @@ test('the line the installer check reads says what was imported', async () => {
   assert.equal(lines.length, 1)
   assert.match(lines[0], /imported \d+ sessions/u)
   assert.match(lines[0], /\/home\/\.dsh/u)
+})
+
+test('the import runs on the context that carries the filesystem service', async () => {
+  // The plugin's import reads and writes through the host's filesystem service. The context the
+  // chat import service came from carries that service only, so the import would find no
+  // filesystem on it; the context the filesystem injection gives carries it.
+  // The version override is remembered per context, so the context the import runs on is also
+  // the one the version is stated on.
+  const seen = []
+  const pluginDir = await fakePluginDir({
+    'lib/import-core.mjs': 'export async function withHostFormatVersion(ctx, version, fn) { globalThis.__seen.push({ ctx, version }); return await fn() }\n',
+    'lib/toolkit.mjs': 'export async function importDiscoveryItem(ctx, format, sourcePath, ids, opts) { globalThis.__seen.push({ ctx, format, sourcePath }); return { status: "imported" } }\n',
+  })
+  globalThis.__seen = seen
+  const service = fakeImportService({ sessions: ['a.jsonl'], summary: { imported: 1, skipped: 0, failed: 0 } })
+  const chatImportContext = { chatImport: service, effect: () => {} }
+  const filesystemContext = { fs: { resolve: async p => p }, effect: () => {} }
+  const ctx = {
+    get: name => {
+      if (name === 'chatImport') return service
+      if (name === 'profileContext') return { dir: pluginDir }
+      return undefined
+    },
+    inject: (names, callback) => {
+      if (names.includes('chatImport')) return callback(chatImportContext)
+      if (names.includes('fs')) return callback(filesystemContext)
+      return undefined
+    },
+  }
+  const previous = process.env.DS_BOT_AUTO_IMPORT
+  const previousHome = process.env.DS_BOT_USER_DSH_HOME
+  process.env.DS_BOT_AUTO_IMPORT = '1'
+  process.env.DS_BOT_USER_DSH_HOME = '/home/.dsh'
+  try {
+    const rt = { ctx, warn: () => {} }
+    install(rt)
+    const result = await rt.runAutoImport()
+    assert.equal(result.imported, 2)
+  } finally {
+    delete globalThis.__seen
+    if (previous === undefined) delete process.env.DS_BOT_AUTO_IMPORT
+    else process.env.DS_BOT_AUTO_IMPORT = previous
+    if (previousHome === undefined) delete process.env.DS_BOT_USER_DSH_HOME
+    else process.env.DS_BOT_USER_DSH_HOME = previousHome
+    await rm(pluginDir, { recursive: true, force: true })
+  }
+  assert.ok(seen.length > 0)
+  for (const entry of seen) {
+    assert.equal(entry.ctx, filesystemContext, 'the import runs on the filesystem context')
+  }
+  assert.ok(seen.some(entry => entry.version === 4), 'the target session format version is stated')
 })
