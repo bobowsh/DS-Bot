@@ -14,6 +14,19 @@ CI 只跑单元测试和 Linux 上的测试台。窗口外框、输入法、高 
 - 一个能用的模型（DeepSeek API key 或账号）。测试里要填的密钥都用**假值**。
 - 想保留现有数据，先备份数据目录：Windows 是 `C:\Users\<用户名>\.dsh\`，macOS 是 `~/.dsh/`。最好用一台没有自己团队数据的机器或账户来测。
 
+## 改版本号
+
+发版前先把版本号改好。桌面应用和插件用同一个版本号，产物名里的 `<版本>` 由此而来。
+
+1. 改 `app/package.json` 的 `version` 和 `ds-bot/package.json` 的 `version`，两处相同。`app/test/package.test.mjs` 里有一条测试守着这个约束，它红了就是两处没改齐。
+2. 刷新 `ds-bot/package-lock.json`：在 `ds-bot/` 里运行 `npm install --package-lock-only`。它的根条目记着版本号，不刷新会和 `ds-bot/package.json` 对不上。
+3. `app/package-lock.json` 里 `node_modules/ds-bot` 那一条的 `version` 字段**不用管**：它是 `file:` 依赖，npm 装的是 `../ds-bot` 目录的实际内容，这个字段只是元数据，不决定装什么，强刷反而会重新求解整棵树。
+4. `app/node_modules/ds-bot` 是 `file:` 依赖**复制**出来的副本，不是链接。改了 `ds-bot/package.json` 的版本后，它还是旧的——打包打的是 `node_modules` 里的实际内容，所以在 `app/` 里运行一次 `npm ci`，让它按新版本重新复制。
+5. 核一下实际装的是新版：`node -e "console.log(require('./app/node_modules/ds-bot/package.json').version)"`，和两个 package.json 一致。
+6. 跑 `cd app && node --test test/package.test.mjs`，确认那条「两个版本一致」的测试是绿的。
+
+> 记一笔：`npm install --legacy-peer-deps` 用来装 peer 依赖版本对不上的包是可行的，但**它会重新求解整棵树**，把 `@electron/windows-sign`、`electron-winstaller` 这些打包要用的依赖从 lock 里剔掉，直接毁掉打包。要装新包，先 `npm install <包> --package-lock-only` 更新 lock，再 `npm ci` 恢复全树。
+
 ## 1. 安装 DSH Desktop
 
 | # | 步骤 | 期望 | 结果 |
