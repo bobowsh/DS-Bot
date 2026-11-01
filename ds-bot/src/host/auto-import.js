@@ -8,6 +8,7 @@
 // DSH context rather than the app calling across the process boundary. Nothing here may stop
 // the start: a failure is logged and the app goes on.
 import { join } from 'node:path'
+import { HOST_SESSION_VERSION, loadFormatRunner } from './import-format.js'
 
 // The formats the import plugin reads the user's DSH sessions in: the current log revision and
 // the older ones. Both are scanned, so a home written by an earlier DSH is read as well.
@@ -34,9 +35,11 @@ export function requestedHome(env = process.env) {
  * @param {object} [options]
  * @param {string} [options.home] - the user's DSH home
  * @param {(message: string) => void} [options.onProgress] - called with the progress of the import
+ * @param {((ctx: unknown, version: number, fn: () => Promise<unknown>) => Promise<unknown>) | undefined} [options.runWithVersion]
+ *   the plugin's helper that runs an import with a stated target format version
  * @returns {Promise<{ imported: number, failed: number, skipped: number, formats: string[] }>}
  */
-export async function importUserSessions(ctx, { home = requestedHome(), service = ctx.get?.('chatImport'), onProgress } = {}) {
+export async function importUserSessions(ctx, { home = requestedHome(), service = ctx.get?.('chatImport'), onProgress, runWithVersion } = {}) {
   const result = { imported: 0, failed: 0, skipped: 0, formats: [] }
   if (!home) return result
   if (!service) return result
@@ -57,7 +60,12 @@ export async function importUserSessions(ctx, { home = requestedHome(), service 
     onProgress?.(`ds-bot: importing ${sessions.length} ${format} sessions…`)
     let summary
     try {
-      summary = await service.importAll({ format, path: root })
+      const run = () => service.importAll({ format, path: root })
+      // The import states the host's session format version, so a session that carries a tool
+      // message is written the way the host reads it (see src/host/import-format.js).
+      summary = runWithVersion === undefined
+        ? await run()
+        : await runWithVersion(ctx, HOST_SESSION_VERSION, run)
     } catch (error) {
       onProgress?.(`ds-bot: the ${format} sessions could not be imported: ${error?.message ?? error}`)
       result.failed += sessions.length
@@ -113,7 +121,15 @@ export function install(rt) {
   async function runAutoImport() {
     const home = requestedHome()
     if (!home) return undefined
-    const result = await importUserSessions(ctx, { home, service, onProgress: message => rt.warn('%s', message) })
+    // The plugin's helper for stating the target format version is looked up in the profile the
+    // plugin was installed into. A plugin that moved it is not fatal: the import runs without a
+    // stated version and fails as it did before.
+    const profileDir = ctx.get?.('profileContext')?.dir
+    const runWithVersion = profileDir === undefined ? undefined : await loadFormatRunner(profileDir)
+    if (runWithVersion === undefined) {
+      rt.warn('ds-bot: the import plugin does not offer its format-version helper; the import runs without a stated version')
+    }
+    const result = await importUserSessions(ctx, { home, service, runWithVersion, onProgress: message => rt.warn('%s', message) })
     // The line the installer check reads: it says what was imported and from where.
     console.log(`LinkBot: imported ${result.imported} sessions from ${home} (${result.formats.join(', ') || 'no sessions'})`)
     // The app listens for this message; a Host without an app (the plugin runs on its own)
