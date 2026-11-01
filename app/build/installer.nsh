@@ -4,6 +4,69 @@
   StrCpy $isForceCurrentInstall "1"
 !macroend
 
+; The install directory is fixed: the program goes to <drive>\LinkBot\app and the
+; data to <drive>\LinkBot\data beside it, so the uninstaller leaves the data alone
+; and the first run finds its places without asking. The drive is D when the machine
+; has one and E otherwise; the user does not choose it.
+;
+; electron-builder appends a product-name sub-folder to any path that does not
+; already contain it (assistedInstaller.nsh, instFilesPre). That whole block sits
+; inside `!ifdef allowToChangeInstallationDirectory`, so with the directory page
+; turned off the path is used exactly as it is set here.
+;
+; The order is: an earlier installation keeps its own drive, then the /D= switch
+; overrides it (how the silent install in the acceptance run sets the path), and
+; only a fresh install picks the drive.
+!macro customInit
+  ; An earlier installation lives where it was put: keep it there.
+  ReadRegStr $0 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
+  ${If} $0 != ""
+    StrCpy $INSTDIR $0
+  ${Else}
+    ; The /D= switch wins over the chosen drive, so a test install can go anywhere.
+    !insertmacro GetDParameter $R0
+    ${If} $R0 != ""
+      StrCpy $INSTDIR $R0
+    ${Else}
+      ; A drive is detected with a wildcard: "D:\" and "D:\." both fail, because a
+      ; backslash at the end of the string is an escape and the path never resolves.
+      IfFileExists "D:\*" 0 useE
+      StrCpy $INSTDIR "D:\LinkBot\app"
+      Goto done
+    ${EndIf}
+    useE:
+    ; No D drive: the next one the user asked for is E.
+    IfFileExists "E:\*" 0 noDrive
+    StrCpy $INSTDIR "E:\LinkBot\app"
+    Goto done
+    noDrive:
+    ; Neither drive: the program folder of the current user is the last resort.
+    StrCpy $INSTDIR "$LocalAppData\Programs\LinkBot\app"
+    done:
+  ${EndIf}
+
+  ; The installer never asks for administrator rights, so a folder the user cannot
+  ; write to only fails halfway through the install, with a misleading error.
+  ; The directory is fixed now, so there is no directory page to go back to: the
+  ; install stops here instead, and says which folder is the problem.
+  ClearErrors
+  CreateDirectory "$INSTDIR"
+  ${If} ${Errors}
+    MessageBox MB_OK|MB_ICONEXCLAMATION "Cannot create $INSTDIR. Choose a folder you can write to."
+    Abort
+  ${EndIf}
+  ; A folder that holds files is an upgrade; it must also allow deleting them.
+  ClearErrors
+  GetTempFileName $R1 "$INSTDIR"
+  ${If} ${Errors}
+  ${OrIf} $R1 == ""
+    MessageBox MB_OK|MB_ICONEXCLAMATION "Cannot write to $INSTDIR. Choose a folder you can write to."
+    Abort
+  ${EndIf}
+  ClearErrors
+  Delete "$R1"
+!macroend
+
 ; The LANG_* symbols exist only after addLangs, which runs just before this
 ; hook; a LangString for a language the build does not load would create a
 ; phantom language table (makensis warning 6040, treated as error).

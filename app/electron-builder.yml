@@ -46,7 +46,11 @@ nsis:
   oneClick: false
   perMachine: false
   allowElevation: false
-  allowToChangeInstallationDirectory: true
+  # The install directory is fixed (see build/installer.nsh): the app goes to <drive>\LinkBot\app
+  # and the data to <drive>\LinkBot\data beside it. The user does not choose it.
+  # Turning this off also drops the directory page, and with it the sub-folder that
+  # electron-builder would otherwise append to the chosen path.
+  allowToChangeInstallationDirectory: false
   include: build/installer.nsh
   installerLanguages: [zh_CN, en_US]
   multiLanguageInstaller: true

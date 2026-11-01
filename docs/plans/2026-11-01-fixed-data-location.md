@@ -50,9 +50,8 @@
 
 ## 不做什么
 
-- 不硬编码 `d:\LinkBot` 或任何绝对路径。
-- 不改安装器：`app/build/installer.nsh` 保持原样，不加 `customInstall` 宏。
-- 不用 NSIS 禁止用户选择安装目录（`allowToChangeInstallationDirectory` 保持不变）。
+- 不硬编码 `d:\LinkBot` 或任何绝对路径。**安装位置是唯一的例外**：用户 2026-11-01 拍板把安装目录固定为 `<盘>\LinkBot\app`（D 盘没有则 E 盘），数据仍跟着安装目录走，不硬编码在代码里。
+- 不用 NSIS 禁止用户选择安装目录这条另说：**用户明确要求安装位置固定、不可更改**，所以安装器不再显示目录页（`allowToChangeInstallationDirectory: false`）。这与初稿「不改安装器」的取舍相反，见「变更」。
 - 不改 `DS_BOT_HOME` 的 throwaway 语义，也不新增环境变量。
 - 不禁止在设置 → 通用 → 位置里移动数据；移动后 `locations.json` 已是新位置，首启预置只在文件不存在时生效，不会覆盖。
 - 不改 `placeProblem()` 的校验规则。
@@ -67,3 +66,4 @@
 
 - 2026-11-01：初稿，记录方案；代码与安装器尚未改动。
 - 2026-11-01：方案从"安装器写 `locations.json`"改为"app 首启写"（方案 B）。原因：NSIS 里拼带 `\\` 和 `\"` 的 JSON 转义难验证（`StrRep` 宏在 3.0.4.1 模板下不自动可用，`\"` 不是合法转义），为一次性的预置背一套转义不值；JS 里 `JSON.stringify` 转义零成本、可单测、与 `saveLocations()` 同路径。代码落在 `app/src/first-run.mjs`：`fixedPlaces()` + `chooseLocations()` 首启分支；解耦导入提示为 `locations.json` 存在时也走 `offerImport`，拒绝记忆 `import-declined`。`installer.nsh` 不动。
+- 2026-11-01：用户拍板**安装位置本身固定**：装到 `<盘>\LinkBot\app`（D 盘没有则 E 盘），用户不能改。初稿「不改安装器」这条取舍作废。改法：`app/electron-builder.yml` 的 `allowToChangeInstallationDirectory: false`（目录页连同 electron-builder 追加产品名子目录的那段逻辑一起不再编译），`app/build/installer.nsh` 加 `customInit` 设 `$INSTDIR`；顺序是「已有安装位置 → `/D=` 开关 → D 盘 → E 盘 → 用户程序目录」。实测：装到 `D:\LinkBot\app\DeepSeek Bot.exe`（无产品名子目录），首启生成 `D:\LinkBot\data\locations.json`（`dataDir` = `D:\LinkBot\data`）与 `D:\LinkBot\workspace`。
