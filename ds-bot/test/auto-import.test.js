@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { importUserSessions, requestedHome } from '../src/host/auto-import.js'
+import { importUserSessions, install, requestedHome } from '../src/host/auto-import.js'
 
 // The import plugin's service, in memory: it records what it was asked to scan and import.
 function fakeImportService({ sessions = [], summary = {}, failScan, failImport } = {}) {
@@ -87,4 +87,31 @@ test('an import that fails does not throw', async () => {
   assert.equal(result.failed, 2)
   assert.equal(result.imported, 0)
   assert.equal(result.formats.length, 2)
+})
+
+test('the line the installer check reads says what was imported', async () => {
+  const service = fakeImportService({ sessions: ['a.jsonl'], summary: { imported: 3, skipped: 0, failed: 0 } })
+  const lines = []
+  const original = console.log
+  console.log = (...args) => lines.push(args.join(' '))
+  const previous = process.env.DS_BOT_AUTO_IMPORT
+  const previousHome = process.env.DS_BOT_USER_DSH_HOME
+  process.env.DS_BOT_AUTO_IMPORT = '1'
+  process.env.DS_BOT_USER_DSH_HOME = '/home/.dsh'
+  try {
+    const ctx = ctxWith(service)
+    ctx.inject = (names, callback) => callback({ chatImport: service, effect: () => {} })
+    const rt = { ctx, warn: () => {} }
+    install(rt)
+    await rt.runAutoImport()
+  } finally {
+    console.log = original
+    if (previous === undefined) delete process.env.DS_BOT_AUTO_IMPORT
+    else process.env.DS_BOT_AUTO_IMPORT = previous
+    if (previousHome === undefined) delete process.env.DS_BOT_USER_DSH_HOME
+    else process.env.DS_BOT_USER_DSH_HOME = previousHome
+  }
+  assert.equal(lines.length, 1)
+  assert.match(lines[0], /imported \d+ sessions/u)
+  assert.match(lines[0], /\/home\/\.dsh/u)
 })

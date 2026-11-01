@@ -176,3 +176,35 @@ describe('the notice for a variable that could not be removed', () => {
     assert.deepEqual(result.skipped, ['machine'])
   })
 })
+
+describe('the line the installer check reads', () => {
+  const capture = async (run) => {
+    const lines = []
+    const original = console.log
+    console.log = (...args) => lines.push(args.join(' '))
+    try {
+      await run()
+    } finally {
+      console.log = original
+    }
+    return lines
+  }
+
+  test('the removal says what was removed', async () => {
+    const lines = await capture(() => removeDshHomeVariableWithNotice({
+      read: () => 'C:\\somewhere\\.dsh',
+      remove: () => {},
+    }))
+    assert.equal(lines.length, 1)
+    assert.match(lines[0], /DSH_HOME/u)
+    assert.match(lines[0], /user/u)
+  })
+
+  test('nothing is said when no variable was removed', async () => {
+    const lines = await capture(() => removeDshHomeVariableWithNotice({
+      read: () => undefined,
+      remove: () => {},
+    }))
+    assert.deepEqual(lines, [])
+  })
+})

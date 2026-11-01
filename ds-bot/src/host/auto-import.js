@@ -94,6 +94,8 @@ export function install(rt) {
     const home = requestedHome()
     if (!home) return undefined
     const result = await importUserSessions(ctx, { home, service, onProgress: message => rt.warn('%s', message) })
+    // The line the installer check reads: it says what was imported and from where.
+    console.log(`DeepSeek Bot: imported ${result.imported} sessions from ${home} (${result.formats.join(', ') || 'no sessions'})`)
     // The app listens for this message; a Host without an app (the plugin runs on its own)
     // has no channel, and the import is still done.
     if (typeof process.send === 'function') {

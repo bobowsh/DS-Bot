@@ -120,6 +120,10 @@ export function removeDshHomeVariable(io = {}) {
  */
 export async function removeDshHomeVariableWithNotice(io = {}) {
   const result = removeDshHomeVariable({ read: io.read, remove: io.remove, broadcast: io.broadcast, name: io.name })
+  if (result.removed.length > 0) {
+    // The line the installer check reads: it says the variables are gone.
+    console.log(`DeepSeek Bot: removed the ${DSH_HOME_VARIABLE} variable (${result.removed.join(', ')})`)
+  }
   if (result.skipped.length === 0 && result.failed.length === 0) return result
   const show = io.show
   if (typeof show === 'function') {
