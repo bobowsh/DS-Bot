@@ -2531,6 +2531,7 @@ body[data-bt-motion=quiet] .bt-mark[data-poke]{cursor:default}
 .bt-row-body{display:flex;flex-direction:column;min-width:0;flex:1 1 auto}
 .bt-row-name{display:flex;align-items:center;gap:6px;min-width:0;font-size:14px;line-height:20px;font-weight:400}
 .bt-row-title{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bt-row-name>.bt-tag{flex:none;font-size:11px;line-height:15px;padding:0 5px;max-width:96px}
 .bt-tag{flex:none;max-width:96px;font-size:12px;line-height:16px;font-weight:400;padding:1px 6px;border-radius:4px;background:var(--bt-tag-bg);color:var(--bt-tag-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bt-row-preview{font-size:13px;line-height:18px;color:var(--bt-ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bt-unread{width:8px;height:8px;border-radius:50%;background:var(--bt-accent);flex:none;margin-right:2px;animation:bt-fade .13s cubic-bezier(.22,1,.36,1)}
@@ -9276,7 +9277,15 @@ function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessio
     wide ? (0, import_react18.createElement)(
       "span",
       { className: "bt-row-body" },
-      (0, import_react18.createElement)("span", { className: "bt-row-name" }, (0, import_react18.createElement)("span", { className: "bt-row-title" }, bot.name), pinned ? (0, import_react18.createElement)(PinMark) : null),
+      (0, import_react18.createElement)(
+        "span",
+        { className: "bt-row-name" },
+        (0, import_react18.createElement)("span", { className: "bt-row-title" }, bot.name),
+        // The Bot's label sits on the name's line, so a name never has to carry it in
+        // parentheses; the line under it stays the preview or what the Bot is doing.
+        bot.role ? (0, import_react18.createElement)("span", { className: "bt-tag" }, bot.role) : null,
+        pinned ? (0, import_react18.createElement)(PinMark) : null
+      ),
       runningLine ? (0, import_react18.createElement)("span", { className: "bt-row-preview" }, runningLine) : awayLine ? (0, import_react18.createElement)("span", { className: "bt-row-preview" }, awayLine) : waitsFor ? (0, import_react18.createElement)("span", { className: "bt-row-preview" }, waitsFor) : preview ? (0, import_react18.createElement)("span", { className: "bt-row-preview" }, preview) : null
     ) : null,
     wide && unread && !active ? (0, import_react18.createElement)("span", { className: "bt-unread", "aria-hidden": true }) : !wide && !active && (alert || unread) ? (0, import_react18.createElement)("span", { className: `bt-dot${alert ? " bt-dot-wait" : ""}`, "aria-hidden": true }) : null
@@ -17216,9 +17225,9 @@ function ApprovalCard({ approval, bot, actions }) {
     )
   );
 }
-function MemberState({ entry, bot, room: room2, roster }) {
+function MemberState({ entry, room: room2, roster }) {
   if (entry?.state === "ask") return stateLine("bt-member-state bt-mw-ask", entry.approvals[0].at, t("Waiting for your approval"));
-  if (entry?.state !== "work") return bot.role ? stateLine("bt-member-state", void 0, bot.role) : null;
+  if (entry?.state !== "work") return null;
   const where = entry.doing.roomId === room2.id ? "" : entry.doing.roomId ? t("in {name}", { name: roster.roomsById[entry.doing.roomId]?.name ?? t("a group chat") }) : t("in its own chat");
   return stateLine("bt-member-state", entry.doing.since, (0, import_react46.createElement)(Shimmer, null, `${workPhrase(entry.doing)}…`), where ? ` ${where}` : "");
 }
@@ -17473,6 +17482,8 @@ function MemberRow({ member, entry, room: room2, roster, actions }) {
             "span",
             { className: "bt-member-line" },
             (0, import_react47.createElement)("span", { className: "bt-member-name" }, member.name),
+            // The member's label rides the name's line, the way the sidebar shows a Bot's.
+            member.role ? (0, import_react47.createElement)("span", { className: "bt-tag" }, member.role) : null,
             room2.admin === member.id ? (0, import_react47.createElement)("span", { className: "bt-tag" }, t("Admin")) : null
           ),
           (0, import_react47.createElement)(MemberState, { entry, bot: member, room: room2, roster })
