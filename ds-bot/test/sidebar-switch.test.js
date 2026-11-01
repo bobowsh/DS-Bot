@@ -252,7 +252,7 @@ test('a sidebar row shows its name on hover when the name is hidden or cut', () 
 // The Bot's label rides its name's line, and the line under it keeps the preview.
 test('a sidebar row shows the Bot\'s label beside its name, and nowhere else', () => {
   viewport.innerWidth = 1280
-  const partsOf = (role) => {
+  const partsOf = (role, busy = false) => {
     const bot = { id: 'writer', name: 'Writer', role, createdAt: 1 }
     const roster = { bots: [bot], rooms: [], agents: [], byId: { writer: bot }, ready: true, exchangeTurns: {} }
     const rows = []
@@ -267,8 +267,8 @@ test('a sidebar row shows the Bot\'s label beside its name, and nowhere else', (
       actions: Object.fromEntries(['openSession', 'openAgent', 'openAgentSession', 'newAgentSession', 'openMenu', 'openPalette', 'openNewChat', 'toggleSidebar', 'clearUnread'].map(name => [name, () => {}])),
       useRoster: pick => pick(roster), useUi: pick => pick({ unread: {} }), useRegistry: pick => pick({}),
       useSessions: pick => pick({ ids: [], byId: {} }), useUpdate: () => ({}),
-      useSessionStatus: pick => pick(new Map()), useSessionRetainInfo: () => null,
-      useActivity: pick => pick({}), useWork: pick => pick({ waiting: {}, rooms: {}, approvals: [] }),
+      useSessionStatus: pick => pick(busy ? new Map([['writer', { running: true }]]) : new Map()), useSessionRetainInfo: () => null,
+      useActivity: pick => pick(busy ? { writer: 'working' } : {}), useWork: pick => pick({ waiting: {}, rooms: {}, approvals: [] }),
     }))
     const expand = (node) => {
       if (Array.isArray(node)) return node.map(expand)
@@ -297,6 +297,12 @@ test('a sidebar row shows the Bot\'s label beside its name, and nowhere else', (
   assert.deepEqual(classesOf(partsOf(undefined)['bt-row-name']), ['bt-row-title'])
   // The preview line never carries it.
   assert.deepEqual(classesOf(partsOf('DSH 开发')['bt-row-preview'] ?? { props: { children: [] } }).filter(name => name === 'bt-tag'), [])
+  // The label shows the same whether the Bot is idle or at work: what it is doing moves to
+  // the line below and never displaces it.
+  const busy = partsOf('DSH 开发', true)
+  assert.deepEqual(classesOf(busy['bt-row-name']), ['bt-row-title', 'bt-tag'])
+  assert.deepEqual(classesOf(busy['bt-row-preview']).filter(name => name === 'bt-tag'), [])
+  assert.match(text(busy['bt-row-preview']), /…$/)
 })
 
 test('preparing sidebar navigation leaves actions elsewhere unchanged', () => {
