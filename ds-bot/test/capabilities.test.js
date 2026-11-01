@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { test } from 'node:test'
 import { createRuntime } from '../index.js'
 import { expandCapabilityNames, validateCapabilityName } from '../src/host/capabilities.js'
@@ -472,4 +472,60 @@ test('a failed HTTP MCP mount does not show the encoded secret from its URL', as
   const status = env.rt.capabilityStatusesView().chief.exa
   assert.equal(status.state, 'error')
   assert.equal(status.error, 'Connection failed: fetch https://mcp.exa.test/mcp?apiKey=[secret:EXA_API_KEY]')
+})
+
+test('a skill locator reads SKILL.md from the file, mounts it per Bot, and refreshes on reconcile', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsb-skill-files-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }))
+  const skillDir = join(dir, 'release-checks')
+  mkdirSync(join(skillDir, 'scripts'), { recursive: true })
+  writeFileSync(join(skillDir, 'SKILL.md'), '# Release checks\n\nRun scripts/check.mjs before shipping.\n')
+  const env = await setup()
+  t.after(() => env.dispose())
+  const { ctx, rt, mounts, skills } = env
+  await rt.capabilitySave({ name: 'release-checks', kind: 'skill', description: 'Pre-ship checks', locator: skillDir, content: 'Ignored while a locator is set.' }, { botId: 'chief' })
+  const saved = rt.state.capabilities.items['release-checks']
+  assert.equal(saved.locator, skillDir)
+  await rt.changeCapabilityAttachment('attach', { name: 'release-checks' }, 'chief')
+  const chief = testAgent('chief', mounts, skills)
+  const worker = testAgent('worker', mounts, skills)
+  for (const agent of [chief, worker]) ctx.emit('agent/created', { agent })
+  await rt.scheduleCapabilitiesReconcile()
+  const mounted = skills.get('chief').get('release-checks')
+  assert.equal(mounted.content, '# Release checks\n\nRun scripts/check.mjs before shipping.\n')
+  assert.equal(mounted.source, 'runtime')
+  assert.deepEqual(mounted.resourceBase, { kind: 'directory', path: skillDir.split(sep).join('/') })
+  assert.equal(skills.get('worker').has('release-checks'), false)
+  assert.equal(rt.capabilityStatusesView().chief['release-checks'].state, 'ready')
+  writeFileSync(join(skillDir, 'SKILL.md'), '# Release checks\n\nRun scripts/check.mjs twice.\n')
+  await rt.capabilitySave({ name: 'release-checks', kind: 'skill', description: 'Pre-ship checks', locator: skillDir }, { botId: 'chief' })
+  await rt.scheduleCapabilitiesReconcile()
+  assert.equal(skills.get('chief').get('release-checks').content, '# Release checks\n\nRun scripts/check.mjs twice.\n')
+  const withoutLocator = mounts.findLast(mount => mount.sessionId === 'chief' && mount.plugin.name === 'ds-bot-capability-skill-release-checks')
+  await rt.capabilitySave({ name: 'plain', kind: 'skill', description: 'Plain', content: 'In-memory only.' }, { botId: 'chief' })
+  await rt.changeCapabilityAttachment('attach', { name: 'plain' }, 'chief')
+  await rt.scheduleCapabilitiesReconcile()
+  assert.equal(skills.get('chief').get('plain').content, 'In-memory only.')
+  assert.equal(skills.get('chief').get('plain').resourceBase, undefined)
+  assert.equal(withoutLocator.disposed, false)
+  await rt.changeCapabilityAttachment('detach', { name: 'release-checks' }, 'chief')
+  await rt.scheduleCapabilitiesReconcile()
+  assert.equal(skills.get('chief').has('release-checks'), false)
+})
+
+test('a skill whose locator folder is gone fails to mount and says so', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsb-skill-missing-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }))
+  const env = await setup()
+  t.after(() => env.dispose())
+  const { ctx, rt, mounts, skills } = env
+  const gone = join(dir, 'gone')
+  writeFileSync(join(dir, 'other.txt'), 'x')
+  await rt.capabilitySave({ name: 'gone', kind: 'skill', description: 'Missing folder', locator: gone }, { botId: 'chief' })
+  await rt.changeCapabilityAttachment('attach', { name: 'gone' }, 'chief')
+  ctx.emit('agent/created', { agent: testAgent('chief', mounts, skills) })
+  await rt.scheduleCapabilitiesReconcile()
+  const status = rt.capabilityStatusesView().chief.gone
+  assert.equal(status.state, 'error')
+  assert.equal(skills.get('chief').has('gone'), false)
 })

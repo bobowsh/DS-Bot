@@ -823,6 +823,7 @@ export function install(rt) {
       url: { type: 'string', description: 'MCP server URL; write $DSH_SECRET_<NAME> in the path or query to insert a saved secret, URL-encoded. Prefer headers for keys' },
       headers: { type: 'object', additionalProperties: true, description: 'HTTP headers; write $DSH_SECRET_<NAME> to insert a saved secret instead of the value' },
       content: { type: 'string', description: 'Skill instructions' },
+      locator: { type: 'string', description: 'Skill directory holding SKILL.md and its scripts; when set, the skill is read from the file on each mount and the Bot can load its scripts' },
       items: { type: 'array', items: { type: 'string' }, description: 'MCP server and skill names in the pack' },
     },
     output,

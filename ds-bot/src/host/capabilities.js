@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { join, sep } from 'node:path'
 import { encodeUrlComponent } from './secrets.js'
 import { own } from './store.js'
 
@@ -120,6 +122,8 @@ export function install(rt) {
         Object.assign(item, { transport, url, headers: stringMap(body.headers, 'Headers'), approved: true })
       }
     } else if (kind === 'skill') {
+      const locator = String(body.locator ?? '').trim()
+      if (locator !== '') item.locator = locator
       item.content = String(body.content ?? '').trim()
     } else {
       const names = [...new Set(strings(body.items))]
@@ -265,7 +269,17 @@ export function install(rt) {
   const resolveUrl = (url, botId) => String(url).replace(SECRET_REFERENCE, (_match, name) => encodeUrlComponent(secretFor(name, botId)))
   const resolveList = (list, botId) => (list ?? []).map(raw => String(raw).replace(SECRET_REFERENCE, (_match, name) => secretFor(name, botId)))
   const configFor = (item, botId) => {
-    if (item.kind === 'skill') return { name: item.name, description: item.description, content: item.content }
+    if (item.kind === 'skill') {
+      if (item.locator) {
+        const directory = item.locator.split(sep).join('/')
+        return {
+          name: item.name, description: item.description,
+          content: readFileSync(join(item.locator, 'SKILL.md'), 'utf8'),
+          resourceBase: { kind: 'directory', path: directory },
+        }
+      }
+      return { name: item.name, description: item.description, content: item.content }
+    }
     if (item.transport === 'stdio') return { transport: 'stdio', serverName: item.name, command: item.command, args: resolveList(item.args, botId), env: resolveValues(item.env, botId), failOnStartupError: true }
     return { transport: 'streamable-http', serverName: item.name, url: resolveUrl(item.url, botId), headers: resolveValues(item.headers, botId), failOnStartupError: true }
   }
@@ -302,7 +316,10 @@ export function install(rt) {
           name: `ds-bot-capability-skill-${name}`,
           inject: ['skills'],
           apply(c) {
-            c.effect(() => c.skills.register({ name: config.name, description: config.description, source: 'runtime', content: config.content }))
+            c.effect(() => c.skills.register({
+              name: config.name, description: config.description, source: 'runtime', content: config.content,
+              ...(config.resourceBase ? { resourceBase: config.resourceBase } : {}),
+            }))
           },
         }
         : await loadMcpPlugin()
