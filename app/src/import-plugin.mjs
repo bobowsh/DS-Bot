@@ -14,7 +14,7 @@
 // files inside the asar are read once at the start.
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, basename } from 'node:path'
 
 export const PLUGIN_NAME = 'dsh-chat-import'
 
@@ -71,16 +71,20 @@ export function newerVersion(a, b) {
  * @returns {Promise<{ installed: boolean, updated: boolean, listed: boolean }>}
  */
 export async function installImportPlugin({ profileDir, sourceDir }) {
-  const manifest = await readManifest(profileDir)
-  if (manifest === undefined) return { installed: false, updated: false, listed: false }
+  const sourceVersion = await packageVersion(sourceDir)
+  if (sourceVersion === undefined) return { installed: false, updated: false, listed: false }
+  // The profile is made by the Host when it boots, and the app puts the plugin there before
+  // that. The profile's own files are written here as well, so the plugin has a place to live
+  // and the Host finds the profile already there.
+  await mkdir(profileDir, { recursive: true })
+  await mkdir(join(profileDir, 'node_modules'), { recursive: true })
+  const manifest = await readManifest(profileDir) ?? { name: `dsh-profile-${basename(profileDir)}`, private: true, dependencies: {} }
   const bundles = manifest.dsh?.profile?.bundles ?? []
   const dependencies = manifest.dependencies ?? {}
   const known = Object.hasOwn(dependencies, PLUGIN_NAME)
   const listed = bundles.includes(PLUGIN_NAME)
   // The profile depends on it but does not list it: the user turned it off.
   const turnedOff = known && !listed
-  const sourceVersion = await packageVersion(sourceDir)
-  if (sourceVersion === undefined) return { installed: false, updated: false, listed }
   const target = pluginDir(profileDir)
   const targetVersion = await packageVersion(target)
   // The copy is refreshed when the installer carries a newer plugin. A copy that is already the

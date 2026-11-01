@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
@@ -72,6 +72,19 @@ describe('the import plugin in the profile', () => {
   test('an installation without the plugin does not fail the start', async () => {
     const result = await installImportPlugin({ profileDir, sourceDir: join(root, 'missing') })
     assert.equal(result.installed, false)
+  })
+
+  test('the plugin goes into a profile that has no manifest yet', async () => {
+    // The app puts the plugin in place before the Host boots, and the Host writes the profile's
+    // own files when it starts.
+    const fresh = join(root, 'fresh-profile')
+    const result = await installImportPlugin({ profileDir: fresh, sourceDir })
+    assert.equal(result.installed, true)
+    assert.equal(result.listed, true)
+    const written = JSON.parse(readFileSync(join(fresh, 'package.json'), 'utf8'))
+    assert.ok(written.dsh.profile.bundles.includes(PLUGIN_NAME), 'the bundle list names it')
+    assert.equal(written.dependencies[PLUGIN_NAME], '0.26.3', 'the profile depends on it')
+    assert.ok(existsSync(join(fresh, 'node_modules', PLUGIN_NAME, 'cordis.patch.yml')), 'the files are there')
   })
 
   test('a newer plugin in the installer replaces the older copy in the profile', async () => {
