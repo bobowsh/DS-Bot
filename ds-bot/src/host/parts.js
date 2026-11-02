@@ -1203,6 +1203,26 @@ export function install(rt) {
     }
   }
 
+  // Upstream gives a group's own Session its folder only at its next part, but DSH's files panel reads
+  // the cwd of the current Session (dsh-client-ui-sidebar-files: "that Session's workspace root"), so
+  // right after the folder changes the panel still shows the old one. This sets the group Session's
+  // folder at once, without moving any part. Delete it when upstream sets it at once too.
+  async function adoptRoomFolder(roomId) {
+    if (readOnly()) return
+    await rt.load()
+    const room = rt.roomOf(roomId)
+    if (room === undefined) return
+    const folders = ctx.get?.('workingDirectory')
+    const target = rt.workDirOf({ roomId })
+    if (target === undefined || typeof folders?.get !== 'function' || typeof folders?.set !== 'function') return
+    try {
+      const agent = await rt.resolveAgent(rt.sessionOfRoom(room))
+      if (agent.status === 'idle' && folders.get(agent.session) !== target) await folders.set(agent, target)
+    } catch (error) {
+      rt.warn('ds-bot: the group "%s" did not start working in %s at once: %s', room.name, target, error)
+    }
+  }
+
   ctx.on('agent/request-error', async (payload, next) => {
     const failure = payload.failure
     if (!STUCK_CODES.includes(failure?.code)) return next()
@@ -1483,5 +1503,5 @@ export function install(rt) {
     return { sessionId: parts.at(-1).sessionId, ...(await partPage(parts, index, cursor)) }
   }
 
-  Object.assign(rt, { clock, partsOf, historyEntry, partLines, noteText, earlierPage, chatPage, displayItems, followFolder, heldBack, switchJobs: () => switches.values() })
+  Object.assign(rt, { clock, partsOf, historyEntry, partLines, noteText, earlierPage, chatPage, displayItems, followFolder, adoptRoomFolder, heldBack, switchJobs: () => switches.values() })
 }

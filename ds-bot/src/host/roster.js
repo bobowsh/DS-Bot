@@ -558,6 +558,9 @@ export function install(rt) {
       delete room.memberDirs
       changes.push(workDir ? `every member now works in ${workDir} here` : 'every member works in its own folder again')
       void rt.followFolder({ roomId: room.id })
+      // The files panel reads the current Session's cwd, so the group's own Session takes the
+      // folder now rather than at its next part (see adoptRoomFolder).
+      void rt.adoptRoomFolder?.(room.id)
     }
     const before = room.name
     if (name !== undefined) {

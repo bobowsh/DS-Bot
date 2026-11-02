@@ -699,6 +699,8 @@ test('a group whose folder is gone works on in the team workspace and is told on
   assert.equal((await call('update-room', { id: 'r1', workDir: project })).ok, true)
   agentOf('gb').session.header.cwd = project
   rmSync(project, { recursive: true, force: true })
+  // The test is about what assembling a turn does, not about the set the folder change made.
+  sets.length = 0
   assert.equal(await assemble(ctx, agentOf('gb')), true)
   assert.deepEqual(sets, [['gb', team]])
   const notice = () => (state().rooms.r1.log ?? []).filter(line => line.kind === 'notice' && line.reason === 'folder')
@@ -719,6 +721,7 @@ test("a member that never reached the group's folder still brings the one-time n
   t.after(stop)
   assert.equal((await call('update-room', { id: 'r1', workDir: project })).ok, true)
   rmSync(project, { recursive: true, force: true })
+  sets.length = 0
   // 'gb' was made in the team workspace and never moved to the group's folder.
   assert.equal(await assemble(ctx, agentOf('gb')), true)
   assert.deepEqual(sets, [])
@@ -1037,6 +1040,22 @@ test('in a group with a folder of its own a member stays inside it; without one 
   assert.equal(state().rooms.r1.memberDirs.b, project)
   assert.equal(state().bots.b.workDir, undefined)
   assert.equal(state().rooms.r1.workDir, undefined)
+})
+
+// DSH's files panel reads the current Session's cwd (dsh-client-ui-sidebar-files), so right after the
+// group's folder changes its own Session must already be there, not only its next part.
+test('the group\'s own Session is in the folder it is given as soon as it is given', async (t) => {
+  const { sets, service } = folderService()
+  const { call, agentOf, project, state, stop } = await start({ services: { workingDirectory: service } })
+  t.after(stop)
+  assert.equal((await call('update-room', { id: 'r1', workDir: project })).ok, true)
+  assert.equal(state().rooms.r1.workDir, project)
+  await until(() => sets.some(([id, path]) => id === 'r1' && path === project))
+  assert.deepEqual(sets, [['r1', project]])
+  // The files panel reads this: the Session's own working directory, already changed.
+  assert.equal(service.get(agentOf('r1').session), project)
+  // The group's own Session keeps working in it, without a fresh part being made for it.
+  assert.equal(state().rooms.r1.sessionId, undefined)
 })
 
 test('Sessions that are not a Bot\'s keep DSH\'s own working_directory', async (t) => {
