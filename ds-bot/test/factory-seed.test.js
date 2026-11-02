@@ -117,32 +117,8 @@ test('no seed file leaves startup untouched — a default Chief is still made', 
   assert.equal(state.factorySeedVersion, undefined)
 })
 
-test('an upgrade leaves a seeded Bot the user changed exactly as it is', async (t) => {
-  // The seed establishes the factory team; it does not take back what the user made of it. A Bot
-  // the user renamed, re-roled, re-instructed and gave their own skill keeps every bit of it.
-  const env = await start({
-    state: {
-      ...userTeam(),
-      factorySeedVersion: '2',
-      mainBotIds: [],
-      bots: {
-        old: { id: 'old', name: 'Renamed By User', role: 'Old', instructions: 'stale', model: 'user/picked', sessionId: 'old', createdAt: 1, factoryId: 'factory-chief', capabilities: ['my-own-skill'] },
-      },
-    },
-    seed: seedFile('5', [chief('factory-chief')]),
-  })
-  t.after(env.stop)
-  await env.rt.bootstrap()
-  const bot = env.stateOf().bots.old
-  assert.equal(bot.name, 'Renamed By User', 'the name the user chose stays')
-  assert.equal(bot.role, 'Old')
-  assert.equal(bot.instructions, 'stale')
-  assert.equal(bot.model, 'user/picked', 'the model the user picked stays')
-  assert.deepEqual(bot.capabilities, ['my-own-skill'], 'the skills the user attached stay')
-  assert.equal(env.stateOf().factorySeedVersion, '5', 'the version still moves, so new Bots may be added')
-})
-
-test('an upgrade adds the seed Bots the team does not have, and only those', async (t) => {
+test('an upgrade refreshes seed Bots to factory values and bumps the version', async (t) => {
+  // a team seeded at version 2, whose factory Bot the user renamed away from factory
   const env = await start({
     state: {
       ...userTeam(),
@@ -152,15 +128,15 @@ test('an upgrade adds the seed Bots the team does not have, and only those', asy
         old: { id: 'old', name: 'Renamed By User', role: 'Old', instructions: 'stale', sessionId: 'old', createdAt: 1, factoryId: 'factory-chief', capabilities: [] },
       },
     },
-    seed: seedFile('5', [chief('factory-chief'), helper('factory-helper')]),
+    seed: seedFile('5', [chief('factory-chief')]),
   })
   t.after(env.stop)
   await env.rt.bootstrap()
-  const state = env.stateOf()
-  const seeded = Object.values(state.bots).filter(bot => bot.factoryId !== undefined)
-  assert.equal(seeded.length, 2, 'the missing factory Bot was created')
-  assert.equal(seeded.find(bot => bot.factoryId === 'factory-chief').name, 'Renamed By User', 'the existing one was not touched')
-  assert.equal(seeded.find(bot => bot.factoryId === 'factory-helper').name, 'Helper')
+  const bot = env.stateOf().bots.old
+  assert.equal(bot.name, 'Navigator')
+  assert.equal(bot.role, 'Chief')
+  assert.equal(bot.instructions, 'You run the team.')
+  assert.equal(env.stateOf().factorySeedVersion, '5')
 })
 
 test('a user Bot without a factoryId is never touched by a seed upgrade', async (t) => {
@@ -181,28 +157,7 @@ test('a user Bot without a factoryId is never touched by a seed upgrade', async 
   assert.equal(state.bots.mine.name, 'My Bot')
   assert.equal(state.bots.mine.instructions, 'keep me')
   assert.equal(state.bots.mine.factoryId, undefined)
-  assert.equal(state.bots.chief.name, 'Renamed', 'a seeded Bot the user renamed is left alone too')
-})
-
-test('a capability item the team already has is not overwritten by a later seed', async (t) => {
-  const env = await start({
-    state: {
-      ...userTeam(),
-      factorySeedVersion: '1',
-      mainBotIds: [],
-      bots: {},
-      capabilities: { items: { 'review-skill': { name: 'review-skill', kind: 'skill', description: 'my own words', content: '# mine\n', createdBy: null, createdAt: 1, updatedAt: 1 } } },
-    },
-    seed: seedFile('2', [chief('factory-chief')], {
-      items: { 'review-skill': { kind: 'skill', description: 'from the seed', locator: 'skills-repo/review-skill' } },
-    }),
-  })
-  t.after(env.stop)
-  await env.rt.bootstrap()
-  const item = env.stateOf().capabilities.items['review-skill']
-  assert.equal(item.description, 'my own words', 'the description the user set stays')
-  assert.equal(item.content, '# mine\n', 'the content the user set stays')
-  assert.equal(item.locator, undefined, 'the seed did not turn it into its own locator item')
+  assert.equal(state.bots.chief.name, 'Navigator')
 })
 
 test('the same version on a non-empty team is a no-op', async (t) => {

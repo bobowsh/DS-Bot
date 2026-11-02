@@ -62,19 +62,28 @@ export function install(rt) {
     return null
   }
 
-  // Add the seed's capability items that are not there yet, and leave the ones that are. A skill
-  // the user renamed or re-described stays as the user left it: the seed establishes the factory
-  // library, it does not take it back. Items the user made themselves are not named by the seed
-  // and are never touched.
+  // Merge the seed's capability library into state, overwriting items by name and leaving
+  // anything the user made that is not named in the seed.
   function applyCapabilities(seed) {
     state.capabilities ??= { items: {} }
     state.capabilities.items ??= {}
     const items = state.capabilities.items
     for (const [name, raw] of Object.entries(seed.capabilities?.items ?? {})) {
-      if (items[name] !== undefined) continue
       const built = seedItem(name, raw)
       if (built) items[name] = built
     }
+  }
+
+  // Refresh one already-stored seed Bot to factory values. Name, role, instructions, model
+  // and the attached capability list are reset; anything the user changed is overwritten —
+  // that is what "update the factory team" means.
+  function refreshBot(bot, seedBot) {
+    const cleanName = String(seedBot.name ?? '').trim().slice(0, 40)
+    if (cleanName) bot.name = cleanName
+    bot.role = String(seedBot.role ?? '').trim().slice(0, 24)
+    if (seedBot.instructions !== undefined) bot.instructions = String(seedBot.instructions).trim()
+    if (seedBot.model) bot.model = seedBot.model
+    bot.capabilities = [...seedBot.capabilities ?? []]
   }
 
   // Build a seed Bot through createBot so it gets a real Session, kickoff and greeting like
@@ -106,11 +115,9 @@ export function install(rt) {
     return rt.createBot(options)
   }
 
-  // Apply the factory seed. A first launch (empty team) creates every seed Bot. An upgrade
-  // (version moved) adds the seed Bots the team does not have yet and leaves the ones it does:
-  // a Bot the user renamed, re-instructed, re-modelled or gave their own skills to keeps all of
-  // it. The seed establishes the factory team; it does not take back what the user made of it.
-  // A same version on a non-empty team is a no-op.
+  // Apply the factory seed. First launch (empty team) creates every seed Bot; an upgrade
+  // (version moved) refreshes seed Bots by factoryId, adds any new ones, and leaves user Bots
+  // (no factoryId) untouched. A same version on a non-empty team is a no-op (idempotent).
   async function applySeed() {
     const seed = readSeed()
     if (!seed) return
@@ -120,14 +127,16 @@ export function install(rt) {
     applyCapabilities(seed)
     for (const seedBot of seed.bots) {
       const existing = seedBot.factoryId ? Object.values(state.bots).find(bot => bot.factoryId === seedBot.factoryId) : undefined
-      if (existing) continue
-      // One bad seed Bot (a name that clashes with a user's Bot, a failed Session create)
-      // must not abort the whole seed or hang startup: skip it, keep the rest, and record
-      // the version so the next launch does not retry the same failure every boot.
-      try {
-        await createSeedBot(seedBot)
-      } catch (error) {
-        rt.warn('ds-bot: factory seed Bot %s not created: %s', seedBot.factoryId ?? seedBot.name, error?.message ?? error)
+      if (existing) refreshBot(existing, seedBot)
+      else {
+        // One bad seed Bot (a name that clashes with a user's Bot, a failed Session create)
+        // must not abort the whole seed or hang startup: skip it, keep the rest, and record
+        // the version so the next launch does not retry the same failure every boot.
+        try {
+          await createSeedBot(seedBot)
+        } catch (error) {
+          rt.warn('ds-bot: factory seed Bot %s not created: %s', seedBot.factoryId ?? seedBot.name, error?.message ?? error)
+        }
       }
     }
     state.factorySeedVersion = version
