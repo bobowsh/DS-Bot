@@ -98,10 +98,16 @@ async function importSessions(ctx, { service, importer, format, root, sessions }
     try {
       const out = await importer.withVersion(ctx, HOST_SESSION_VERSION, run)
       const status = out?.status ?? out?.mode ?? 'imported'
-      if (status === 'imported' || status === 'appended') summary.imported += 1
+      const imported = status === 'imported' || status === 'appended'
+      if (imported) summary.imported += 1
       else if (status === 'skipped') summary.skipped += 1
       else summary.failed += 1
       summary.results.push({ sourcePath, format, status, ...(out?.error === undefined ? {} : { error: out.error }) })
+      // A session the plugin declined without throwing still says why in the result it gave.
+      // Without this the log counts it as a failure and the reason is nowhere to be found.
+      if (!imported && status !== 'skipped' && out?.error !== undefined) {
+        summary.errors.push({ sourcePath, error: out.error })
+      }
     } catch (error) {
       summary.failed += 1
       summary.results.push({ sourcePath, format, status: 'failed', error: error instanceof Error ? error.message : String(error) })

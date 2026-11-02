@@ -199,3 +199,51 @@ test('the import runs on the context that carries the filesystem service', async
   }
   assert.ok(seen.some(entry => entry.version === 4), 'the target session format version is stated')
 })
+
+test('a session the plugin declined without throwing still says why', async () => {
+  // The plugin can turn a session down without raising: it then reports the reason in the result
+  // it returns. Counting it as a failure and dropping the reason is what leaves an import that
+  // says only "0 sessions" with nothing to go on.
+  const seen = []
+  const pluginDir = await fakePluginDir({
+    'lib/import-core.mjs': 'export async function withHostFormatVersion(ctx, version, fn) { return await fn() }\n',
+    'lib/toolkit.mjs': 'export async function importDiscoveryItem() { return { status: "failed", error: "the session could not be written: format v3" } }\n',
+  })
+  globalThis.__seen = seen
+  const service = fakeImportService({ sessions: ['a.jsonl'], summary: { imported: 1, skipped: 0, failed: 0 } })
+  const ctx = {
+    get: name => {
+      if (name === 'chatImport') return service
+      if (name === 'profileContext') return { dir: pluginDir }
+      return undefined
+    },
+    inject: (names, callback) => {
+      if (names.includes('chatImport')) return callback({ chatImport: service, effect: () => {} })
+      if (names.includes('fs')) return callback({ fs: { resolve: async p => p }, effect: () => {} })
+      return undefined
+    },
+  }
+  const messages = []
+  const previous = process.env.DS_BOT_AUTO_IMPORT
+  const previousHome = process.env.DS_BOT_USER_DSH_HOME
+  process.env.DS_BOT_AUTO_IMPORT = '1'
+  process.env.DS_BOT_USER_DSH_HOME = '/home/.dsh'
+  try {
+    const rt = { ctx, warn: (format, message) => messages.push(String(message ?? format)) }
+    install(rt)
+    const result = await rt.runAutoImport()
+    assert.equal(result.imported, 0)
+    assert.equal(result.failed, 2, 'both formats hold the session and both fail')
+  } finally {
+    delete globalThis.__seen
+    if (previous === undefined) delete process.env.DS_BOT_AUTO_IMPORT
+    else process.env.DS_BOT_AUTO_IMPORT = previous
+    if (previousHome === undefined) delete process.env.DS_BOT_USER_DSH_HOME
+    else process.env.DS_BOT_USER_DSH_HOME = previousHome
+    await rm(pluginDir, { recursive: true, force: true })
+  }
+  assert.ok(
+    messages.some(message => message.includes('format v3')),
+    `the reason the plugin gave is in the log: ${messages.join(' | ')}`,
+  )
+})
