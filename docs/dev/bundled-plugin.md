@@ -3,7 +3,15 @@
 一个插件要随桌面应用一起装进用户的机器，装完就能用，而且**用户能在插件管理界面里把它关掉**。
 本文是这条路的做法与它背后的机制，照着做就能加下一个预置插件。
 
-范例：`dsh-chat-import`（需求九，提交 `6e30a95` 与 `7a0d6ac`）。
+范例：`dsh-chat-import`（需求九，提交 `6e30a95`、`7a0d6ac`，以及 `ea01ed5` 的清理）。
+
+## 一句话结论
+
+放 **app 的 `dependencies`** → 界面当它是「app 自带的」，**没有开关**。
+放 **profile 的 `node_modules`** → 界面当它是「用户装的插件」，**有开关**，而且照样随包分发、不联网。
+
+差别只在一处判定（`shipped`），但它决定了这个插件用户能不能关。
+
 
 ## 为什么不能放进 dependencies
 
@@ -170,6 +178,36 @@ profile 里存着上一版插件，app 升级会带来新版。每次启动时�
 6. `app/src/main.mjs` 在 Host 启动前调用它；
 7. 测试覆盖这几条：首次装上、版本更新时覆盖、版本相同时不动、用户禁用后不写回、profile 还没有 manifest 时也能装；
 8. 打包后实测：包在 `resources/bundled-plugins/` 里、首启后 profile 的 `node_modules` 里有它、profile 的 `dependencies` 里有它。
+
+## 怎么验证它真的生效
+
+「测试全绿」不等于「装到机器上真的能用」——这条路有三段（打包 → 首启解包 → DSH 认它），
+单元测试只覆盖第二段的逻辑。装好的包要用真实进程验一遍，四条断言缺一不可：
+
+| 断言 | 读哪里 | 说明 |
+|---|---|---|
+| 压缩包随包分发了 | `<安装目录>/resources/bundled-plugins/<包名>.tgz` | 不存在说明 `extraResources` 没配上 |
+| 插件的文件进了 profile | `<data>/profiles/<profile>/node_modules/<包名>/` 有内容 | 只有 `package.json` 没有 `lib/` 说明解包漏了 |
+| **profile 依赖它** | profile `package.json` 的 `dependencies[<包名>]` | 没有这一条，`shipped` 判定和启用状态都会错 |
+| **启用列表里有它** | profile `package.json` 的 `dsh.profile.bundles` | 不在列表里 = 出厂就是关闭的，用户开机看不到功能 |
+| 子依赖也在旁边 | profile `node_modules/` 下能找到 `fzstd` 这类 | 少了插件加载直接失败，整行不激活 |
+
+跑法：用 `DS_BOT_HOME` + `DS_BOT_SHELL_DATA` 指到临时目录启动打包后的 exe，等 Host 打印
+`dsh web: http://127.0.0.1:<port>/`（说明启动走到位了），再从 Node 读上面几个路径。
+`app/scripts/check-packed.mjs` 是同一思路的完整版（它还驱动界面发一条消息）。
+
+> **`DS_BOT_HOME` 会跳过首次启动的分支**。只在验「首启解包」时才用它；验「真首启自动导入」
+> 必须用装机后的固定目录（不设 `DS_BOT_HOME`、且 `locations.json` 不存在），这两件事的触发条件不同。
+
+本次实现（`dsh-chat-import` 0.26.3）实测结果，可作为对照：
+
+```
+压缩包：1,368,240 字节，解出来 "version": "0.26.3"
+profile 依赖：true (0.26.3)
+启用列表包含：true
+插件目录：10 项，含 cordis.patch.yml
+旁边的包：dsh-chat-import, fzstd
+```
 
 ## 已知代价
 
