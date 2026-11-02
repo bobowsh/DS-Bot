@@ -206,3 +206,38 @@ test('a first start whose seed copy has not landed reads the packaged resources 
   assert.equal(seeded[0].name, 'Navigator')
   assert.equal(state.factorySeedVersion, '7')
 })
+
+test('a Bot created from the seed starts with the skills the seed gives it', async (t) => {
+  // A refresh path already set capabilities; a Bot created on a first start did not, so a fresh
+  // install opened with the library in place but nobody holding a skill.
+  const env = await start({
+    state: { ...userTeam(), mainBotIds: [], bots: {} },
+    seed: seedFile('1', [
+      chief('factory-chief'),
+      { ...helper('factory-helper'), capabilities: ['review-skill', 'grilling'] },
+    ], { items: { 'review-skill': { kind: 'skill', description: 'Code review', content: '# review\n' }, grilling: { kind: 'skill', description: 'Grill the request', content: '# grilling\n' } } }),
+  })
+  t.after(env.stop)
+  await env.rt.bootstrap()
+  const state = env.stateOf()
+  const created = Object.values(state.bots).filter(bot => bot.factoryId !== undefined)
+  assert.equal(created.length, 2)
+  const navigator = created.find(bot => bot.factoryId === 'factory-chief')
+  const support = created.find(bot => bot.factoryId === 'factory-helper')
+  assert.deepEqual(navigator.capabilities, ['review-skill'], 'the chief holds what the seed gives it')
+  assert.deepEqual(support.capabilities, ['review-skill', 'grilling'], 'the helper holds both skills it was given')
+  // Both skills are in the library too, so the names resolve.
+  for (const name of ['review-skill', 'grilling']) assert.ok(state.capabilities.items[name] !== undefined, `${name} is in the library`)
+})
+
+test('a seed Bot with no skills is created with no skills, not an empty override', async (t) => {
+  const env = await start({
+    state: { ...userTeam(), mainBotIds: [], bots: {} },
+    seed: seedFile('1', [{ ...helper('factory-helper'), name: 'Plain' }]),
+  })
+  t.after(env.stop)
+  await env.rt.bootstrap()
+  const seeded = Object.values(env.stateOf().bots).filter(bot => bot.factoryId === 'factory-helper')
+  assert.equal(seeded.length, 1)
+  assert.deepEqual(seeded[0].capabilities, [], 'a Bot the seed gives no skills starts with none')
+})
