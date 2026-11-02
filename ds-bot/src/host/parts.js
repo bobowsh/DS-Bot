@@ -1203,35 +1203,6 @@ export function install(rt) {
     }
   }
 
-  // A group's own Session is the one its file panel reads, so it takes the group's folder at
-  // once; each member's conversation in the group goes on to a fresh part at its next turn
-  // there, which an idle one can start now.
-  async function followRoomFolder(roomId) {
-    if (readOnly()) return
-    await rt.load()
-    const room = rt.roomOf(roomId)
-    if (room === undefined) return
-    const folders = ctx.get?.('workingDirectory')
-    const target = rt.workDirOf({ roomId })
-    if (target !== undefined && typeof folders?.get === 'function' && typeof folders?.set === 'function') {
-      try {
-        const agent = await rt.resolveAgent(roomId)
-        if (agent.status === 'idle' && folders.get(agent.session) !== target) await folders.set(agent, target)
-      } catch (error) {
-        rt.warn('ds-bot: the group "%s" did not start working in %s: %s', room.name, target, error)
-      }
-    }
-    for (const sessionId of Object.values(room.sessions ?? {})) {
-      if (typeof sessionId !== 'string' || switches.has(sessionId)) continue
-      try {
-        const agent = await rt.resolveAgent(sessionId)
-        if (agent.status === 'idle' && await folderMove(agent) !== undefined) startSwitch(agent, { folder: true })
-      } catch (error) {
-        rt.warn('ds-bot: a member of the group "%s" did not move on to a fresh part there: %s', room.name, error)
-      }
-    }
-  }
-
   ctx.on('agent/request-error', async (payload, next) => {
     const failure = payload.failure
     if (!STUCK_CODES.includes(failure?.code)) return next()
@@ -1311,7 +1282,7 @@ export function install(rt) {
     const timer = setTimeout(() => {
       void rt.load()
         .then(async () => {
-          for (const room of Object.values(rt.state.rooms)) if (room.workDir) await followRoomFolder(room.id)
+          for (const room of Object.values(rt.state.rooms)) if (room.workDir) await followFolder({ roomId: room.id })
         })
         .catch(error => rt.warn('ds-bot: the groups did not start working in their folders: %s', error))
     }, RESUME_DELAY_MS)
@@ -1512,5 +1483,5 @@ export function install(rt) {
     return { sessionId: parts.at(-1).sessionId, ...(await partPage(parts, index, cursor)) }
   }
 
-  Object.assign(rt, { clock, partsOf, historyEntry, partLines, noteText, earlierPage, chatPage, displayItems, followFolder, followRoomFolder, heldBack, switchJobs: () => switches.values() })
+  Object.assign(rt, { clock, partsOf, historyEntry, partLines, noteText, earlierPage, chatPage, displayItems, followFolder, heldBack, switchJobs: () => switches.values() })
 }
