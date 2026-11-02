@@ -3,7 +3,9 @@
 一个插件要随桌面应用一起装进用户的机器，装完就能用，而且**用户能在插件管理界面里把它关掉**。
 本文是这条路的做法与它背后的机制，照着做就能加下一个预置插件。
 
-范例：`dsh-chat-import`（需求九，提交 `6e30a95`、`7a0d6ac`，以及 `ea01ed5` 的清理）。
+本文按**清单式**写：装进 profile 的不是一个插件，而是安装包携带的一组插件，每个都独立、都能被用户单独关掉。
+
+范例：`dsh-chat-import`（需求九，提交 `6e30a95`、`7a0d6ac`、`ea01ed5` 的清理）；清单式改造见提交 `4e8ebc1`。
 
 ## 一句话结论
 
@@ -41,6 +43,25 @@ const shipped = Object.hasOwn(installation.dependencies ?? {}, name);
 三步：**放在 devDependencies（npm 装它，开发时可跑）→ extraResources 随包分发（离线可用）→
 首启复制进 profile 的 node_modules（手装插件的待遇）**。
 
+清单式的做法把这三步都改成「按清单循环」，清单写在 `app/scripts/before-pack.mjs`：
+
+```js
+export const BUNDLED_PLUGINS = [
+  'dsh-chat-import',
+  'dsh-rule-manager',
+  'dsh-session-manager',
+  'dsh-tool-activator',
+  '@copylee/dsh-computer-use',
+  '@jayyuen66/dsh-ocr-review',
+  '@j62268781-alt/dsh-skills-mcp-manager',
+  '@linxin666/dsh-client-ui-git-graph',
+  'deepseek-harness-intelligent-ui',
+]
+```
+
+加一个预置插件 = 在这个清单里加一行；包内容从插件开发目录的 `pack/` 取（见下一节）。
+
+
 ### 1. app/package.json：放进 devDependencies
 
 ```json
@@ -56,9 +77,9 @@ const shipped = Object.hasOwn(installation.dependencies ?? {}, name);
 - `package-lock.json` 用 `npm install --package-lock-only` 增量更新，**不要**用带
   `--legacy-peer-deps` 的整树安装（它会重新求解，把打包要的依赖从 lock 里剔掉）。
 
-### 2. app/electron-builder.yml：随包分发（一个压缩包）
+### 2. app/electron-builder.yml：随包分发（一组压缩包）
 
-打包时把插件目录压成一个 `.tgz`（`npm pack` 的标准形态），放在 `extraResources` 里：
+打包时把每个插件压成一个 `.tgz`（`npm pack` 的标准形态），整组放进 `extraResources`：
 
 ```yaml
 extraResources:
@@ -66,22 +87,54 @@ extraResources:
     to: bundled-plugins
 ```
 
-这个归档由 `beforePack` 钩子生成（`app/scripts/bundled-plugin.mjs`，用 `tar` 包打成 gzipped tar），
-装完它在 `<安装目录>\resources\bundled-plugins\<包名>.tgz`。
+这些归档由 `beforePack` 钩子生成（`app/scripts/bundled-plugin.mjs`，用 `tar` 包打成 gzipped tar），
+装完它们在 `<安装目录>\resources\bundled-plugins\<压平的包名>-<版本>.tgz`。
+
+**文件名要把 scope 压平**：`@copylee/dsh-computer-use` 打成 `copylee-dsh-computer-use-0.8.1.tgz`。
+`bundled-plugins` 是**平铺的一层目录**，名字里带 `/` 会变成子目录，安装器只读这一层，永远找不到它。
+包里真正的包名仍带 scope，首启解包时从归档的 `package.json` 读回来（`archivePackageName`）。
 
 > **为什么用压缩包而不是一堆散文件**：安装包里少几百个文件，占的地方也小得多。
 > 归档是 npm 自己发布的格式，将来想改成 `npm install <tgz>` 也不用换文件。
 
+### 2.1 包内容从哪来：插件开发目录
+
+包内容**不从 profile 的 `node_modules` 现取**，而是从插件开发目录：
+`E:\dsbot-work\dsh-plugins-dev\<插件名>\`，每个插件一个子目录：
+
+```
+<插件名>\
+├─ src\             ← git 源码（作者仓库的默认分支最新代码，供以后改插件）
+├─ pack\            ← 打包用的包内容（实际进 tgz 的就是这一份）
+└─ SOURCE-NOTE.md   ← 来源、版本、有没有真源码
+```
+
+`prepareBundledPlugins` 按这个顺序找包：`<dev>/<名字不带 scope>/pack` → `<dev>/<全名>/pack` →
+`app/node_modules/<全名>`（最后一个兜住 `dsh-chat-import` 这种只在 app 里装的）。
+开发目录由 `DS_BOT_PLUGINS_DEV` 指定，默认是仓库上一级的 `dsh-plugins-dev`。
+
+**`pack/` 用哪个版本**：要出厂的那一版。可以在 `src/` 里构建出来再拷进 `pack/`（本例的
+`dsh-tool-activator 0.4.3` 就是这样：`pnpm install && pnpm run build` 后按 `package.json` 的
+`files` 列表拷进 `pack/`），也可以直接用 npm 已装的那一版。
+
+**`src` 里有真源码的才算「源码仓」**：有的插件 `repository` 指向空仓库（作者没发布源码，如
+`@linxin666/dsh-client-ui-git-graph`、`deepseek-harness-intelligent-ui`），这两个只有 `pack/`，
+`SOURCE-NOTE.md` 里写清原因。
+
 ### 3. 首启解包进 profile
 
-解包发生在 **Electron 主进程**（`app/src/main.mjs`），在 Host 启动之前：
+解包发生在 **Electron 主进程**（`app/src/main.mjs`），在 Host 启动之前，**按清单逐个装**：
 
 ```js
-await installImportPlugin({
-  profileDir: join(where.dataDir, 'profiles', PROFILE),
-  archive: join(resourcesDir(), 'bundled-plugins', 'dsh-chat-import.tgz'),
-})
+for (const entry of bundledPlugins(resourcesDir())) {
+  // 文件名是压平的，真正的包名从归档自己的 manifest 读回来。
+  const name = await archivePackageName(entry.path) ?? entry.name
+  await installImportPlugin({ profileDir, archive: entry.path, name, version: entry.version })
+    .catch(error => { console.error(`LinkBot: the plugin ${name} was not put in place:`, error) })
+}
 ```
+
+一个插件装失败只影响它自己（`catch` 拦住），不会让启动失败，也不会挡住清单里后面的插件。
 
 **解包只靠 Node 内建的 `zlib`**（`app/src/import-plugin.mjs` 的 `readTgz` / `unpackTgz`）——
 tgz 就是 gzip 压的 tar，tar 的格式很简单（每 512 字节一个头），几十行就能读，
@@ -93,6 +146,14 @@ tgz 就是 gzip 压的 tar，tar 的格式很简单（每 512 字节一个头）
 > 整行没激活，`import_chat` 工具和首启自动导入**一起消失**，而日志里看不出原因。
 > 所以 `prepareBundledPlugins` 会把插件的依赖（和依赖的依赖）一起收进归档，
 > 解包时放在 profile 的 `node_modules` 根——**紧挨着插件**，Node 才找得到。
+>
+> 同一类失败的另一个例子：`@jayyuen66/dsh-ocr-review` 缺 `@jayyuen66/dsh-plugin-shared`
+> （它自己的依赖，不是宿主包），加载报 `Cannot find package '@jayyuen66/dsh-plugin-shared'`。
+> 把这个依赖放进它的 `pack/node_modules/` 之后就能加载了。
+>
+> **要分清「缺宿主包」和「缺自己的依赖」**：`@deepseek-ai/*` 由宿主 DSH 提供，profile 里本来就没有
+> （实测装机后的 `profiles/ds-bot/node_modules` 只有插件本身和它的依赖），不需要也没法打进去；
+> 其余名字的包都是插件自己的依赖，必须随归档带。
 
 profile 是 DSH 管的目录，插件放在它的 `node_modules` 里，就是**用户手装插件的待遇**：
 
@@ -169,15 +230,37 @@ profile 里存着上一版插件，app 升级会带来新版。每次启动时�
 
 加一个新的预置插件：
 
-1. `app/package.json` 的 `devDependencies` 加包名和版本；
-2. `npm install --package-lock-only` 更新 lock（**不要**用整树安装）；
-3. `app/scripts/bundled-plugin.mjs` 不用改（它打包任何包），在 `app/scripts/before-pack.mjs` 的
-   `preparePlugins(appDir, [...])` 里加上包名；
-4. `app/electron-builder.yml` 的 `extraResources` 加一条 `from: build/bundled-plugins` → `to: bundled-plugins`；
-5. 在 `app/src/import-plugin.mjs` 里加这个插件（解包、比对版本、写 profile）；
-6. `app/src/main.mjs` 在 Host 启动前调用它；
-7. 测试覆盖这几条：首次装上、版本更新时覆盖、版本相同时不动、用户禁用后不写回、profile 还没有 manifest 时也能装；
-8. 打包后实测：包在 `resources/bundled-plugins/` 里、首启后 profile 的 `node_modules` 里有它、profile 的 `dependencies` 里有它。
+1. 把包内容放进 `dsh-plugins-dev\<插件名>\pack\`（需要有 `package.json`、`cordis.patch.yml`、入口文件）；
+   有 git 源码的放 `src\`，并写一份 `SOURCE-NOTE.md` 记来源与版本；
+2. `app/scripts/before-pack.mjs` 的 `BUNDLED_PLUGINS` 里加一行包名；
+3. `app/electron-builder.yml` 的 `extraResources` 已有 `from: build/bundled-plugins`，**不用改**；
+4. `app/src/main.mjs` 和 `app/src/import-plugin.mjs` **也不用改**（它们按清单循环，包名从归档读）；
+5. 如果这个插件有自己的 npm 依赖（不是 `@deepseek-ai/*`），把它放进 `pack/node_modules/`，
+   否则装到用户机器上会 `Cannot find package`；
+6. 测试：`app/test/import-plugin.test.mjs` 里「the other bundled plugins」那组覆盖了多插件、scoped 包名、
+   互不干扰、禁用保持；新插件按需补断言；
+7. 打包后实测：归档在 `resources/bundled-plugins/` 里、首启后 profile 的 `node_modules` 里有它、
+   profile 的 `dependencies` 和 `dsh.profile.bundles` 里都有它。
+
+### 加插件前的加载测试（必做）
+
+**装进 profile ≠ 能加载**。插件装好后要能在宿主环境里 `import()` 成功，缺自己的依赖就会失败，
+而那时用户看到的是「插件在列表里但功能没出现」。
+
+测试方法要注意一点：**不能在一个空目录里直接 `import()` 插件入口**。实测那样连
+`dsh-chat-import`（装机验证过能用的）都会报 `Cannot find package '@deepseek-ai/dsh-llm'`——
+因为 `@deepseek-ai/*` 由宿主提供，profile 里没有。要按宿主的方式解析：为 `@deepseek-ai/*`
+加一层 fallback 到宿主的 `node_modules`（开发时是 `ds-bot/dev/harness/node_modules`，
+装机后是安装目录里的 DSH），其余从 profile 解析。
+
+判定三类结果：
+
+| 结果 | 含义 |
+|---|---|
+| OK | 在宿主环境里能加载 |
+| PATCH-ONLY | 只有 `cordis.patch.yml`、没有运行时入口（纯补丁型，正常） |
+| FAIL | 缺包/入口缺失，**不能出厂**，除非把缺的依赖补进归档 |
+
 
 ## 怎么验证它真的生效
 
