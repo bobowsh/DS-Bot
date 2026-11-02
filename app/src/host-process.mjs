@@ -12,6 +12,30 @@ const settlesWithin = (promise, ms) => new Promise((resolve) => {
   void promise.then(() => { clearTimeout(timer); resolve(true) })
 })
 
+/**
+ * Write to one of this process's own streams, keeping a stream that cannot be written to from
+ * ending the process.
+ *
+ * A launcher that started the app and then went away leaves stdout and stderr as pipes with no
+ * reader: writing throws EPIPE, or emits it as an `error` event, and either one is uncaught and
+ * fatal. The Host's output is only echoed here, so a write that cannot be made is dropped.
+ * @param {NodeJS.WriteStream} stream - the stream to write to
+ * @param {string} text - what to write
+ */
+export function forward(stream, text) {
+  // The handler stays for the life of the stream: a later write fails the same way, and the
+  // write that failed has already been dropped.
+  if (!stream.__dsBotForwardGuard) {
+    stream.__dsBotForwardGuard = true
+    stream.on('error', () => {})
+  }
+  try {
+    stream.write(text)
+  } catch {
+    // EPIPE and its siblings: the reader is gone, so this output has nowhere to go.
+  }
+}
+
 export class HostProcess {
   #options
   #child
@@ -41,9 +65,14 @@ export class HostProcess {
       this.#child = child
       child.stdout.setEncoding('utf8')
       child.stderr.setEncoding('utf8')
-      child.stdout.on('data', (chunk) => { process.stdout.write(redact(chunk)) })
+      // The Host's output goes to this process's own stdout and stderr, which are pipes when the
+      // app was started by a launcher that has gone away: a write then fails with EPIPE (or
+      // ECONNRESET), and an unhandled one of those ends the main process, which would take the
+      // running team down with it. The output is only a copy of what the Host said, so a write
+      // that cannot be made is dropped.
+      child.stdout.on('data', (chunk) => { forward(process.stdout, redact(chunk)) })
       child.stderr.on('data', (chunk) => {
-        process.stderr.write(redact(chunk))
+        forward(process.stderr, redact(chunk))
         this.#stderr = (this.#stderr + chunk).slice(-STDERR_TAIL_CHARS)
       })
       child.on('message', (message) => {
