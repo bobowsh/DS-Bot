@@ -160,8 +160,6 @@ export async function installImportPlugin({ profileDir, archive, version }) {
   const dependencies = manifest.dependencies ?? {}
   const known = Object.hasOwn(dependencies, PLUGIN_NAME)
   const listed = bundles.includes(PLUGIN_NAME)
-  // The profile depends on it but does not list it: the user turned it off.
-  const turnedOff = known && !listed
   // The copy is refreshed when the installer carries a newer plugin. A copy that is already the
   // same version is left alone, and so is one that is newer than the installer (a user who put
   // a newer plugin in place keeps it).
