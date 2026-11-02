@@ -214,15 +214,29 @@ profile 依赖：true (0.26.3)
 - **profile 里有一份运行副本**：安装目录里是压缩包（一个文件），data 目录里是解开的副本（用户数据区）。
 - **用户禁用后，压缩包还在**：用户关掉的是插件的运行，不是安装包里的文件。
 
-## 备选方案：用 npm 装 tgz
+## 备选方案：交给 npm / pnpm 装 tgz
 
-也可以把 tgz 交给 npm：`npm install <tgz> --prefix <profile>`，让 npm 自己解压、处理依赖、写 manifest，
-比手写 manifest 更标准。**本项目没有采用**，理由：
+也可以把 tgz 交给包管理器：`pnpm add <tgz> --prefix <profile>`，让它自己解压、处理依赖、写
+manifest，比手写 manifest 更标准。**本项目没有采用**，理由：
 
-- 首启要跑一次 npm，多花几秒，还要一个可用的 npm（app 带的是 pnpm，Host 用它）；
-- 插件的依赖树要交给 npm 解析，失败点在启动路径上；
+- **装机环境里没有 npm**：Electron 自带自己的 Node 运行时，不带 npm CLI（实测 `npm --version`
+  在这个环境里是 `ENOENT`）。app 只随包带 pnpm（`app/node_modules/pnpm`，Host 进程启动时用它），
+  所以这条路实际只能用 pnpm 走，不是 npm。
+- **离线是硬要求**：`pnpm add` 即使拿到本地 tgz，也可能为了解析 peer 依赖去问 registry。首启时
+  网络没通，用户看到的就是卡住或者报错。要真离线得加 `--offline` 并确认 store 里已有全部依赖，
+  这又多一层要在真机上验的东西。
+- **失败点挪到了启动路径上**：现在解包失败只是 `installImportPlugin` 返回 `installed: false`，
+  启动照走；换成包管理器就多了一个可能卡住启动的子进程。
 - 现在的做法是**解包 + 自己写 profile 的 manifest**，`dependencies` 与 `bundles` 两行都在
-  `app/src/import-plugin.mjs` 里，一眼能看完；
-- 插件若带子依赖（如 `fzstd`），目录直拷要一并处理，交给 npm 更省心——**这是 npm 方案真正的优势**，
-  等到有带依赖的预置插件时值得重新评估。
+  `app/src/import-plugin.mjs` 里，一眼能看完。
+
+### 子依赖不是问题：tgz 里已经带了
+
+这条容易误解，写清楚：`prepareBundledPlugins` 打包时会把插件的依赖一起收进 tgz 的
+`package/node_modules/`（本次是 `fzstd`，215 个文件里的 8 个）。`unpackTgz` 专门处理这一层——
+把它摊到 profile 的 `node_modules` 根、紧挨着插件，Node 才找得到。所以「目录直拷要手动处理依赖」
+这件事**已经做了**，不是待办。
+
+实测：解包后 profile 的 `node_modules` 下并排出现 `dsh-chat-import` 和 `fzstd` 两个包。
+
 
