@@ -1,7 +1,7 @@
 {
   "name": "deepseek-bot",
   "productName": "LinkBot",
-  "version": "0.2.5-rc3",
+  "version": "0.2.5-rc4",
   "private": true,
   "description": "LinkBot desktop app: the ds-bot team on its own pinned DeepSeek Harness.",
   "author": "Fei2411",
