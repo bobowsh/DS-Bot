@@ -139,7 +139,7 @@ export function install(rt) {
     return holdName('bot', cleanName, () => buildBot(cleanName, options))
   }
 
-  async function buildBot(cleanName, { role = '', instructions = '', color, brief = '', createdBy, main = false, avatar, model, effort, workDir, copyOf, pickModel = false, factoryId }) {
+  async function buildBot(cleanName, { role = '', instructions = '', color, brief = '', createdBy, main = false, avatar, model, effort, workDir, copyOf, pickModel = false, factoryId, capabilities }) {
     const cleanAvatarValue = cleanAvatar(avatar)
     // The model is fixed at creation, so a later change of the DSH default leaves it alone.
     const modelRef = model ? await rt.resolveModel(model) : pickModel ? undefined : await rt.defaultModel()
@@ -169,7 +169,9 @@ export function install(rt) {
         instructions: String(instructions).trim(),
         createdAt: Date.now(),
         createdBy: createdBy ?? null,
-        capabilities: [],
+        // The skills a Bot starts with: a seeded Bot gets the ones its seed names, a Bot the user
+        // makes starts bare and is given skills later.
+        capabilities: Array.isArray(capabilities) ? [...capabilities] : [],
         ...(factoryId ? { factoryId: String(factoryId) } : {}),
       }
       if (main) state.mainBotIds.push(id)

@@ -98,6 +98,9 @@ export function install(rt) {
       main: seedBot.main === true,
       createdBy: null,
       factoryId: seedBot.factoryId,
+      // The skills the seed gives this Bot. Without this a seeded team opens with the capability
+      // library in place but nobody holding a skill, which looks like the seed did nothing.
+      ...(Array.isArray(seedBot.capabilities) ? { capabilities: [...seedBot.capabilities] } : {}),
     }
     if (seedBot.model) {
       try {

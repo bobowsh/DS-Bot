@@ -18,7 +18,7 @@ import { downloadSaver } from './downloads.mjs'
 import { canonicalExecPath } from './canonical-path.mjs'
 import { chooseLocations, localeText, programFolder, saveLocations, text } from './first-run.mjs'
 import { removeDshHomeVariableWithNotice } from './auto-import.mjs'
-import { installImportPlugin } from './import-plugin.mjs'
+import { archivePackageName, installImportPlugin } from './import-plugin.mjs'
 import { installFactoryResources, pullSkillsRepo } from './factory.mjs'
 import { hostPort } from './host-port.mjs'
 import { HostProcess } from './host-process.mjs'
@@ -173,25 +173,42 @@ function stopHost() {
 }
 
 /**
- * The plugin archive the installer carries, with the version its file name carries. The name
+ * The plugin archives the installer carries, with the version each file name carries. The name
  * holds the version so a start that finds nothing to do reads a file name, not the archive.
  * @param {string} resourcesDir - the app's resources directory
- * @param {string} name - the plugin's package name
- * @returns {{ path: string, version: string } | undefined}
+ * @returns {{ name: string, path: string, version: string }[]}
  */
-export function findBundledPlugin(resourcesDir, name) {
+export function bundledPlugins(resourcesDir) {
   const dir = join(resourcesDir, 'bundled-plugins')
   let entries
   try {
     entries = readdirSync(dir)
   } catch {
-    return undefined
+    return []
   }
-  const found = entries
-    .map(file => /^(.+)-(\d+\.\d+\.\d+(?:-[\w.]+)?)\.tgz$/u.exec(file))
-    .filter(match => match[1] === name)
-    .sort((a, b) => b[2].localeCompare(a[2], 'en', { numeric: true }))[0]
-  return found === undefined ? undefined : { path: join(dir, `${name}-${found[2]}.tgz`), version: found[2] }
+  // A scoped name is packed with the scope flattened to a dash, so the version is the last
+  // dashed segment and everything before it is the name.
+  const found = []
+  for (const file of entries) {
+    const match = /^(.+)-(\d+\.\d+\.\d+(?:-[\w.]+)?)\.tgz$/u.exec(file)
+    if (match === null) continue
+    found.push({ name: match[1], path: join(dir, file), version: match[2] })
+  }
+  return found.sort((a, b) => a.name.localeCompare(b.name, 'en'))
+}
+
+/**
+ * The plugin archive the installer carries for one package, by its flattened file name.
+ * @param {string} resourcesDir - the app's resources directory
+ * @param {string} name - the plugin's package name
+ * @returns {{ path: string, version: string } | undefined}
+ */
+export function findBundledPlugin(resourcesDir, name) {
+  const flattened = name.replace(/^@/u, '').replace(/\//gu, '-')
+  const found = bundledPlugins(resourcesDir)
+    .filter(entry => entry.name === flattened)
+    .sort((a, b) => b.version.localeCompare(a.version, 'en', { numeric: true }))[0]
+  return found === undefined ? undefined : { path: found.path, version: found.version }
 }
 
 async function start() {
@@ -213,16 +230,20 @@ async function start() {
     onFailure: fail,
   })
   const ready = (async () => {
-    // The import plugin belongs to the profile, not to the app: the user may turn it off in the
-    // plugin manager. It travels with the installer and is unpacked into the profile here, before
-    // the Host starts, so the profile already holds it when DSH composes the bundle list.
-    const plugin = findBundledPlugin(resourcesDir(), 'dsh-chat-import')
-    if (plugin !== undefined) {
+    // The bundled plugins belong to the profile, not to the app: the user may turn each one off in
+    // the plugin manager. They travel with the installer and are unpacked into the profile here,
+    // before the Host starts, so the profile already holds them when DSH composes the bundle list.
+    // A plugin turned off stays off: installImportPlugin reads the profile's own manifest and does
+    // not put a bundle back into a list the user removed it from.
+    for (const entry of bundledPlugins(resourcesDir())) {
+      // The file name is flattened, so the package name comes from the archive's own manifest.
+      const name = await archivePackageName(entry.path) ?? entry.name
       await installImportPlugin({
         profileDir: join(where.dataDir, 'profiles', PROFILE),
-        archive: plugin.path,
-        version: plugin.version,
-      }).catch(error => { console.error('LinkBot: the import plugin was not put in place:', error) })
+        archive: entry.path,
+        name,
+        version: entry.version,
+      }).catch(error => { console.error(`LinkBot: the plugin ${name} was not put in place:`, error) })
     }
     // The factory seed and the bundled skills repo land before the Host starts: ds-bot builds
     // the seeded team at its startup, and reads the seed file from the data location. It runs

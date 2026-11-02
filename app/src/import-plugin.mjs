@@ -19,8 +19,8 @@ import { gunzipSync } from 'node:zlib'
 
 export const PLUGIN_NAME = 'dsh-chat-import'
 
-/** Where the plugin is put inside the profile. */
-const pluginDir = profileDir => join(profileDir, 'node_modules', PLUGIN_NAME)
+/** Where a plugin is put inside the profile. */
+const pluginDir = (profileDir, name) => join(profileDir, 'node_modules', ...name.split('/'))
 
 /**
  * The files of a gzipped tar, read with the zlib that Node carries: the archive is the shape npm
@@ -110,6 +110,23 @@ async function archiveVersion(archive) {
 }
 
 /**
+ * The package name an archive holds, read from its manifest. An installer names its archives with
+ * the scope flattened (`scope-name-1.2.3.tgz`), so the name inside is what identifies the package.
+ * @param {string} archive - the plugin's archive
+ * @returns {Promise<string | undefined>}
+ */
+export async function archivePackageName(archive) {
+  try {
+    const entries = readTgz(await readFile(archive))
+    const manifest = entries.find(entry => entry.path === 'package/package.json')
+    const name = manifest === undefined ? undefined : JSON.parse(manifest.body.toString('utf8')).name
+    return typeof name === 'string' && name.trim() !== '' ? name.trim() : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * Whether `a` is a newer version than `b`. A pre-release is older than the release it leads to,
  * and a pre-release is compared by its own parts. The same rule the app's own update check uses.
  * @param {string} a @param {string} b
@@ -129,7 +146,7 @@ export function newerVersion(a, b) {
 }
 
 /**
- * Put the plugin into the profile and add it to the profile's bundle list.
+ * Put a bundled plugin into the profile and add it to the profile's bundle list.
  *
  * The bundle list is only touched the first time: the plugin manager removes a bundle from the
  * list when the user turns it off, and the profile keeps it in its dependencies, so the app can
@@ -140,11 +157,12 @@ export function newerVersion(a, b) {
  * @param {object} options
  * @param {string} options.profileDir - the profile directory
  * @param {string} options.archive - the plugin's archive inside the installation
+ * @param {string} [options.name] - the package name, when it is not the import plugin
  * @param {string} [options.version] - the archive's version, when the file name carries it
  * @returns {Promise<{ installed: boolean, updated: boolean, listed: boolean }>}
  */
-export async function installImportPlugin({ profileDir, archive, version }) {
-  const target = pluginDir(profileDir)
+export async function installImportPlugin({ profileDir, archive, name = PLUGIN_NAME, version }) {
+  const target = pluginDir(profileDir, name)
   const targetVersion = await packageVersion(target)
   // The version is in the archive's name, so a start that finds nothing to do reads a file name
   // instead of unpacking the archive.
@@ -158,8 +176,8 @@ export async function installImportPlugin({ profileDir, archive, version }) {
   const manifest = await readManifest(profileDir) ?? { name: `dsh-profile-${basename(profileDir)}`, private: true, dependencies: {} }
   const bundles = manifest.dsh?.profile?.bundles ?? []
   const dependencies = manifest.dependencies ?? {}
-  const known = Object.hasOwn(dependencies, PLUGIN_NAME)
-  const listed = bundles.includes(PLUGIN_NAME)
+  const known = Object.hasOwn(dependencies, name)
+  const listed = bundles.includes(name)
   // The copy is refreshed when the installer carries a newer plugin. A copy that is already the
   // same version is left alone, and so is one that is newer than the installer (a user who put
   // a newer plugin in place keeps it).
@@ -175,9 +193,9 @@ export async function installImportPlugin({ profileDir, archive, version }) {
     await unpackTgz(source, target, join(profileDir, 'node_modules'))
   }
   // The profile owns the plugin: it is one of the profile's dependencies, not of the app's.
-  manifest.dependencies = { ...dependencies, [PLUGIN_NAME]: sourceVersion }
+  manifest.dependencies = { ...dependencies, [name]: sourceVersion }
   if (!known && !listed) {
-    manifest.dsh = { ...manifest.dsh, profile: { ...manifest.dsh?.profile, bundles: [...bundles, PLUGIN_NAME] } }
+    manifest.dsh = { ...manifest.dsh, profile: { ...manifest.dsh?.profile, bundles: [...bundles, name] } }
   }
   await writeFile(join(profileDir, 'package.json'), `${JSON.stringify(manifest, undefined, 2)}\n`, 'utf8')
   return { installed: true, updated, listed: !known && !listed }

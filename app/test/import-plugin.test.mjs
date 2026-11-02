@@ -199,3 +199,75 @@ describe('the import plugin in the profile', () => {
     assert.equal(readFileSync(marker, 'utf8'), 'kept', 'the unpacked files are left alone')
   })
 })
+
+// The installer carries more than the import plugin: the team's own environment travels with it.
+// Each plugin is one archive, unpacked into the same profile, and each keeps its own switch.
+describe('the other bundled plugins', () => {
+  const OTHER = 'dsh-session-manager'
+  let root
+  let profileDir
+  let archive
+
+  before(async () => {
+    root = mkdtempSync(join(tmpdir(), 'ds-bot-plugin-others-'))
+    profileDir = join(root, 'profile')
+    const source = join(root, 'source')
+    mkdirSync(join(source, 'lib'), { recursive: true })
+    writeFileSync(join(source, 'package.json'), `${JSON.stringify({ name: OTHER, version: '0.7.5', main: './lib/index.js' }, undefined, 2)}\n`)
+    writeFileSync(join(source, 'cordis.patch.yml'), '- insert:\n    - id: session-manager\n      name: dsh-session-manager\n', 'utf8')
+    writeFileSync(join(source, 'lib', 'index.js'), 'export const marker = 1\n', 'utf8')
+    archive = join(root, 'other.tgz')
+    await packPlugin(source, archive, 'package')
+  })
+  after(() => { rmSync(root, { recursive: true, force: true }) })
+
+  const profileManifest = () => JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'))
+
+  test('a plugin named by the caller goes in under its own name, beside the import plugin', async () => {
+    const result = await installImportPlugin({ profileDir, archive, name: OTHER, version: '0.7.5' })
+    assert.equal(result.installed, true)
+    assert.equal(result.listed, true)
+    const manifest = profileManifest()
+    assert.deepEqual(manifest.dependencies, { [OTHER]: '0.7.5' })
+    assert.deepEqual(manifest.dsh.profile.bundles, [OTHER])
+    assert.ok(existsSync(join(profileDir, 'node_modules', OTHER, 'cordis.patch.yml')), 'its files are there')
+    assert.ok(existsSync(join(profileDir, 'node_modules', OTHER, 'lib', 'index.js')), 'its entry came too')
+  })
+
+  test('a scoped plugin keeps its scope in the profile path', async () => {
+    const scoped = '@scope/dsh-demo'
+    const source = join(root, 'source-scoped')
+    mkdirSync(join(source, 'lib'), { recursive: true })
+    writeFileSync(join(source, 'package.json'), `${JSON.stringify({ name: scoped, version: '1.0.0' }, undefined, 2)}\n`)
+    writeFileSync(join(source, 'cordis.patch.yml'), '- insert: []\n', 'utf8')
+    const scopedArchive = join(root, 'scoped.tgz')
+    await packPlugin(source, scopedArchive, 'package')
+    const result = await installImportPlugin({ profileDir, archive: scopedArchive, name: scoped, version: '1.0.0' })
+    assert.equal(result.installed, true)
+    assert.ok(existsSync(join(profileDir, 'node_modules', '@scope', 'dsh-demo', 'package.json')), 'the scope is a directory')
+    assert.equal(profileManifest().dependencies[scoped], '1.0.0')
+  })
+
+  test('the second plugin to arrive leaves the first one alone', async () => {
+    const manifest = profileManifest()
+    assert.equal(manifest.dependencies[OTHER], '0.7.5', 'the first plugin is still recorded')
+    assert.deepEqual(
+      [...manifest.dsh.profile.bundles].sort(),
+      [OTHER, '@scope/dsh-demo'].sort(),
+      'both are in the bundle list',
+    )
+  })
+
+  test('turning one off keeps it off while the others still install', async () => {
+    const before = profileManifest()
+    const turnedOff = {
+      ...before,
+      dsh: { ...before.dsh, profile: { ...before.dsh.profile, bundles: before.dsh.profile.bundles.filter(name => name !== OTHER) } },
+    }
+    writeFileSync(join(profileDir, 'package.json'), `${JSON.stringify(turnedOff, undefined, 2)}\n`)
+    const result = await installImportPlugin({ profileDir, archive, name: OTHER, version: '0.7.5' })
+    assert.equal(result.listed, false, 'it is not reported as newly listed')
+    assert.equal(profileManifest().dsh.profile.bundles.includes(OTHER), false, 'the user choice holds')
+    assert.equal(profileManifest().dependencies[OTHER], '0.7.5', 'the dependency stays, which is how a disabled plugin is told apart')
+  })
+})
