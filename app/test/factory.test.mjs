@@ -153,3 +153,52 @@ describe('pullSkillsRepo', () => {
     assert.match(warnings[0], /the skills repo was not updated/u)
   })
 })
+
+// The seed that actually ships: it is a team for a stranger's machine, so it must carry no model
+// (a fresh install has no keys and would open on "model unavailable") and no path from the
+// developer's own box. These assertions guard the file itself, not a copy in a temporary directory.
+describe('the shipped seed team', () => {
+  const seed = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'resources', 'factory', 'factory-team.json'), 'utf8'))
+
+  test('carries a main Bot and more than one member', () => {
+    assert.ok(seed.bots.length > 1)
+    assert.equal(seed.bots.filter(bot => bot.main === true).length, 1)
+    for (const bot of seed.bots) {
+      assert.ok(bot.factoryId, `a seed Bot has no factoryId: ${bot.name}`)
+      assert.ok(bot.name, 'a seed Bot has no name')
+      assert.ok(bot.instructions, `a seed Bot has no instructions: ${bot.name}`)
+    }
+    const ids = seed.bots.map(bot => bot.factoryId)
+    assert.equal(new Set(ids).size, ids.length, 'factoryIds must be unique or an upgrade would refresh the wrong Bot')
+  })
+
+  test('carries no model or effort, so a fresh install opens on the model picker', () => {
+    for (const bot of seed.bots) {
+      assert.equal(bot.model, undefined, `${bot.name} ships a model`)
+      assert.equal(bot.effort, undefined, `${bot.name} ships a thinking level`)
+    }
+  })
+
+  test('carries nothing that only exists on the machine it was written on', () => {
+    const text = JSON.stringify(seed)
+    // A drive letter path, a UNC path, or the developer's home name.
+    assert.doesNotMatch(text, /[A-Za-z]:\\\\/u, 'the seed names an absolute Windows path')
+    assert.doesNotMatch(text, /\\\\\\\\(?!")/u, 'the seed names a UNC path')
+    for (const bot of seed.bots) {
+      assert.equal(bot.workDir, undefined, `${bot.name} ships a working directory`)
+      assert.equal(bot.avatar, undefined, `${bot.name} ships an avatar file`)
+    }
+  })
+
+  test('every seeded capability can be rebuilt from what ships', () => {
+    for (const [name, item] of Object.entries(seed.capabilities?.items ?? {})) {
+      if (item.kind === 'skill') {
+        assert.ok(item.locator || item.content, `${name}: a skill needs a locator into the skills repo or inline content`)
+      } else if (item.kind === 'mcp') {
+        const command = item.transport === 'stdio' ? String(item.command ?? '') : String(item.url ?? '')
+        assert.ok(command.length > 0, `${name}: an MCP needs a command or a url`)
+        assert.doesNotMatch(command, /^[A-Za-z]:[\\\\/]/u, `${name}: an MCP command must not be an absolute path`)
+      }
+    }
+  })
+})
