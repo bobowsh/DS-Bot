@@ -43,6 +43,22 @@ export function officeRuntimeRequest(context) {
   }
 }
 
+// The plugins the installer carries into the profile. The import plugin is the one this project
+// owns; the rest are the environment the team was built and verified with. Each is packed from
+// its `pack/` in the plugin development folder (DS_BOT_PLUGINS_DEV), falling back to the app's
+// own node_modules, so what ships is the npm-published version that is known to install.
+export const BUNDLED_PLUGINS = [
+  'dsh-chat-import',
+  'dsh-rule-manager',
+  'dsh-session-manager',
+  'dsh-tool-activator',
+  '@copylee/dsh-computer-use',
+  '@jayyuen66/dsh-ocr-review',
+  '@j62268781-alt/dsh-skills-mcp-manager',
+  '@linxin666/dsh-client-ui-git-graph',
+  'deepseek-harness-intelligent-ui',
+]
+
 export async function beforePack(context, prepare = preparePrimaryRuntime, prepareSkills = ensureSkillsRepoGit, preparePlugins = prepareBundledPlugins) {
   const targets = []
   for (const archToNames of context.packager?.packagerOptions?.targets?.values() ?? [])
@@ -55,5 +71,5 @@ export async function beforePack(context, prepare = preparePrimaryRuntime, prepa
   await prepareSkills()
   // The plugins the app carries travel as archives; extraResources copies them as they are.
   const appDir = context.packager.appDir ?? context.packager.projectDir
-  await preparePlugins(appDir, ['dsh-chat-import'])
+  await preparePlugins(appDir, BUNDLED_PLUGINS)
 }
