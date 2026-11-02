@@ -16,6 +16,25 @@ const repoDir = dataDir => join(dataDir, 'skills-repo')
 // The identity a pull authors with when it cannot fast-forward; the shipped repo has none.
 const GIT_IDENTITY = { name: 'LinkBot', email: 'ds-bot@localhost' }
 
+/** The version a factory seed declares, or undefined when there is none to read. */
+function seedVersion(path) {
+  try {
+    const version = JSON.parse(nodeFs.readFileSync(path, 'utf8'))?.version
+    return version === undefined || version === null ? undefined : String(version)
+  } catch {
+    return undefined
+  }
+}
+
+/** Whether `candidate` is a newer seed version than `installed`. Plain numbers compare as numbers. */
+function newerSeed(candidate, installed) {
+  if (installed === undefined) return true
+  const a = Number(candidate)
+  const b = Number(installed)
+  if (Number.isFinite(a) && Number.isFinite(b)) return a > b
+  return String(candidate) > String(installed)
+}
+
 async function copyTree(from, to, signal) {
   await mkdir(to, { recursive: true })
   await cp(from, to, { recursive: true, signal })
@@ -35,7 +54,11 @@ async function loadGit() {
 export async function installFactoryResources({ dataDir, resourcesDir, signal }) {
   const result = { seedCopied: false, repo: 'kept' }
   const bundledSeed = join(resourcesDir, 'factory', 'factory-team.json')
-  if (existsSync(bundledSeed) && !existsSync(seedFile(dataDir))) {
+  // A seed that ships a newer version replaces the one already installed: an upgrade must be able
+  // to renew the factory team. The copy is skipped while the versions match, so a seed the user
+  // edited in place is left alone, and one that carries a version ahead of the installer's keeps
+  // winning. ds-bot refreshes the seeded Bots when this version moves (src/host/factory-seed.js).
+  if (existsSync(bundledSeed) && newerSeed(seedVersion(bundledSeed), existsSync(seedFile(dataDir)) ? seedVersion(seedFile(dataDir)) : undefined)) {
     await mkdir(join(dataDir, 'factory'), { recursive: true, signal })
     await cp(bundledSeed, seedFile(dataDir), signal)
     result.seedCopied = true

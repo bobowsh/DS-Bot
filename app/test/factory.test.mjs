@@ -56,13 +56,37 @@ describe('installFactoryResources', () => {
     assert.equal(readFileSync(join(dataDir, 'skills-repo', 'review-skill', 'SKILL.md'), 'utf8'), '# review-skill\n')
   })
 
-  test('never overwrites a seed the data location already carries', async () => {
+  test('keeps a seed that is ahead of the one the installer carries', async () => {
+    // The bundled seed is version 1; a data location carrying 9 is newer, so it wins.
     const res = resources(root)
     const dataDir = join(root, 'data-c')
     write(join(dataDir, 'factory', 'factory-team.json'), JSON.stringify({ version: '9', bots: [{ factoryId: 'user-changed' }] }))
     const result = await installFactoryResources({ dataDir, resourcesDir: res })
     assert.equal(result.seedCopied, false)
     assert.equal(JSON.parse(readFileSync(join(dataDir, 'factory', 'factory-team.json'), 'utf8')).version, '9')
+  })
+
+  test('a seed beside the installer that is newer replaces the installed one', async () => {
+    // An upgrade ships a higher version, and the factory team has to come with it. Without this
+    // an upgraded install keeps applying the seed it was first installed with.
+    const res = resources(root)
+    const dataDir = join(root, 'data-c2')
+    write(join(dataDir, 'factory', 'factory-team.json'), JSON.stringify({ version: '1', bots: [{ factoryId: 'old-team' }] }))
+    write(join(res, 'factory', 'factory-team.json'), JSON.stringify({ version: '2', bots: [{ factoryId: 'new-team' }] }))
+    const result = await installFactoryResources({ dataDir, resourcesDir: res })
+    assert.equal(result.seedCopied, true)
+    const applied = JSON.parse(readFileSync(join(dataDir, 'factory', 'factory-team.json'), 'utf8'))
+    assert.equal(applied.version, '2')
+    assert.equal(applied.bots[0].factoryId, 'new-team')
+  })
+
+  test('the same version is left alone, so a seed the user edited stays edited', async () => {
+    const res = resources(root)
+    const dataDir = join(root, 'data-c3')
+    write(join(dataDir, 'factory', 'factory-team.json'), JSON.stringify({ version: '1', bots: [{ factoryId: 'edited-by-user' }] }))
+    const result = await installFactoryResources({ dataDir, resourcesDir: res })
+    assert.equal(result.seedCopied, false)
+    assert.equal(JSON.parse(readFileSync(join(dataDir, 'factory', 'factory-team.json'), 'utf8')).bots[0].factoryId, 'edited-by-user')
   })
 
   test('leaves a skills repo that is already there alone', async () => {
