@@ -1,64 +1,59 @@
-// The Host's output reaches this process's own stdout and stderr, and a stream whose reader is
-// gone must not end the app: a launcher that started it and then went away leaves those streams
-// as pipes nobody reads, where a write fails with EPIPE — unhandled, that ends the main process
-// and the running team with it.
 import assert from 'node:assert/strict'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { test } from 'node:test'
-import { forward } from '../src/host-process.mjs'
+import { fileURLToPath } from 'node:url'
+import * as host from '../src/host-process.mjs'
 
-// A stream that fails every write the way a pipe without a reader does: it throws.
-function throwingStream() {
-  const calls = []
-  return {
-    calls,
-    write(text) {
-      calls.push(text)
-      throw Object.assign(new Error('write EPIPE'), { code: 'EPIPE' })
-    },
-    on() {},
+test('Linux uses the bundled plain Node, not Electron in Node mode', () => {
+  const resources = join('application', 'resources')
+  assert.equal(host.hostExecutable(resources, 'linux'), join(resources, 'primary-runtime', 'dependencies', 'node', 'bin', 'node'))
+  for (const platform of ['darwin', 'win32']) {
+    assert.equal(host.hostExecutable(resources, platform), process.execPath)
   }
-}
+})
 
-// A stream that reports the failure as an error event instead, which is the other way a pipe
-// without a reader fails.
-function erroringStream() {
-  const handlers = []
-  const stream = {
-    handlers,
-    writes: 0,
-    write() { this.writes += 1; return true },
-    on(event, handler) { if (event === 'error') handlers.push(handler) },
+test('the Linux Host loads sharp only in its plain Node child', { skip: process.platform === 'win32' }, async () => {
+  const work = mkdtempSync(join(tmpdir(), 'ds-bot-linux-image-'))
+  const node = join(work, 'primary-runtime', 'dependencies', 'node', 'bin', 'node')
+  mkdirSync(dirname(node), { recursive: true })
+  symlinkSync(process.execPath, node)
+  const app = dirname(dirname(fileURLToPath(import.meta.url)))
+  const failures = []
+  const child = new host.HostProcess({
+    entry: join(app, 'test', 'fixtures', 'image-host.mjs'),
+    cwd: work,
+    env: { ...process.env, DS_BOT_RUNTIME_DIR: work },
+    pnpm: join(app, 'node_modules', 'pnpm', 'bin', 'pnpm.mjs'),
+    onFailure: error => failures.push(error),
+  }, 'linux')
+  try {
+    const { injections } = await child.start()
+    assert.deepEqual(injections, [{ executable: node, electron: null, width: 2, height: 2 }])
+    assert.equal(Object.keys(createRequire(import.meta.url).cache).some(file => /[/\\]sharp[/\\]/u.test(file)), false)
+    assert.deepEqual(failures, [])
+  } finally {
+    await child.stop()
+    rmSync(work, { recursive: true, force: true })
   }
-  return stream
-}
-
-test('a write that throws does not escape', () => {
-  const stream = throwingStream()
-  // The call must not throw: an uncaught EPIPE here is what ends the main process.
-  assert.doesNotThrow(() => forward(stream, 'a line on stderr\n'))
-  assert.deepEqual(stream.calls, ['a line on stderr\n'], 'the text was offered to the stream')
 })
 
-test('the stream carries an error handler that swallows the failure', () => {
-  const stream = erroringStream()
-  forward(stream, 'a line on stdout\n')
-  assert.equal(stream.handlers.length, 1, 'one error handler is installed')
-  assert.doesNotThrow(() => stream.handlers[0](Object.assign(new Error('write EPIPE'), { code: 'EPIPE' })))
-  assert.equal(stream.writes, 1, 'the output was still offered to the stream')
+// The engine's own report of a failed start is on the Host's stderr; the
+// error box gets its tail with the message (#516).
+test('withLogTail attaches the stderr tail so the real cause reaches the box', () => {
+  const stderr = 'dsh: warning: 7 entries did not activate\n'
+    + '  workspace (@deepseek-ai/dsh-workspace): Error: corrupt session log "/data/sessions/_deleted/s1/session.v4.jsonl.zstd": header id "s1" and cwd identify "/data/sessions/ws/s1/session.v4.jsonl.zstd"\n'
+    + '  session-controller: pending (waiting for service: workspaceRegistry)\n'
+  const message = host.withLogTail('The profile in /data did not start sessionController, workspaceRegistry; the engine log has the cause', stderr)
+  assert.match(message, /^The profile in \/data did not start sessionController, workspaceRegistry/)
+  assert.match(message, /corrupt session log "\/data\/sessions\/_deleted\/s1\/session\.v4\.jsonl\.zstd"/)
 })
 
-test('the error handler is installed once, not per write', () => {
-  const stream = erroringStream()
-  forward(stream, 'one\n')
-  forward(stream, 'two\n')
-  forward(stream, 'three\n')
-  assert.equal(stream.handlers.length, 1, 'a second handler would only collect garbage')
-  assert.equal(stream.writes, 3)
-})
-
-test('a stream that works is written to as before', () => {
-  const written = []
-  const stream = { write(text) { written.push(text); return true }, on() {} }
-  forward(stream, 'the Host said this\n')
-  assert.deepEqual(written, ['the Host said this\n'])
+test('withLogTail redacts launch tokens and skips an empty tail', () => {
+  assert.equal(
+    host.withLogTail('The DSH Host stopped (exit 1)', 'launch http://127.0.0.1:43117/?token=abc123 other'),
+    'The DSH Host stopped (exit 1):\nlaunch http://127.0.0.1:43117/?token=<hidden> other')
+  assert.equal(host.withLogTail('The DSH Host stopped (exit 0)', '   \n'), 'The DSH Host stopped (exit 0)')
 })

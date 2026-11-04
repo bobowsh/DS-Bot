@@ -44,7 +44,7 @@ function page(update) {
   const tree = AboutPage({ useUpdate: select => select(update), actions, run, Section: 'section', Row: 'row' })
   const find = (node, pick) => (Array.isArray(node) ? node.flatMap(one => find(one, pick))
     : node && typeof node === 'object' ? [...pick(node), ...find(node.children, pick)] : [])
-  const [row] = find(tree, node => (node.props?.label === 'DS Bot' ? [node] : []))
+  const [row] = find(tree, node => (node.props?.label === 'LinkBot' ? [node] : []))
   const buttons = find(row?.children ?? [], node => (node.type === 'button' ? [node] : []))
   return {
     hint: row?.props?.hint,

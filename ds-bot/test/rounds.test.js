@@ -13,6 +13,7 @@ import { fakeAttachments, fakeContext } from './fake-ctx.js'
 // Session's inbox the way DSH holds them while a turn runs: queued for the next turn,
 // or steered into the next step.
 // `home`: start on the data of an earlier run, as after a restart.
+let rt
 function start({ home = mkdtempSync(join(tmpdir(), 'ds-bot-rounds-')) } = {}) {
   const ctx = fakeContext()
   const workspaces = new Map()
@@ -72,7 +73,7 @@ function start({ home = mkdtempSync(join(tmpdir(), 'ds-bot-rounds-')) } = {}) {
     route = options
     return register(options)
   }
-  const rt = createRuntime(ctx, { home })
+  rt = createRuntime(ctx, { home })
   const call = async (endpoint, payload) => {
     const response = await route.fetch(new Request('http://localhost/api/bot', { method: 'POST', body: JSON.stringify({ endpoint, payload }) }))
     return response.json()
@@ -89,7 +90,7 @@ function start({ home = mkdtempSync(join(tmpdir(), 'ds-bot-rounds-')) } = {}) {
     mode,
     content: typeof content === 'string' ? [{ type: 'text', text: content }] : content,
   })
-  const relay = (roomId, callId, signal = new AbortController().signal) => ctx.registeredTools.get('group_relay')
+  const relay = (roomId, callId, signal = new AbortController().signal) => rt.teamTools.find(d => d.name === 'group_relay')
     .execute({}, { agent: { id: roomId, inbox: inboxOf(roomId) }, callId, signal })
   // The Bot's answer to its group turn: a delivery source plus the reply text.
   const answer = async (sessionId, exchangeId, text, turn) => {
@@ -327,7 +328,7 @@ test('a message sent between rounds still opens a full round', async (t) => {
 // the round counted the member as passed, showed nothing, and tried the same Session
 // again every round.
 test('a member whose group Session cannot be opened shows a failure, and its next turn there starts a new Session', async (t) => {
-  const { call, emit, userMessage, relay, answer, stop, sent, ctx, rt } = start()
+  const { call, emit, userMessage, relay, answer, stop, sent, rt , ctx } = start()
   t.after(stop)
   const room = await team(call, sent)
   const chief = (await call('state', {})).value.mainBotId
@@ -372,7 +373,7 @@ test('a member whose group Session cannot be opened shows a failure, and its nex
 })
 
 test('a delivery that fails for another reason shows a failure and keeps the Session', async (t) => {
-  const { call, emit, userMessage, relay, answer, stop, sent, ctx, rt } = start()
+  const { call, emit, userMessage, relay, answer, stop, sent, rt , ctx } = start()
   t.after(stop)
   const room = await team(call, sent)
   const chief = (await call('state', {})).value.mainBotId
@@ -403,7 +404,7 @@ test('a delivery that fails for another reason shows a failure and keeps the Ses
 // member wrote the link in its own group Session, which works in the group's folder; the
 // group's Session and other Bots work elsewhere, so the link reaches them in full.
 test('a relative file link a member writes reaches the group, and another Bot, as a full path', async (t) => {
-  const { call, emit, userMessage, relay, answer, stop, sent, ctx, rt } = start()
+  const { call, emit, userMessage, relay, answer, stop, sent, rt } = start()
   t.after(stop)
   const folder = realpathSync.native(mkdtempSync(join(tmpdir(), 'ds-bot-links-')))
   t.after(() => rmSync(folder, { recursive: true, force: true }))
@@ -426,7 +427,7 @@ test('a relative file link a member writes reaches the group, and another Bot, a
   const chief = rt.state.mainBotIds[0]
   const writer = rt.state.rooms[room.id].members.find(id => id !== chief)
   sent.length = 0
-  await ctx.registeredTools.get('message_bot').execute({ to: rt.botOf(writer).name, message: 'Read [notes](notes.md#L3)', when: 'queue' }, {
+  await rt.teamTools.find(d => d.name === 'message_bot').execute({ to: rt.botOf(writer).name, message: 'Read [notes](notes.md#L3)', when: 'queue' }, {
     agent: { id: first.sessionId, session: { id: first.sessionId, header: { cwd: folder } }, inbox: { nextStep: [], nextTurn: [] } }, callId: 'c1',
   })
   const delivered = await waitFor(() => sent.find(entry => entry.sessionId === room.id && entry.message.source?.role === 'post'))
@@ -455,7 +456,7 @@ test('a member turn that fails before it takes the call fails that member in the
 // A member deleted while its group Session is made sits the round out; the Session it was
 // getting belongs to no one, so it is archived instead of left over.
 test('a member deleted while its group Session is made is left out, and the Session is not kept', async (t) => {
-  const { call, emit, userMessage, relay, answer, stop, sent, ctx, rt } = start()
+  const { call, emit, userMessage, relay, answer, stop, sent, rt , ctx } = start()
   t.after(stop)
   const room = await team(call, sent)
   const writer = rt.state.rooms[room.id].members.find(id => !rt.isMain(id))
@@ -490,7 +491,7 @@ test('a member deleted while its group Session is made is left out, and the Sess
 // #206: state.json is written whole on every save, so a long group line keeps its start
 // there and its whole text in a file of its own. Members still read it whole.
 test('a long group line keeps its start in state.json, and members and read_group_chat read it whole', async (t) => {
-  const { call, emit, userMessage, relay, answer, stop, sent, ctx, home, rt } = start()
+  const { call, emit, userMessage, relay, answer, stop, sent, home, rt } = start()
   t.after(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }))
   const room = await team(call, sent)
   const long = `${'长'.repeat(9000)}结尾`
@@ -508,7 +509,7 @@ test('a long group line keeps its start in state.json, and members and read_grou
   assert.equal(saved.text.length, 2000)
   assert.equal(saved.length, long.length)
   assert.equal(readFileSync(join(home, 'group-lines', room.id, `${saved.seq}.txt`), 'utf8'), long)
-  const read = ctx.registeredTools.get('read_group_chat')
+  const read = rt.teamTools.find(d => d.name === 'read_group_chat')
   const exec = { agent: { id: first.sessionId } }
   assert.match(await read.execute({ group: 'R1' }, exec), new RegExp(`cut; ${long.length} characters in all; read_group_chat with seq ${saved.seq} reads it whole`))
   assert.ok((await read.execute({ group: 'R1', seq: saved.seq }, exec)).endsWith(long))
@@ -527,7 +528,7 @@ test('a long group line keeps its start in state.json, and members and read_grou
   const again = start({ home })
   t.after(() => again.stop({ keep: true }))
   await again.call('state', {})
-  const whole = await again.ctx.registeredTools.get('read_group_chat').execute({ group: 'R1', seq: saved.seq }, exec)
+  const whole = await again.rt.teamTools.find(d => d.name === 'read_group_chat').execute({ group: 'R1', seq: saved.seq }, exec)
   assert.ok(whole.endsWith(long))
 
   // The file goes with the line once the log moves past it, and with the group.
@@ -604,7 +605,7 @@ test('a long post goes to the group as a file, and reaches the member with its p
   const room = await team(call, sent)
   const chief = rt.state.mainBotIds[0]
   const long = `${Array.from({ length: 400 }, (_, at) => `第 ${at + 1} 行：${'报告内容。'.repeat(10)}`).join('\n')}\n结尾`
-  const posted = await ctx.registeredTools.get('post_to_group').execute({ group: 'R1', message: long }, { agent: { id: rt.chatOf(chief) } })
+  const posted = await rt.teamTools.find(d => d.name === 'post_to_group').execute({ group: 'R1', message: long }, { agent: { id: rt.chatOf(chief) } })
   assert.match(posted, /^Posted in "R1"/)
   const post = sent.find(entry => entry.sessionId === room.id && entry.message.source.role === 'post')
   const file = post.message.content.find(block => block.type === 'file')?.attachment
@@ -701,6 +702,36 @@ test('calls parked under the old relay limit run in the group\'s next round', as
   assert.equal(state().paused, undefined)
   const saved = JSON.parse(readFileSync(join(home, 'state.json'), 'utf8')).rooms[room.id]
   assert.equal(saved.paused, undefined)
+})
+
+// #872: calls the idle guard parked wait for the user. A round a Bot's post opens
+// leaves them; the user's message that joins that round brings them in.
+test('calls the idle guard parked wait for the user\'s message, also one that joins a running round', async (t) => {
+  const { call, emit, compose, relay, answer, stop, sent, rt } = start()
+  t.after(stop)
+  const room = await team(call, sent)
+  await call('update-room', { id: room.id, mode: 'admin' })
+  const chief = rt.state.mainBotIds[0]
+  const writer = Object.values(rt.state.bots).find(bot => bot.name === 'Writer')
+  const state = () => rt.state.rooms[room.id]
+  state().paused = [{ id: writer.id, name: 'Writer', note: 'Chief mentioned you', by: chief, idle: true }]
+  await rt.save()
+
+  await emit(room.id, { type: 'user/message', data: { source: { kind: 'bot', form: 'relay', role: 'post', exchangeId: 'p1', senderSessionId: writer.id, senderName: 'Writer', roomId: room.id }, content: [{ type: 'text', text: '[Group post from Writer]\n@Chief the draft is up' }] } })
+  const running = relay(room.id, 'relay')
+  const first = await turnFor(sent)
+  assert.equal(first.sessionId, state().sessions[chief])
+  assert.equal(state().paused.length, 1, 'a Bot\'s post does not bring the parked call in')
+
+  await compose(room.id, 'Go on, both of you')
+  await answer(first.sessionId, first.message.source.exchangeId, 'Thanks.', 1)
+  const parked = await waitFor(() => sent.find(entry => entry !== first && entry.message.source.role === 'room' && /Chief mentioned you/.test(entry.message.content[0].text)))
+  assert.ok(parked, 'the user\'s message brings the parked call in')
+  assert.equal(state().paused, undefined)
+  const again = await waitFor(() => sent.find(entry => entry !== first && entry !== parked && entry.message.source.role === 'room'))
+  await answer(parked.sessionId, parked.message.source.exchangeId, 'On it.', 1)
+  await answer(again.sessionId, again.message.source.exchangeId, 'Fine.', 2)
+  await running
 })
 
 test('a member the reply timeout cut short is told to the group, not left as silence', async (t) => {

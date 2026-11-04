@@ -150,11 +150,10 @@ function ApprovalCard({ approval, bot, actions }) {
         h('button', { type: 'button', className: 'bt-q-btn', onClick: () => actions.openSession(bot.id) }, t("Open {name}'s chat", { name: bot.name }))))
 }
 
-// A member's second line in the group's details: what it is doing here. The member's
-// label is not repeated here: it rides the name's line, so this line stays free for work.
-export function MemberState({ entry }) {
+// A member's second line in the group's details: what it is doing here, or its role.
+export function MemberState({ entry, bot }) {
   if (entry?.state === 'ask') return stateLine('bt-member-state bt-mw-ask', entry.approvals[0].at, t('Waiting for your approval'))
-  if (entry?.state !== 'work') return null
+  if (entry?.state !== 'work') return bot.role ? stateLine('bt-member-state', undefined, bot.role) : null
   return stateLine('bt-member-state', entry.doing.since, h(Shimmer, null, `${workPhrase(entry.doing)}…`))
 }
 

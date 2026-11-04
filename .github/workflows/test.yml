@@ -20,9 +20,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, node: 24, dsh: 0.2.1-rc.4 }
-          - { os: windows-latest, node: 24, dsh: 0.2.1-rc.4 }
-          - { os: ubuntu-latest, node: 22, dsh: 0.2.1-rc.4 }
+          - { os: ubuntu-latest, node: 24, dsh: 0.2.1-rc.5 }
+          - { os: windows-latest, node: 24, dsh: 0.2.1-rc.5 }
+          - { os: ubuntu-latest, node: 22, dsh: 0.2.1-rc.5 }
           - { os: ubuntu-latest, node: 24, dsh: 0.2.0-rc.2 }
     defaults:
       run:
@@ -161,7 +161,7 @@ jobs:
           $deadline = (Get-Date).AddSeconds(240)
           while ((Installed-Version) -ne $env:NEXT_VERSION -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 3 }
           if ((Installed-Version) -ne $env:NEXT_VERSION) { throw "The installed version is $(Installed-Version), not $env:NEXT_VERSION" }
-          while ((Get-Process | Where-Object { $_.Path -like '*deepseek-bot-updater*' }) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
+          while ((Get-Process | Where-Object { $_.Path -like '*dsbot-updater*' }) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
           node scripts/check-packed.mjs $exe
           if ($LASTEXITCODE -ne 0) { throw 'The updated app failed its check' }
 
