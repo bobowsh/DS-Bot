@@ -57,6 +57,7 @@ export const BUNDLED_PLUGINS = [
   '@j62268781-alt/dsh-skills-mcp-manager',
   '@linxin666/dsh-client-ui-git-graph',
   'deepseek-harness-intelligent-ui',
+  'dsh-xdpool',
 ]
 
 export async function beforePack(context, prepare = preparePrimaryRuntime, prepareSkills = ensureSkillsRepoGit, preparePlugins = prepareBundledPlugins) {
