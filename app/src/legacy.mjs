@@ -2,8 +2,13 @@
 import { existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
+// The name the app had before it was renamed. It names the folders an earlier install
+// left behind, so those are still found.
 export const PRODUCT_NAME = 'DS Bot'
-export const APP_ID = 'io.github.fei2411.dsbot'
+// The app id of this build: it names the Windows uninstall entry and the single-instance
+// lock, so it is the one electron-builder.yml carries. It is a technical identifier, not a
+// name the user sees, so it keeps the shape it had before the product was renamed.
+export const APP_ID = 'io.github.fei2411.deepseekbot'
 export const LEGACY_PRODUCT_NAME = 'DeepSeek Bot'
 export const LEGACY_ENGINE = 'deepseek-bot-engine'
 export const LEGACY_ARTIFACT_PREFIX = 'DeepSeek-Bot'

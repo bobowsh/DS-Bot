@@ -43,6 +43,26 @@ async function pick(title, from, signal, ui) {
 export const programFolder = () => installFolder(app.getPath('exe'))
 
 /**
+ * The places a packaged Windows install uses: its data and its team workspace sit beside the
+ * program folder, so the uninstaller leaves the data alone and the first run finds them
+ * without asking. An install at <root>\app puts <root>\data and <root>\workspace.
+ *
+ * Nothing is hardcoded: the places follow wherever the program was put. A parent that is a
+ * drive root, or missing, is not fixed either — there is nowhere beside it to put them.
+ * Every other platform keeps the default places, since the program folder on macOS is the
+ * sealed .app bundle, whose contents the data must not enter.
+ *
+ * @returns {{ dataDir: string, workspace: string } | undefined} the fixed places, or none
+ */
+export function fixedPlaces() {
+  if (!app.isPackaged || process.platform !== 'win32') return undefined
+  const program = programFolder()
+  const root = dirname(program)
+  if (root === program || root === dirname(root)) return undefined
+  return { dataDir: join(root, 'data'), workspace: join(root, 'workspace') }
+}
+
+/**
  * The picker of 「换个位置…」 on the start page: one folder, from which the root rule
  * (place.mjs) makes the places. Undefined when the picker was cancelled or the app is quitting.
  * @param {string} from the folder the picker opens in
@@ -56,8 +76,11 @@ export async function pickRoot(from, signal, ui) {
   }
 }
 
-/** The places a first start offers. */
-export const defaultPlaces = () => ({ dataDir: join(homedir(), '.ds-bot'), workspace: join(homedir(), 'DS Bot') })
+/**
+ * The places a first start offers: the fixed ones beside a packaged Windows program, and
+ * the default ones everywhere else.
+ */
+export const defaultPlaces = () => fixedPlaces() ?? { dataDir: join(homedir(), '.ds-bot'), workspace: join(homedir(), 'DS Bot') }
 
 /** The Bot team in a data folder, if it has one. */
 export function teamIn(dataDir) {
@@ -142,11 +165,32 @@ export function chooseLocations() {
     return fallbackPlaces(file)
   }
   const { dataDir, workspace } = defaultPlaces()
+  // The folders the places name are made right away: the data folder is written to
+  // whatever the start does next, and the workspace with it.
+  makePlaces(dataDir, workspace)
+  // The places are saved even when there is a team to offer: the offer is answered on the
+  // import card, and the places it copies into are these ones.
+  saveLocations({ dataDir, workspace })
   const offer = offerOf(dataDir)
   if (offer !== undefined) return { dataDir, workspace, offer }
-  // There is nothing to copy, so the first run ends with the chosen places.
-  saveLocations({ dataDir, workspace })
   return { dataDir, workspace }
+}
+
+/**
+ * The folders the places name, made so that the first run finds them there. A folder that
+ * cannot be made is left to the start that writes into it: the app says so when it fails.
+ * @param {string} dataDir - where the data goes
+ * @param {string} [workspace] - where the team's files go
+ */
+function makePlaces(dataDir, workspace) {
+  for (const dir of [dataDir, workspace]) {
+    if (dir === undefined) continue
+    try {
+      mkdirSync(dir, { recursive: true })
+    } catch (error) {
+      console.error(`LinkBot: the folder ${dir} was not made: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
 }
 
 /**

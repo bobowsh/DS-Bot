@@ -98,7 +98,7 @@
     ; lacks the product name. The folder the user picks is the folder the app
     ; goes into, so that suffix is taken off again: what the user chose is what
     ; is installed, with nothing appended.
-    !
+    ;
     ; The builder's function is still called, so its own code stays referenced
     ; (a function nobody calls is a warning the build treats as an error). The
     ; suffix it added is removed by its own length: "\LinkBot" is one backslash
@@ -138,6 +138,17 @@
 
       ; Probe the same destination that the install page will use.
       Call dsbResolveInstDir
+
+      ; A drive's root is not a place for one app. The installer asks whether the app is
+      ; running by looking at the paths of the processes that start with the install folder,
+      ; so a root would make it every process on the drive, and the install would stop with
+      ; "cannot be closed" for something it cannot close.
+      ${StdUtils.GetParentPath} $R5 "$dsbCheckTarget"
+      ${If} $R5 == ""
+      ${OrIf} $R5 == "$dsbCheckTarget"
+        MessageBox MB_OK|MB_ICONEXCLAMATION "Choose a folder for the app, not the drive's root."
+        Abort
+      ${EndIf}
 
       ; $R1: the nearest ancestor that exists. Folders this check creates are
       ; removed again below, and only as far up as this ancestor.

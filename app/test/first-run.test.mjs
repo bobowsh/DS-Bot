@@ -11,7 +11,7 @@ import { paths, state } from './helpers/fake-electron.mjs'
 import { installHooks } from './helpers/register.mjs'
 
 await installHooks()
-const { chooseLocations } = await import('../src/first-run.mjs')
+const { chooseLocations, defaultPlaces, fixedPlaces } = await import('../src/first-run.mjs')
 
 const write = (path, text) => {
   mkdirSync(dirname(path), { recursive: true })
@@ -64,7 +64,11 @@ describe('the packaged Windows install', () => {
     assert.equal(existsSync(where.dataDir), true, 'the data folder is made')
     assert.equal(existsSync(where.workspace), true, 'the workspace folder is made')
     const saved = JSON.parse(readFileSync(locationsFile, 'utf8'))
-    assert.deepEqual(saved, { dataDir: join(install, 'data'), workspace: join(install, 'workspace') })
+    // The free space of the data's drive is kept with the places, so a later start can
+    // tell when the drive has run short.
+    assert.equal(saved.dataDir, join(install, 'data'))
+    assert.equal(saved.workspace, join(install, 'workspace'))
+    assert.ok(saved.freeAtStart > 0, 'the free space of the drive is kept')
   })
 
   test('an install whose folder is a drive root is not fixed', { skip: process.platform !== 'win32' && 'the fixed places are a Windows install rule' }, async () => {
@@ -73,11 +77,10 @@ describe('the packaged Windows install', () => {
     // An exe at a drive root makes the program folder itself the root: its "parent" is a
     // whole drive, not a place for one app's data. The path only computes; nothing is made there.
     paths.exe = 'C:\\LinkBot.exe'
-    state.dialogAnswer = { response: 2 } // Quit at the welcome box: nothing beyond it is asked
     const where = await chooseLocations(new AbortController().signal)
-    assert.equal(state.dialogs.length, 1, 'the first start asks instead of fixing')
-    assert.match(state.dialogs[0].message, /Welcome to LinkBot/)
-    assert.deepEqual(where, { quit: true })
+    assert.equal(where.dataDir, defaultPlaces().dataDir, 'the default places are used')
+    assert.notEqual(where.dataDir, 'C:\\data', 'not beside the program folder')
+    assert.equal(state.dialogs.length, 0, 'the start asks nothing: the start page picks the place')
   })
 
   test('an existing locations.json keeps its places and asks nothing about the team', async () => {
@@ -89,7 +92,8 @@ describe('the packaged Windows install', () => {
     process.env.DSH_HOME = dshHomeWithTeam()
     const where = await chooseLocations(new AbortController().signal)
     assert.equal(where.dataDir, data, 'the saved places stand')
-    assert.deepEqual(where, { dataDir: data, workspace }, 'no import offer comes back')
+    assert.equal(where.workspace, workspace, 'the saved workspace stands')
+    assert.equal(where.offer, undefined, 'no import offer comes back')
     assert.equal(state.dialogs.length, 0, 'the first start asks nothing')
   })
 
@@ -141,22 +145,23 @@ describe('a locations.json that cannot be read', () => {
 })
 
 describe('a run that is not a packaged Windows install', () => {
-  test('the first start still asks and its answer is saved', async () => {
+  test('the first start takes the default places and saves them', async () => {
     state.packaged = false
     process.env.DSH_HOME = dshHomeEmpty()
-    state.dialogAnswer = { response: 0 } // Start with the shown places
     const where = await chooseLocations(new AbortController().signal)
-    assert.equal(state.dialogs.length, 1)
-    assert.match(state.dialogs[0].message, /Welcome to LinkBot/)
+    assert.equal(where.dataDir, defaultPlaces().dataDir, 'the default places')
+    assert.equal(where.workspace, defaultPlaces().workspace, 'the default workspace')
+    assert.equal(state.dialogs.length, 0, 'the start page picks the place, not a dialog')
     const saved = JSON.parse(readFileSync(locationsFile, 'utf8'))
-    assert.deepEqual(saved, { dataDir: where.dataDir, workspace: where.workspace })
+    assert.equal(saved.dataDir, where.dataDir, 'the places are saved')
+    assert.equal(saved.workspace, where.workspace, 'the workspace is saved')
   })
 
-  test('an unpackaged Windows run keeps asking even beside a program folder', async () => {
+  test('an unpackaged Windows run does not take the fixed places', async () => {
     state.packaged = false
     process.env.DSH_HOME = dshHomeEmpty()
-    state.dialogAnswer = { response: 0 }
-    await chooseLocations(new AbortController().signal)
-    assert.match(state.dialogs[0].message, /Welcome to LinkBot/, 'not the fixed places')
+    const where = await chooseLocations(new AbortController().signal)
+    assert.notEqual(where.dataDir, fixedPlaces()?.dataDir, 'not the fixed places')
+    assert.equal(where.dataDir, defaultPlaces().dataDir, 'the default places')
   })
 })

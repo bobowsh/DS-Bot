@@ -5,11 +5,11 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { chmod, cp, lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { homedir, hostname } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import { parseSessionFormatLogFilename } from '@deepseek-ai/dsh-session-format'
 import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
-import { parse } from 'yaml'
-import { within } from './copy-tree.mjs'
+import { parse, stringify } from 'yaml'
+import { copyTree, within } from './copy-tree.mjs'
 
 export { within }
 
@@ -18,6 +18,11 @@ export { within }
 // that the app does not have.
 export const MODEL_ROWS = ['llm-deepseek', 'llm-deepseek-account', 'llm-pi-ai', 'agent-default-model', 'agent-preset-registry']
 const LOCK_STALE_MS = 60_000
+// What an import leaves behind in the old home: the lock of the team that ran there, the
+// turns that were in flight, and the workspace the team used. None of them travel with
+// the copy: the lock belongs to the home that is still there, and the rest are the old
+// team's own.
+const LEFT_BEHIND = new Set(['state.lock', 'inflight.json', 'workspace'])
 // Folders that a project makes again from its own files (windows-onboarding §4): the import card
 // offers to leave them out of the work files, and does so by default from 200 MB on.
 export const REGENERABLE = new Set(['node_modules', '.venv', '__pycache__', '.pnpm-store', '.next'])
