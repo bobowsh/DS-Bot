@@ -132,8 +132,14 @@ export function chooseLocations() {
   if (process.env.DS_BOT_HOME) return { dataDir: process.env.DS_BOT_HOME, workspace: process.env.DS_BOT_WORKSPACE || undefined }
   const file = locationsFile()
   if (existsSync(file)) {
-    const saved = JSON.parse(readFileSync(file, 'utf8'))
-    return { dataDir: saved.dataDir, workspace: saved.workspace, freeAtStart: roomOf(saved.freeAtStart) }
+    const saved = readSaved(file)
+    // A file that cannot be read, or that names no folder, is no answer at all: the app
+    // starts on the default places rather than refusing to start. The broken file is kept
+    // beside the new one, so nothing the user had is lost.
+    if (saved !== undefined && typeof saved.dataDir === 'string' && saved.dataDir !== '') {
+      return { dataDir: saved.dataDir, workspace: saved.workspace, freeAtStart: roomOf(saved.freeAtStart) }
+    }
+    return fallbackPlaces(file)
   }
   const { dataDir, workspace } = defaultPlaces()
   const offer = offerOf(dataDir)
@@ -141,4 +147,30 @@ export function chooseLocations() {
   // There is nothing to copy, so the first run ends with the chosen places.
   saveLocations({ dataDir, workspace })
   return { dataDir, workspace }
+}
+
+/**
+ * The places to start on when the saved ones cannot be used.
+ *
+ * A file that cannot be read, or that names no folder, gives no hint about where the
+ * data is: the default places are used. The file is moved aside first, so nothing the
+ * user had is lost and the new one can be written under its name.
+ *
+ * @param {string} file - the file that could not be used
+ * @returns {{ dataDir: string, workspace?: string, freeAtStart?: number, recovered: 'default' }}
+ */
+function fallbackPlaces(file) {
+  keepBroken(file)
+  const { dataDir, workspace } = defaultPlaces()
+  saveLocations({ dataDir, workspace })
+  return { dataDir, workspace, recovered: 'default' }
+}
+
+/** The unreadable file is kept beside the new one, under a name that says what it was. */
+function keepBroken(file) {
+  try {
+    renameSync(file, `${file}.broken-${Date.now()}`)
+  } catch {
+    // A file that cannot be moved is left where it is; the new one is written over it.
+  }
 }

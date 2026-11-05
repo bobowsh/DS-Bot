@@ -1,29 +1,6 @@
 // Windows and a Linux AppImage download and install updates; macOS and a Linux deb ask before
 // opening the release page.
 
-export const UPDATE_TEXT = {
-  en: {
-    ready: version => `LinkBot ${version} is ready to install.`,
-    readyDetail: 'Restart now to update, or it is installed the next time you quit.',
-    restart: 'Restart now', later: 'Later',
-    onFailure: version => `LinkBot ${version} is installed when its download is done, and then LinkBot opens again.`,
-    available: version => `LinkBot ${version} is available.`,
-    availableDetail: 'This version cannot update itself. Download the new version from its release page, then replace LinkBot in Applications.',
-    download: 'Download',
-    onFailurePage: version => `LinkBot ${version} is available. After this box, its download page opens.`,
-  },
-  zh: {
-    ready: version => `LinkBot ${version} 已经下载好。`,
-    readyDetail: '现在重启就能更新；不重启的话，下次退出时安装。',
-    restart: '立即重启', later: '稍后',
-    onFailure: version => `LinkBot ${version} 下载完会自动安装，然后重新打开。`,
-    available: version => `LinkBot ${version} 已经发布。`,
-    availableDetail: '这个版本不能自己更新。请到发布页下载新版，再用它替换「应用程序」里的 LinkBot。',
-    download: '下载',
-    onFailurePage: version => `LinkBot ${version} 已经发布。关掉这个对话框后，会打开它的下载页面。`,
-  },
-}
-
 const CHECK_EVERY_MS = 4 * 60 * 60_000
 export const RELEASES_URL = 'https://api.github.com/repos/Fei2411/DS-Bot/releases?per_page=20'
 // Where a user downloads the newest version by hand.

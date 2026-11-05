@@ -3,7 +3,7 @@
 // about — it is seeded by the factory (src/factory.mjs, ds-bot's factory-seed). Electron is the
 // test double (test/helpers/loader.mjs), so no display and no data of the user are touched.
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, before, describe, test } from 'node:test'
@@ -37,6 +37,10 @@ afterEach(() => {
   state.dialogAnswer = undefined
   state.packaged = false
   rmSync(locationsFile, { force: true })
+  // The files that a broken locations.json leaves behind are gone with it.
+  for (const name of readdirSync(paths.userData)) {
+    if (name.startsWith('locations.json.broken-')) rmSync(join(paths.userData, name), { force: true })
+  }
 })
 
 describe('the packaged Windows install', () => {
@@ -96,6 +100,43 @@ describe('the packaged Windows install', () => {
     process.env.DSH_HOME = dshHomeWithTeam()
     await chooseLocations(new AbortController().signal)
     assert.equal(existsSync(join(data, 'bot', 'import-declined')), false)
+  })
+})
+
+describe('a locations.json that cannot be read', () => {
+  test('a file that is not JSON at all falls back to the default places, and is kept', async () => {
+    state.packaged = true
+    write(locationsFile, '{ this is not json')
+    process.env.DSH_HOME = dshHomeEmpty()
+    const where = await chooseLocations(new AbortController().signal)
+    assert.equal(where.recovered, 'default', 'the app says the place could not be read')
+    assert.equal(state.dialogs.length, 0, 'the app asks nothing')
+    const kept = readdirSync(paths.userData).filter(name => name.startsWith('locations.json.broken-'))
+    assert.equal(kept.length, 1, 'the unreadable file is kept beside the new one')
+    const saved = JSON.parse(readFileSync(locationsFile, 'utf8'))
+    assert.equal(saved.dataDir, where.dataDir, 'the new place is saved')
+  })
+
+  test('a file that names no folder falls back to the default places, and is kept', async () => {
+    state.packaged = true
+    write(locationsFile, JSON.stringify({ workspace: 'C:\\somewhere' }))
+    process.env.DSH_HOME = dshHomeEmpty()
+    const where = await chooseLocations(new AbortController().signal)
+    assert.equal(where.recovered, 'default', 'the app says the place could not be read')
+    const kept = readdirSync(paths.userData).filter(name => name.startsWith('locations.json.broken-'))
+    assert.equal(kept.length, 1, 'the unreadable file is kept beside the new one')
+  })
+
+  test('a file that names a folder is used as it is', async () => {
+    state.packaged = true
+    const data = mkdtempSync(join(tmpdir(), 'ds-bot-fr-data-'))
+    mkdirSync(join(data, 'workspace'), { recursive: true })
+    // The file names the folder but has no workspace: the folder is still used.
+    write(locationsFile, JSON.stringify({ dataDir: data }))
+    process.env.DSH_HOME = dshHomeEmpty()
+    const where = await chooseLocations(new AbortController().signal)
+    assert.equal(where.recovered, undefined, 'nothing was recovered: the file was read')
+    assert.equal(where.dataDir, data, 'the data stays where it was')
   })
 })
 

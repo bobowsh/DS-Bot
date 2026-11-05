@@ -446,6 +446,19 @@ async function boot(mine) {
     const where = chooseLocations()
     setPlaces({ dataDir: where.dataDir, workspace: where.workspace })
     importOffer = where.offer
+    // The saved places could not be read: the app starts on the default places, and says
+    // so, so the user is not left wondering where the data went.
+    if (where.recovered !== undefined) {
+      console.error(`LinkBot: the saved data location could not be read; the data goes to ${where.dataDir}`)
+      dialog.showMessageBox({
+        type: 'warning',
+        title: 'LinkBot',
+        message: tx('dialog.location.unreadable'),
+        detail: tx('dialog.location.unreadableDetail', { path: where.dataDir }),
+        buttons: [tx('btn.ok')],
+        noLink: true,
+      })
+    }
     if (first) startWindow.explain(explainOf({ offered: importOffer !== undefined, team: teamIn(where.dataDir) }))
     else tellLowSpace(where.freeAtStart)
   }
