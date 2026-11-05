@@ -42,6 +42,13 @@ export function loadAppProfile() {
   return loadOwnBundles(dir, BUNDLES)
 }
 
+/** The profile of the first-run check, under the current DSH_HOME. */
+export function loadCheckProfile() {
+  const dir = resolveProfileDir(CHECK_PROFILE)
+  initProfile(dir, CHECK_BUNDLES)
+  return loadOwnBundles(dir, CHECK_BUNDLES)
+}
+
 function loadOwnBundles(dir, bundles) {
   const profile = loadProfileDirectory('dsh', dir, INSTALL_ANCHOR)
   const lost = profile.skippedBundles.filter(({ packageName }) => bundles.includes(packageName))
