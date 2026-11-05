@@ -4,49 +4,52 @@
   StrCpy $isForceCurrentInstall "1"
 !macroend
 
-; The install directory is fixed: the program goes to <drive>\LinkBot\app and the
-; data to <drive>\LinkBot\data beside it, so the uninstaller leaves the data alone
-; and the first run finds its places without asking. The drive is D when the machine
-; has one and E otherwise; the user does not choose it.
+; The install directory is the one the user picks on the directory page, and the
+; page starts at <drive>\LinkBot\app. The program goes there and the data to
+; <drive>\LinkBot\data beside it, so the uninstaller leaves the data alone and
+; the first run finds its places without asking.
 ;
-; The registered location of an earlier installation is deliberately NOT read: a copy
-; that once went somewhere else (an older build, or a run aimed with /D=) would
-; otherwise drag every later install there with it, and the fixed folder would never
-; be reached again. Every install lands on <drive>\LinkBot\app.
+; The path is used exactly as it is chosen: electron-builder appends a
+; product-name sub-folder to any path that lacks it (assistedInstaller.nsh,
+; instFilesPre), but customPageAfterChangeDir replaces that function with one
+; that keeps the path as it is. The check for a writable folder runs between the
+; directory page and the install (#626).
 ;
-; electron-builder appends a product-name sub-folder to any path that does not
-; already contain it (assistedInstaller.nsh, instFilesPre). That whole block sits
-; inside `!ifdef allowToChangeInstallationDirectory`, so with the directory page
-; turned off the path is used exactly as it is set here.
-;
-; The /D= switch still wins: that is how a silent install in the acceptance run aims
-; the app at a throwaway folder.
+; An earlier installation's folder is the default the page starts at, so an
+; upgrade lands where the copy already is.
 !macro customInit
-  ; The /D= switch wins over the chosen drive, so a test install can go anywhere.
+  ; The /D= switch wins over everything else: that is how a silent install in
+  ; the acceptance run aims the app at a throwaway folder.
   !insertmacro GetDParameter $R0
   ${If} $R0 != ""
     StrCpy $INSTDIR $R0
   ${Else}
-    ; A drive is detected with a wildcard: "D:\" and "D:\." both fail, because a
-    ; backslash at the end of the string is an escape and the path never resolves.
-    IfFileExists "D:\*" 0 useE
-    StrCpy $INSTDIR "D:\LinkBot\app"
-    Goto done
-    useE:
-    ; No D drive: the next one the user asked for is E.
-    IfFileExists "E:\*" 0 noDrive
-    StrCpy $INSTDIR "E:\LinkBot\app"
-    Goto done
-    noDrive:
-    ; Neither drive: the program folder of the current user is the last resort.
-    StrCpy $INSTDIR "$LocalAppData\Programs\LinkBot\app"
-    done:
+    ; An earlier installation lives where it was put: start the page there.
+    ReadRegStr $0 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
+    ${If} $0 != ""
+      StrCpy $INSTDIR $0
+    ${Else}
+      ; A drive is detected with a wildcard: "D:\" and "D:\." both fail, because a
+      ; backslash at the end of the string is an escape and the path never resolves.
+      IfFileExists "D:\*" 0 useE
+      StrCpy $INSTDIR "D:\LinkBot\app"
+      Goto done
+      useE:
+      ; No D drive: the next one the user asked for is E.
+      IfFileExists "E:\*" 0 noDrive
+      StrCpy $INSTDIR "E:\LinkBot\app"
+      Goto done
+      noDrive:
+      ; Neither drive: the program folder of the current user is the last resort.
+      StrCpy $INSTDIR "$LocalAppData\Programs\LinkBot\app"
+      done:
+    ${EndIf}
   ${EndIf}
 
   ; The installer never asks for administrator rights, so a folder the user cannot
   ; write to only fails halfway through the install, with a misleading error.
-  ; The directory is fixed now, so there is no directory page to go back to: the
-  ; install stops here instead, and says which folder is the problem.
+  ; The directory page is there now: the check below happens on it, and the
+  ; install stops here instead, saying which folder is the problem.
   ClearErrors
   CreateDirectory "$INSTDIR"
   ${If} ${Errors}
@@ -82,12 +85,19 @@
 ; error. A content-less page between the directory page and the install checks
 ; that the chosen folder can be created and written to, and sends the user back
 ; to the directory page when it cannot.
+;
+; This also keeps the chosen path as it is: the builder's default instFilesPre
+; appends the product name to a path that lacks it, and a path like
+; "D:\LinkBot\app" would become "D:\LinkBot\app\LinkBot".
 !macro customPageAfterChangeDir
   !ifdef allowToChangeInstallationDirectory
     Var /GLOBAL dsbCheckTarget
 
-    ; The builder's default instFilesPre appends APP_FILENAME when the chosen path
-    ; lacks the new product name. An upgrade must keep the registered folder instead.
+    ; The builder's default instFilesPre appends APP_FILENAME to a path that lacks
+    ; the product name, so "D:\LinkBot\app" would become "D:\LinkBot\app\LinkBot".
+    ; The builder's function is still called, so its own code stays referenced; the
+    ; product-name suffix it adds is then taken off, and the chosen path is used
+    ; as it is.
     !define /redef MUI_PAGE_CUSTOMFUNCTION_PRE dsbInstFilesPre
 
     Function dsbResolveInstDir
@@ -97,13 +107,23 @@
       ${AndIf} $0 == $INSTDIR
         Return
       ${EndIf}
-      Push $INSTDIR
-      Call instFilesPre
-      StrCpy $dsbCheckTarget $INSTDIR
-      Pop $INSTDIR
     FunctionEnd
 
     Function dsbInstFilesPre
+      ; The builder's own function: it appends the product name to a path that
+      ; lacks it.
+      Call instFilesPre
+      ; The suffix it appended is "\LinkBot"; it goes, so the install lands where
+      ; the user chose. The path is compared by its length: the suffix is that
+      ; many characters shorter, and it is removed by that many.
+      ${StdUtils.GetFileNamePart} $1 "$INSTDIR"
+      ${If} $1 == "${APP_FILENAME}"
+        ${StdUtils.GetParentPath} $1 "$INSTDIR"
+        ${If} $1 != ""
+        ${AndIf} $1 != "$INSTDIR"
+          StrCpy $INSTDIR $1
+        ${EndIf}
+      ${EndIf}
       Call dsbResolveInstDir
       StrCpy $INSTDIR $dsbCheckTarget
     FunctionEnd
