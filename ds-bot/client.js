@@ -690,6 +690,7 @@ var ZH = {
   Retry: "重试",
   Retrying: "正在重试",
   Copy: "复制",
+  Goal: "目标",
   Copied: "已复制",
   Code: "代码",
   Objective: "目标",
@@ -5038,7 +5039,7 @@ var HANDOFF_CSS = `
 .bt-handoff .bt-q-foot{flex-wrap:wrap}
 `;
 
-// node_modules/deep-view/src/react/ui.js
+// ../app/node_modules/deep-view/src/react/ui.js
 var import_react10 = require("react");
 var FallbackMarkdown = ({ text }) => (0, import_react10.createElement)("span", null, String(text ?? ""));
 var ViewUi = (0, import_react10.createContext)({ t: (key) => key, Markdown: FallbackMarkdown });
@@ -5105,7 +5106,7 @@ function useOptionKeys2(count, onPick, ownRef) {
   return count > 0 && listening <= 1;
 }
 
-// node_modules/deep-view/src/core/formula.js
+// ../app/node_modules/deep-view/src/core/formula.js
 var FUNCTIONS = {
   min: { args: [1, Infinity], run: (...values) => Math.min(...values.map(num)) },
   max: { args: [1, Infinity], run: (...values) => Math.max(...values.map(num)) },
@@ -5386,7 +5387,7 @@ function evaluate(tree, lookup) {
   }
 }
 
-// node_modules/deep-view/src/core/views.js
+// ../app/node_modules/deep-view/src/core/views.js
 var LAYOUT = ["stack", "row"];
 var DISPLAY = ["text", "metric", "table", "chart", "progress", "callout", "sources", "html"];
 var INPUT_TYPES = ["slider", "choice", "toggle", "number"];
@@ -6006,7 +6007,7 @@ function validateForm(node, values) {
   return { fields };
 }
 
-// node_modules/deep-view/src/react/chart.js
+// ../app/node_modules/deep-view/src/react/chart.js
 var import_react11 = require("react");
 var PALETTE = ["var(--dv-accent)", "var(--dv-ink-tangerine)", "var(--dv-ink-green)", "var(--dv-ink-violet)", "var(--dv-ink-sky)", "var(--dv-ink-rose)", "var(--dv-ink-yellow)", "var(--dv-ink-cyan)", "var(--dv-ink-magenta)"];
 var colorAt = (index) => PALETTE[index % PALETTE.length];
@@ -6445,7 +6446,7 @@ var CHART_CSS = `
 @media (prefers-reduced-motion:reduce){.dv-chart-mark,.dv-chart-dot{transition:none}.dv-chart-tip{animation:none}}
 `;
 
-// node_modules/deep-view/src/react/frame.js
+// ../app/node_modules/deep-view/src/react/frame.js
 var import_react12 = require("react");
 var THEME_VARS = [
   ["--view-ink", "--bt-ink", "--dv-ink"],
@@ -6527,7 +6528,7 @@ var HTML_CSS = `
 .dv-view-frame-stopped{margin:0;font-size:13px;line-height:18px;color:var(--dv-ink-2)}
 `;
 
-// node_modules/deep-view/src/react/card.js
+// ../app/node_modules/deep-view/src/react/card.js
 var import_react13 = require("react");
 var mdLabels = (ui2) => ({ code: { copyLabel: ui2.t("Copy"), copiedLabel: ui2.t("Copied") }, footnotes: ui2.t("Footnotes") });
 var TONES2 = ["good", "warn", "bad"];
@@ -7196,7 +7197,7 @@ ${CHART_CSS}
 ${HTML_CSS}
 `;
 
-// node_modules/deep-view/src/react/styles.js
+// ../app/node_modules/deep-view/src/react/styles.js
 var THEME_CSS = `
 body{
 --dv-ink:var(--dsw-alias-label-primary);
@@ -7293,10 +7294,10 @@ button.dv-q-opt:active{background:var(--dv-active)}
 @media (prefers-reduced-motion:reduce){.dv-q,.dv-view-bare,.dv-q-submit,.dv-menu,.dv-q-check{animation:none}}
 `;
 
-// node_modules/deep-view/src/react/index.js
+// ../app/node_modules/deep-view/src/react/index.js
 var DEEP_VIEW_CSS = THEME_CSS + QUESTION_CSS + WIDGET_CSS;
 
-// node_modules/deep-view/src/core/reply.js
+// ../app/node_modules/deep-view/src/core/reply.js
 var REPLY_KIND = "user-question-reply";
 function viewCardText(args) {
   let card = args;
@@ -18817,6 +18818,33 @@ function GroupOverview({ room: room2, roster, actions, usage, useWork, openSetti
         roster,
         actions
       })))
+    ),
+    (0, import_react49.createElement)(
+      "div",
+      { key: "goal" },
+      (0, import_react49.createElement)("div", { className: "bt-section-title" }, t("Goal")),
+      (0, import_react49.createElement)(
+        "div",
+        { className: "bt-kv" },
+        room2.goal ? [
+          (0, import_react49.createElement)("span", { key: "t" }, room2.goal.title, " ", (0, import_react49.createElement)("span", { className: "bt-note" }, goalView(room2.goal, { roster })?.barLabel ?? "")),
+          (0, import_react49.createElement)("button", {
+            key: "s",
+            type: "button",
+            className: "bt-soft bt-soft-sm",
+            onClick: () => {
+              actions.toggleGoal(room2.id);
+              if (typeof document !== "undefined" && document.querySelector("[data-rightbar-fullscreen]")) actions.closeOverlay();
+            }
+          }, t("Show"))
+        ] : (0, import_react49.createElement)("button", {
+          type: "button",
+          className: "bt-soft bt-soft-sm",
+          disabled: !canSetGoal(room2, roster),
+          title: hasGoalAdmin(room2, roster) ? void 0 : t("This group has no admin"),
+          onClick: () => actions.composeGoal(room2.id)
+        }, t("Set a goal"))
+      )
     ),
     (0, import_react49.createElement)(
       "div",

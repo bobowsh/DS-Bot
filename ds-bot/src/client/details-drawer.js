@@ -10,6 +10,7 @@ import { BotSettingsForm } from './bot-settings.js'
 import { GroupSettingsForm, ROOM_MODES, roomSubtitle, shownMode } from './group-settings.js'
 import { ModelMenu, modelOf } from './model-menu.js'
 import { FolderMenu } from './folder-menu.js'
+import { canSetGoal, goalView, hasGoalAdmin } from './goal.js'
 import { MemoryRow } from './memory-panel.js'
 import { ScheduleSummary } from './schedules.js'
 import { useGlide, useMorph } from './motion.js'
@@ -166,6 +167,23 @@ function GroupOverview({ room, roster, actions, usage, useWork, openSettings }) 
       h('div', { className: 'bt-members', role: 'list' }, members.map(member => h(MemberRow, {
         key: member.id, member, entry: entries.find(item => item.id === member.id), room, roster, actions,
       })))),
+    h('div', { key: 'goal' }, h('div', { className: 'bt-section-title' }, t('Goal')),
+      h('div', { className: 'bt-kv' },
+        room.goal
+          ? [h('span', { key: 't' }, room.goal.title, ' ', h('span', { className: 'bt-note' }, goalView(room.goal, { roster })?.barLabel ?? '')),
+            h('button', {
+              key: 's', type: 'button', className: 'bt-soft bt-soft-sm',
+              onClick: () => {
+                actions.toggleGoal(room.id)
+                // On a narrow layout the panel is a drawer over the header: leave it.
+                if (typeof document !== 'undefined' && document.querySelector('[data-rightbar-fullscreen]')) actions.closeOverlay()
+              },
+            }, t('Show'))]
+          : h('button', {
+            type: 'button', className: 'bt-soft bt-soft-sm', disabled: !canSetGoal(room, roster),
+            title: hasGoalAdmin(room, roster) ? undefined : t('This group has no admin'),
+            onClick: () => actions.composeGoal(room.id),
+          }, t('Set a goal')))),
     h('div', { key: 'mode' }, h('div', { className: 'bt-section-title' }, t('Who answers')),
       h('div', { className: 'bt-kv' }, h('span', null, t(ROOM_MODES.find(([id]) => id === shownMode(room, roster))?.[1] ?? 'Everyone')))),
     room.permission ? h('div', { key: 'permission' }, h('div', { className: 'bt-section-title' }, t('Permissions')),

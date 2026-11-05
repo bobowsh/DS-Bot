@@ -653,6 +653,7 @@ const ZH = {
   Retry: '重试',
   Retrying: '正在重试',
   Copy: '复制',
+  Goal: '目标',
   Copied: '已复制',
   Code: '代码',
   Objective: '目标',
