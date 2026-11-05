@@ -24,31 +24,27 @@
   ${If} $R0 != ""
     StrCpy $INSTDIR $R0
   ${Else}
-    ; An earlier installation lives where it was put: start the page there.
-    ; Only a full path counts: a bare drive letter ("d:") is what an install that
-    ; landed in the drive's root leaves behind, and following it would put the
-    ; next one in the root as well. A full path is longer than its drive letter.
-    ReadRegStr $0 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
-    StrLen $R9 $0
-    ${If} $0 != ""
-    ${AndIf} $R9 > 3
-      StrCpy $INSTDIR $0
-    ${Else}
-      ; A drive is detected with a wildcard: "D:\" and "D:\." both fail, because a
-      ; backslash at the end of the string is an escape and the path never resolves.
-      IfFileExists "D:\*" 0 useE
-      StrCpy $INSTDIR "D:\LinkBot\app"
-      Goto done
-      useE:
-      ; No D drive: the next one the user asked for is E.
-      IfFileExists "E:\*" 0 noDrive
-      StrCpy $INSTDIR "E:\LinkBot\app"
-      Goto done
-      noDrive:
-      ; Neither drive: the program folder of the current user is the last resort.
-      StrCpy $INSTDIR "$LocalAppData\Programs\LinkBot\app"
-      done:
-    ${EndIf}
+    ; The folder is fixed: <drive>\LinkBot\app, with the data at
+    ; <drive>\LinkBot\data beside it.
+    ;
+    ; The registered location of an earlier installation is deliberately NOT read.
+    ; It was the one thing that kept an install from ever reaching this folder: a
+    ; copy that once landed elsewhere (in a drive's root, or under another
+    ; product name) left its path behind, and every later install followed it.
+    ; A drive is detected with a wildcard: "D:\" and "D:\." both fail, because a
+    ; backslash at the end of the string is an escape and the path never resolves.
+    IfFileExists "D:\*" 0 useE
+    StrCpy $INSTDIR "D:\LinkBot\app"
+    Goto done
+    useE:
+    ; No D drive: the next one the user asked for is E.
+    IfFileExists "E:\*" 0 noDrive
+    StrCpy $INSTDIR "E:\LinkBot\app"
+    Goto done
+    noDrive:
+    ; Neither drive: the program folder of the current user is the last resort.
+    StrCpy $INSTDIR "$LocalAppData\Programs\LinkBot\app"
+    done:
   ${EndIf}
 
   ; The installer never asks for administrator rights, so a folder the user cannot
@@ -98,39 +94,39 @@
   !ifdef allowToChangeInstallationDirectory
     Var /GLOBAL dsbCheckTarget
 
-    ; The builder's default instFilesPre appends APP_FILENAME to a path that lacks
-    ; the product name, so "D:\LinkBot\app" would become "D:\LinkBot\app\LinkBot".
-    ; The builder's function is still called, so its own code stays referenced; the
-    ; product-name suffix it adds is then taken off, and the chosen path is used
-    ; as it is.
+    ; The builder's default instFilesPre appends APP_FILENAME to a path that
+    ; lacks the product name. The folder the user picks is the folder the app
+    ; goes into, so that suffix is taken off again: what the user chose is what
+    ; is installed, with nothing appended.
+    !
+    ; The builder's function is still called, so its own code stays referenced
+    ; (a function nobody calls is a warning the build treats as an error). The
+    ; suffix it added is removed by its own length: "\LinkBot" is one backslash
+    ; and the product name, so the path is that many characters shorter.
     !define /redef MUI_PAGE_CUSTOMFUNCTION_PRE dsbInstFilesPre
 
     Function dsbResolveInstDir
       StrCpy $dsbCheckTarget $INSTDIR
-      ReadRegStr $0 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
-      ${If} $0 != ""
-      ${AndIf} $0 == $INSTDIR
-        Return
-      ${EndIf}
     FunctionEnd
 
     Function dsbInstFilesPre
+      ; The path the user chose, before the builder touches it.
+      Call dsbResolveInstDir
       ; The builder's own function: it appends the product name to a path that
       ; lacks it.
       Call instFilesPre
-      ; The suffix it appended is "\LinkBot"; it goes, so the install lands where
-      ; the user chose. The path is compared by its length: the suffix is that
-      ; many characters shorter, and it is removed by that many.
-      ${StdUtils.GetFileNamePart} $1 "$INSTDIR"
-      ${If} $1 == "${APP_FILENAME}"
-        ${StdUtils.GetParentPath} $1 "$INSTDIR"
-        ${If} $1 != ""
-        ${AndIf} $1 != "$INSTDIR"
-          StrCpy $INSTDIR $1
-        ${EndIf}
+      ; Did it append? The path it holds now is the one the user chose, or that
+      ; one plus "\LinkBot". The two lengths tell which, and the difference is
+      ; how much to take off the end.
+      StrLen $2 "$INSTDIR"
+      StrLen $3 "$dsbCheckTarget"
+      ${If} $2 > $3
+        ; It appended: the folder the user chose is that many characters
+        ; shorter, so the extra tail goes.
+        IntOp $4 $2 - $3
+        StrCpy $5 "$INSTDIR" -$4
+        StrCpy $INSTDIR $5
       ${EndIf}
-      Call dsbResolveInstDir
-      StrCpy $INSTDIR $dsbCheckTarget
     FunctionEnd
 
     Page custom dsbCheckInstDir
