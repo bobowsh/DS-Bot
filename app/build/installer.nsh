@@ -9,31 +9,29 @@
 ; and the first run finds its places without asking. The drive is D when the machine
 ; has one and E otherwise; the user does not choose it.
 ;
+; The registered location of an earlier installation is deliberately NOT read: a copy
+; that once went somewhere else (an older build, or a run aimed with /D=) would
+; otherwise drag every later install there with it, and the fixed folder would never
+; be reached again. Every install lands on <drive>\LinkBot\app.
+;
 ; electron-builder appends a product-name sub-folder to any path that does not
 ; already contain it (assistedInstaller.nsh, instFilesPre). That whole block sits
 ; inside `!ifdef allowToChangeInstallationDirectory`, so with the directory page
 ; turned off the path is used exactly as it is set here.
 ;
-; The order is: an earlier installation keeps its own drive, then the /D= switch
-; overrides it (how the silent install in the acceptance run sets the path), and
-; only a fresh install picks the drive.
+; The /D= switch still wins: that is how a silent install in the acceptance run aims
+; the app at a throwaway folder.
 !macro customInit
-  ; An earlier installation lives where it was put: keep it there.
-  ReadRegStr $0 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
-  ${If} $0 != ""
-    StrCpy $INSTDIR $0
+  ; The /D= switch wins over the chosen drive, so a test install can go anywhere.
+  !insertmacro GetDParameter $R0
+  ${If} $R0 != ""
+    StrCpy $INSTDIR $R0
   ${Else}
-    ; The /D= switch wins over the chosen drive, so a test install can go anywhere.
-    !insertmacro GetDParameter $R0
-    ${If} $R0 != ""
-      StrCpy $INSTDIR $R0
-    ${Else}
-      ; A drive is detected with a wildcard: "D:\" and "D:\." both fail, because a
-      ; backslash at the end of the string is an escape and the path never resolves.
-      IfFileExists "D:\*" 0 useE
-      StrCpy $INSTDIR "D:\LinkBot\app"
-      Goto done
-    ${EndIf}
+    ; A drive is detected with a wildcard: "D:\" and "D:\." both fail, because a
+    ; backslash at the end of the string is an escape and the path never resolves.
+    IfFileExists "D:\*" 0 useE
+    StrCpy $INSTDIR "D:\LinkBot\app"
+    Goto done
     useE:
     ; No D drive: the next one the user asked for is E.
     IfFileExists "E:\*" 0 noDrive
