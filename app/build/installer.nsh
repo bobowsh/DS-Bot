@@ -25,8 +25,13 @@
     StrCpy $INSTDIR $R0
   ${Else}
     ; An earlier installation lives where it was put: start the page there.
+    ; Only a full path counts: a bare drive letter ("d:") is what an install that
+    ; landed in the drive's root leaves behind, and following it would put the
+    ; next one in the root as well. A full path is longer than its drive letter.
     ReadRegStr $0 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
+    StrLen $R9 $0
     ${If} $0 != ""
+    ${AndIf} $R9 > 3
       StrCpy $INSTDIR $0
     ${Else}
       ; A drive is detected with a wildcard: "D:\" and "D:\." both fail, because a
