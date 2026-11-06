@@ -46,32 +46,31 @@ afterEach(() => {
 describe('the packaged Windows install', () => {
   before(() => {
     delete process.env.DS_BOT_HOME
-    // A packaged layout of its own: <install>\app holds the exe, so the fixed folders land
-    // under <install>, not in the temp root the shared fake path sits in.
+    // A packaged layout of its own: <install>\app holds the exe.
     const install = mkdtempSync(join(tmpdir(), 'ds-bot-fr-install-'))
     paths.exe = join(install, 'app', 'LinkBot.exe')
   })
 
-  test('fixes the folders beside the program folder and asks nothing', { skip: process.platform !== 'win32' && 'the fixed places are a Windows install rule' }, async () => {
+  test('the folders are the ones beside the program folder and nothing is asked', { skip: process.platform !== 'win32' && 'the fixed places are a Windows install rule' }, async () => {
     state.packaged = true
     process.env.DSH_HOME = dshHomeWithTeam()
     const signal = new AbortController().signal
     const where = await chooseLocations(signal)
-    const install = dirname(dirname(paths.exe))
-    assert.equal(where.dataDir, join(install, 'data'))
-    assert.equal(where.workspace, join(install, 'workspace'))
+    // The app's own folders: the program in D:\LinkBot\app, its data in D:\LinkBot\data.
+    assert.equal(where.dataDir, defaultPlaces().dataDir)
+    assert.equal(where.workspace, defaultPlaces().workspace)
     assert.equal(state.dialogs.length, 0, 'no welcome box, no pickers and no import offer')
     assert.equal(existsSync(where.dataDir), true, 'the data folder is made')
     assert.equal(existsSync(where.workspace), true, 'the workspace folder is made')
     const saved = JSON.parse(readFileSync(locationsFile, 'utf8'))
     // The free space of the data's drive is kept with the places, so a later start can
     // tell when the drive has run short.
-    assert.equal(saved.dataDir, join(install, 'data'))
-    assert.equal(saved.workspace, join(install, 'workspace'))
+    assert.equal(saved.dataDir, defaultPlaces().dataDir)
+    assert.equal(saved.workspace, defaultPlaces().workspace)
     assert.ok(saved.freeAtStart > 0, 'the free space of the drive is kept')
   })
 
-  test('an install whose folder is a drive root is not fixed', { skip: process.platform !== 'win32' && 'the fixed places are a Windows install rule' }, async () => {
+  test('an install whose folder is a drive root does not change the places', { skip: process.platform !== 'win32' && 'the fixed places are a Windows install rule' }, async () => {
     state.packaged = true
     process.env.DSH_HOME = dshHomeEmpty()
     // An exe at a drive root makes the program folder itself the root: its "parent" is a

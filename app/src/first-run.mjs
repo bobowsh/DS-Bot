@@ -49,8 +49,6 @@ export const programFolder = () => installFolder(app.getPath('exe'))
  *
  * Nothing is hardcoded: the places follow wherever the program was put. A parent that is a
  * drive root, or missing, is not fixed either — there is nowhere beside it to put them.
- * Every other platform keeps the default places, since the program folder on macOS is the
- * sealed .app bundle, whose contents the data must not enter.
  *
  * @returns {{ dataDir: string, workspace: string } | undefined} the fixed places, or none
  */
@@ -60,6 +58,38 @@ export function fixedPlaces() {
   const root = dirname(program)
   if (root === program || root === dirname(root)) return undefined
   return { dataDir: join(root, 'data'), workspace: join(root, 'workspace') }
+}
+
+/**
+ * The places the app starts on when it has not been told otherwise: the program in
+ * D:\LinkBot\app, its data in D:\LinkBot\data and its team's files in D:\LinkBot\workspace.
+ *
+ * The program folder and the data folder are one folder apart on purpose: the uninstaller
+ * leaves the data alone, and the first run finds its places without asking. The drive is
+ * D when the machine has one and E otherwise; the user's own folders under the profile
+ * are not used, so the app's data never ends up on the system drive by accident.
+ *
+ * @returns {{ dataDir: string, workspace: string }} the places to start on
+ */
+export function defaultPlaces() {
+  const root = driveRoot()
+  return { dataDir: join(root, 'LinkBot', 'data'), workspace: join(root, 'LinkBot', 'workspace') }
+}
+
+/**
+ * The drive the app's folders go on: D when the machine has one, E otherwise, and the
+ * user's own profile folder when neither is there.
+ *
+ * The drive is found with a wildcard: "D:\" and "D:\." both fail, because a backslash at
+ * the end of the string is an escape and the path never resolves.
+ *
+ * @returns {string} the folder the app's own folders are made under
+ */
+function driveRoot() {
+  for (const drive of ['D:', 'E:']) {
+    if (existsSync(`${drive}\\`)) return drive
+  }
+  return homedir()
 }
 
 /**
@@ -75,12 +105,6 @@ export async function pickRoot(from, signal, ui) {
     throw error
   }
 }
-
-/**
- * The places a first start offers: the fixed ones beside a packaged Windows program, and
- * the default ones everywhere else.
- */
-export const defaultPlaces = () => fixedPlaces() ?? { dataDir: join(homedir(), '.ds-bot'), workspace: join(homedir(), 'DS Bot') }
 
 /** The Bot team in a data folder, if it has one. */
 export function teamIn(dataDir) {
