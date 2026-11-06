@@ -117,15 +117,18 @@
       Call instFilesPre
       ; Did it append? The path it holds now is the one the user chose, or that
       ; one plus "\LinkBot". The two lengths tell which, and the difference is
-      ; how much to take off the end.
+      ; how much to take off the end. Both count characters, so a path with
+      ; Chinese in it is cut at the same place it was measured.
       StrLen $2 "$INSTDIR"
       StrLen $3 "$dsbCheckTarget"
       ${If} $2 > $3
-        ; It appended: the folder the user chose is that many characters
-        ; shorter, so the extra tail goes.
         IntOp $4 $2 - $3
-        StrCpy $5 "$INSTDIR" -$4
-        StrCpy $INSTDIR $5
+        ; A cut of nothing would empty the path, and StrCpy reads a cut of zero
+        ; that way, so it is only done when there is something to take off.
+        ${If} $4 > 0
+          StrCpy $5 "$INSTDIR" -$4
+          StrCpy $INSTDIR $5
+        ${EndIf}
       ${EndIf}
     FunctionEnd
 
