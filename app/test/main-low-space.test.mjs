@@ -20,7 +20,7 @@ const copied = path => existsSync(path) && readdirSync(path).length > 0
 await installHooks()
 
 test('a later start on a drive that runs low shows the place line, and its button moves the data on cards', async () => {
-  const { home, workspace } = await startApp({ saved: { freeAtStart: Number.MAX_SAFE_INTEGER } })
+  const { home, workspace } = await startApp({ saved: { freeAtStart: Number.MAX_SAFE_INTEGER }, later: true })
   await waitFor(() => startWindows().length === 1, 'open the start window')
   const start = startWindows()[0]
   const last = () => start.webContents.sent.filter(([channel]) => channel === 'ds-bot:start-state').at(-1)?.[1]

@@ -124,7 +124,9 @@ export const messageBoxes = () => state.dialogs.filter(options => 'message' in o
  * @returns {Promise<{ home: string, workspace: string }>}
  */
 export const moveFromStart = async (to, { before = () => {}, picked = () => {} } = {}) => {
-  const places = await startApp({ saved: { freeAtStart: Number.MAX_SAFE_INTEGER } })
+  // A move starts from a later start: the place line it waits for is the one a later start shows
+  // when the drive has run down from the free space it had when the data went there.
+  const places = await startApp({ saved: { freeAtStart: Number.MAX_SAFE_INTEGER }, later: true })
   before(places)
   await waitFor(() => startState()?.place !== undefined, 'show the place line')
   state.openAnswer = { canceled: false, filePaths: [to] }

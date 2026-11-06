@@ -53,7 +53,9 @@ describe('the packaged Windows install', () => {
 
   test('the folders are the ones beside the program folder and nothing is asked', { skip: process.platform !== 'win32' && 'the fixed places are a Windows install rule' }, async () => {
     state.packaged = true
-    process.env.DSH_HOME = dshHomeWithTeam()
+    // No team in the user's own DSH: this test is about the folders, and an offer would keep
+    // the places unsaved until the card is answered (main-import covers that side).
+    process.env.DSH_HOME = dshHomeEmpty()
     const signal = new AbortController().signal
     const where = await chooseLocations(signal)
     // The app's own folders: the program in <install>\app, its data in <install>\data.

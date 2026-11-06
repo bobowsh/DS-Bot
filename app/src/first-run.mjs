@@ -175,10 +175,11 @@ function readSaved(file) {
  * Where the app keeps its data and the Bots' files: the program's own folder decides it.
  *
  * A packaged install puts its data beside the program folder (D:\LinkBot\app -> D:\LinkBot\data);
- * anywhere else the default place is used. A place saved from an earlier start is **not** read: the
- * data follows the program, so an install that moved decides where its data lives. The consequence
- * is that 「换个位置」 no longer sticks across restarts — the user chose this over keeping the
- * saved place, which would leave an install that moved pointing at a folder it no longer owns.
+ * anywhere else the default place is used. A saved **place** is not used: the data follows the
+ * program, so an install that moved decides where its data lives. The consequence is that
+ * 「换个位置」 no longer sticks across restarts — the user chose this over keeping the saved
+ * place, which would leave an install that moved pointing at a folder it no longer owns. Only the
+ * saved reading of the drive's free space is kept, as metadata for the place line.
  *
  * Nothing is made or written here: the start window asks for the kind of start before the boot
  * has done anything, and it only needs to know where the data would be.
@@ -193,11 +194,12 @@ export function placesFor() {
  * Where the app keeps its data and the Bots' files.
  *
  * The places follow the program: a packaged install puts its data beside the program folder
- * (D:\LinkBot\app -> D:\LinkBot\data), and anywhere else the default place is used. A place
- * saved from an earlier start is **not** read: the data follows the program, so an install that
- * moved decides where its data lives. The consequence is that 「换个位置」 no longer sticks
- * across restarts — the user chose this over keeping the saved place, which would leave an
- * install that moved pointing at a folder it no longer owns.
+ * (D:\LinkBot\app -> D:\LinkBot\data), and anywhere else the default place is used. A saved
+ * **place** is not used: the data follows the program, so an install that moved decides where
+ * its data lives. The consequence is that 「换个位置」 no longer sticks across restarts — the
+ * user chose this over keeping the saved place, which would leave an install that moved pointing
+ * at a folder it no longer owns. The saved reading of the drive's free space is still kept, as
+ * metadata for the place line.
  *
  * A run on throwaway folders (DS_BOT_HOME, for development and tests) asks nothing and copies
  * nothing. `freeAtStart` is the free space of the data's drive that saveLocations() kept, none
@@ -215,8 +217,16 @@ export function chooseLocations() {
   // card is the one that is saved, so nothing is written before that. Every other start has its
   // place already, and writes it so that the free space of the drive is measured while it goes on.
   if (offer === undefined) saveLocations({ dataDir, workspace })
+  // A saved place is not used, but its free-space reading still belongs to this data folder: a
+  // later start shows the place line again when a fifth of that reading is left (start-window §5).
+  // Only a reading for the very same folder is kept, so an install that moved never inherits the
+  // numbers of a folder it no longer owns.
+  const saved = readSaved(locationsFile())
+  const freeAtStart = saved !== undefined && typeof saved.dataDir === 'string' && resolve(saved.dataDir) === resolve(dataDir)
+    ? roomOf(saved.freeAtStart)
+    : undefined
   if (offer !== undefined) return { dataDir, workspace, offer }
-  return { dataDir, workspace }
+  return { dataDir, workspace, freeAtStart }
 }
 
 /**

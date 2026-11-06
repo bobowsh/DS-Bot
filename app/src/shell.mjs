@@ -204,7 +204,7 @@ export function createShell(options) {
       powerMonitor.on('shutdown', () => { sessionEnding = true })
     }
     notice = new BackgroundNotice({
-      marker: options.notice.marker(), show: options.notice.show, message: text().notice, confirm: text().noticeConfirm, log,
+      marker: options.notice.marker(), show: options.notice.show, focus: options.notice.focus, message: text().notice, confirm: text().noticeConfirm, log,
     })
     buildTray()
   }

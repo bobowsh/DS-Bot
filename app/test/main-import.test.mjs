@@ -16,6 +16,7 @@ import { installHooks } from './helpers/register.mjs'
 // the test double is <root>\data. The user's own DSH home — the one the app offers a team from —
 // is a folder of the test's own.
 const home = join(paths.root, 'data')
+const workspace = join(paths.root, 'workspace')
 process.env.HOME = paths.root
 process.env.USERPROFILE = paths.root
 process.env.DSH_HOME = join(paths.root, 'user-dsh')
@@ -61,14 +62,14 @@ test('the first start offers the DSH team on the import card, copies it on cards
   state.ipc.get('ds-bot:start-act')({ sender: start.webContents, senderFrame: start.webContents.mainFrame }, 'importOption', { option: 'regen', value: true })
   await waitFor(() => startState().card.options.regen === true, 'tick the option on the card')
   await startAct('answer', 'copy')
-  await waitFor(() => existsSync(join(home, '.ds-bot', 'bot', 'imported.json')), 'copy the team')
+  await waitFor(() => existsSync(join(home, 'bot', 'imported.json')), 'copy the team')
   await waitFor(() => window()?.loaded.some(url => url.includes('token=')), 'start the copied team')
   const steps = cards().filter(card => card.kind === 'copying').map(card => card.step)
   assert.ok(steps.includes(1) && steps.includes(2) && steps.at(-1) === 3, `the copy shows its three steps (${steps.join(',')})`)
   assert.equal(startState().card, undefined, 'the copying card goes once the team\'s engine is up')
   assert.deepEqual(startState().done, ['data', 'import', 'engine'], 'the import\'s stage is done, and the engine\'s again')
-  assert.ok(existsSync(join(home, 'DS Bot', 'draft.md')), 'the work files came along')
-  assert.equal(existsSync(join(home, 'DS Bot', 'node_modules')), false, 'the regenerable folders did not')
+  assert.ok(existsSync(join(workspace, 'draft.md')), 'the work files came along')
+  assert.equal(existsSync(join(workspace, 'node_modules')), false, 'the regenerable folders did not')
   assert.equal(JSON.parse(readFileSync(join(paths.userData, 'locations.json'), 'utf8')).dataDir, home)
   assert.deepEqual(messageBoxes(), [], 'no message box on the way')
   assert.equal(hostState.starts, 3, 'the warm engine, the chats\' check and the team\'s engine')
