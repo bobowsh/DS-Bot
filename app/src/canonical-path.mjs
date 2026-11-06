@@ -8,7 +8,12 @@ import { realpathSync } from 'node:fs'
 export function canonicalExecPath(execPath, realpath = realpathSync.native) {
   try {
     const real = realpath(execPath)
-    return real === execPath ? undefined : real
+    // Windows does not care about the case of a path: the same file reads as a different string
+    // in a different case, and that is not a path worth restarting for.
+    const same = process.platform === 'win32'
+      ? real.toLowerCase() === execPath.toLowerCase()
+      : real === execPath
+    return same ? undefined : real
   } catch {
     return undefined
   }

@@ -20,27 +20,42 @@ export const waitFor = async (check, what, timeout = 10_000) => {
 /**
  * Start the app on throwaway folders: the places are chosen already and the one-time notice
  * is answered, so that the app asks nothing. The Host answers when the test lets it.
- * @param {{ packaged?: boolean, saved?: object, acknowledged?: boolean, firstRun?: boolean }} options
+ *
+ * The data goes beside the program folder, the way a real install puts it: the saved places are
+ * not read any more, so a folder written here would not decide where the app keeps its data.
+ * Whether this is a first start is decided by the data folder being empty, so a test that wants
+ * a later start asks for one and gets the folder a state.
+ * @param {{ packaged?: boolean, saved?: object, acknowledged?: boolean, firstRun?: boolean, later?: boolean }} options
  *   whether the app is a packaged one, with an updater; what else locations.json keeps beside the
  *   places; whether the tray notice was answered already; a first run keeps its places unchosen,
- *   so that it asks
+ *   so that it asks; a later start is an install that already ran, with a state in its data
  */
-export const startApp = async ({ packaged = true, saved = {}, acknowledged = true, firstRun = false } = {}) => {
-  const home = mkdtempSync(join(tmpdir(), 'ds-bot-main-home-'))
-  const workspace = join(home, 'workspace')
+export const startApp = async ({ packaged = true, saved = {}, acknowledged = true, firstRun = false, later = false } = {}) => {
+  // The places of a real install: the data in <root>\data, the team's files in <root>\workspace.
+  const home = join(paths.root, 'data')
+  const workspace = join(paths.root, 'workspace')
   mkdirSync(workspace, { recursive: true })
   mkdirSync(paths.userData, { recursive: true })
   if (!firstRun) writeFileSync(join(paths.userData, 'locations.json'), JSON.stringify({ dataDir: home, workspace, ...saved }))
   if (acknowledged) writeFileSync(join(paths.userData, 'tray-close-acknowledged'), '')
+  // A later start is told by the data folder: an install that already ran has a state in it.
+  if (later) {
+    mkdirSync(join(home, 'bot'), { recursive: true })
+    writeFileSync(join(home, 'bot', 'state.json'), JSON.stringify({ version: 1, bots: {}, rooms: {} }))
+  }
+  // The user's own DSH home is where the app looks for a team to offer. A test must not see the
+  // team on this machine, so the home points at an empty folder of the test's own.
+  process.env.DSH_HOME = join(paths.root, 'user-dsh')
+  mkdirSync(process.env.DSH_HOME, { recursive: true })
   hold()
-  await import('../../src/main.mjs')
-  // The app is a packaged one, so that it has an updater. The flag comes after the start,
-  // because a packaged app starts on the canonical path of its own.
+  // The flag comes before the app starts: a packaged install puts its data beside the program
+  // folder, and that is the place the app picks when it boots.
   state.packaged = packaged
   // A Linux build updates itself only from inside an AppImage; outside one the app asks about
   // the newest GitHub release, which a test must never fetch. The faked electron-updater
   // answers for the AppImage, as it does on Windows.
   if (process.platform === 'linux') process.env.APPIMAGE ??= '/tmp/ds-bot.AppImage'
+  await import('../../src/main.mjs')
   return { home, workspace }
 }
 

@@ -12,7 +12,7 @@ import { installHooks } from './helpers/register.mjs'
 
 await installHooks()
 
-before(async () => { await startApp() })
+before(async () => { await startApp({ later: true }) })
 
 test('the app starts with a window and a tray', async () => {
   await waitFor(() => window() !== undefined, 'open the window')

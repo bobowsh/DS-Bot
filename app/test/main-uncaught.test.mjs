@@ -11,7 +11,7 @@ await installHooks()
 
 test('an error nothing caught shows the failure page, not a message box', async () => {
   const before = new Set(process.listeners('uncaughtException'))
-  await startApp()
+  await startApp({ later: true })
   await waitFor(() => startWindows().length === 1, 'open the start window')
   // The app's own listener (the test runner has one too, which must not see this error).
   const listener = process.listeners('uncaughtException').find(entry => !before.has(entry))

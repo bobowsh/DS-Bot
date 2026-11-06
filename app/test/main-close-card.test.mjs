@@ -12,7 +12,7 @@ import { installHooks } from './helpers/register.mjs'
 
 await installHooks()
 
-before(async () => { await startApp({ acknowledged: false }) })
+before(async () => { await startApp({ acknowledged: false, later: true }) })
 
 test('a page that does not show the card does not hold the close', async () => {
   await waitFor(() => window() !== undefined, 'open the window')

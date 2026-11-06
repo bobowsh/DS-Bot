@@ -12,10 +12,13 @@ import { hold, state as hostState } from './helpers/fake-host-process.mjs'
 import { handOff, messageBoxes, startAct, startState, startWindows, waitFor, window } from './helpers/app-harness.mjs'
 import { installHooks } from './helpers/register.mjs'
 
-const home = mkdtempSync(join(tmpdir(), 'ds-bot-import-home-'))
-process.env.HOME = home
-process.env.USERPROFILE = home
-process.env.DSH_HOME = join(home, 'dsh')
+// The data follows the program: the app's own data folder is beside the program folder, which in
+// the test double is <root>\data. The user's own DSH home — the one the app offers a team from —
+// is a folder of the test's own.
+const home = join(paths.root, 'data')
+process.env.HOME = paths.root
+process.env.USERPROFILE = paths.root
+process.env.DSH_HOME = join(paths.root, 'user-dsh')
 delete process.env.DS_BOT_HOME
 delete process.env.DS_BOT_WORKSPACE
 
@@ -28,6 +31,10 @@ write(join(dsh, 'bot', 'workspace', 'draft.md'), 'work')
 write(join(dsh, 'bot', 'workspace', 'node_modules', 'x', 'index.js'), 'regenerable')
 
 await installHooks()
+
+// The app is a packaged one: its data goes beside the program folder, which in the test double is
+// <root>\data. The flag comes before the app starts, because that is when the place is picked.
+state.packaged = true
 
 const cards = () => startWindows()[0].webContents.sent.filter(([channel, snapshot]) => channel === 'ds-bot:start-state' && snapshot.card).map(([, snapshot]) => snapshot.card)
 
@@ -62,7 +69,7 @@ test('the first start offers the DSH team on the import card, copies it on cards
   assert.deepEqual(startState().done, ['data', 'import', 'engine'], 'the import\'s stage is done, and the engine\'s again')
   assert.ok(existsSync(join(home, 'DS Bot', 'draft.md')), 'the work files came along')
   assert.equal(existsSync(join(home, 'DS Bot', 'node_modules')), false, 'the regenerable folders did not')
-  assert.equal(JSON.parse(readFileSync(join(paths.userData, 'locations.json'), 'utf8')).dataDir, join(home, '.ds-bot'))
+  assert.equal(JSON.parse(readFileSync(join(paths.userData, 'locations.json'), 'utf8')).dataDir, home)
   assert.deepEqual(messageBoxes(), [], 'no message box on the way')
   assert.equal(hostState.starts, 3, 'the warm engine, the chats\' check and the team\'s engine')
   await handOff()

@@ -27,7 +27,7 @@ test('a failed start offers the downloading update on its banner and installs it
     downloads.push(download)
     return Promise.resolve({ isUpdateAvailable: true, updateInfo: { version: '9.9.9' }, downloadPromise: download.promise })
   }
-  await startApp()
+  await startApp({ later: true })
   await waitFor(() => updaterState.checks === 1, 'check for an update')
   updater.emit('download-progress', { percent: 37.4, transferred: 78 * MB, total: 212 * MB })
 

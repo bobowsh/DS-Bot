@@ -9,13 +9,16 @@ import { join } from 'node:path'
 // The data of the app in this process: a folder of its own, so that a test never writes
 // into the data of the user.
 const root = mkdtempSync(join(tmpdir(), 'ds-bot-fake-user-data-'))
+// The layout of a real install: the program in <root>\app, its data beside it in <root>\data.
+const programFolder = join(root, 'app')
+mkdirSync(programFolder, { recursive: true })
 export const paths = {
   root,
   userData: join(root, 'userData'),
   downloads: join(root, 'downloads'),
-  exe: join(root, 'LinkBot.exe'),
+  exe: join(programFolder, 'LinkBot.exe'),
   // The folder of the app itself: the Host's pnpm lives in it.
-  appPath: join(root, 'app'),
+  appPath: programFolder,
 }
 for (const folder of [paths.userData, paths.downloads]) mkdirSync(folder, { recursive: true })
 
@@ -34,6 +37,10 @@ export const state = {
   // The app is a packaged one: it has an updater. It is set after the app starts, so that
   // the paths of the packaged app do not come into the way of the start.
   packaged: false,
+  // The app is an installed one: its data sits beside the program folder, the way a real
+  // install puts it. It is a question of its own, because the updater and the canonical
+  // restart belong to the packaged app and come after the start.
+  installed: false,
   // No page of the browser comes through.
   rejectLoads: false,
   // The cookies of the browser: the Host's address keeps one after the launch URL was used.
@@ -185,6 +192,9 @@ class FakeApp extends EventEmitter {
   }
 
   get isPackaged() { return state.packaged === true }
+  // Whether the app is an installed one, which decides where its data goes. It is not the same
+  // question as isPackaged: the updater and the canonical restart belong to the packaged app.
+  get isInstalled() { return state.installed === true }
 }
 
 export const app = new FakeApp()

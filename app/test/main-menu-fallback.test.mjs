@@ -14,7 +14,7 @@ Object.defineProperty(process, 'platform', { value: 'darwin' })
 before(async () => {
   // The desktop has no tray.
   state.trayFails = true
-  await startApp({ packaged: false })
+  await startApp({ packaged: false, later: true })
 })
 
 test('the application menu of macOS carries a Quit when there is no tray', async () => {

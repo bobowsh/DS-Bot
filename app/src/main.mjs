@@ -8,7 +8,7 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, screen, session, shell as electronShell, systemPreferences, Tray, WebContentsView } from 'electron'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { readFile, rm } from 'node:fs/promises'
-import { release } from 'node:os'
+import { homedir, release } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
@@ -290,8 +290,29 @@ function stopHost() {
   return hostStop
 }
 
-// A throwaway run (DS_BOT_HOME) asks nothing and shows what a later start shows.
-const startKind = () => (process.env.DS_BOT_HOME || existsSync(join(app.getPath('userData'), 'locations.json')) ? 'later' : 'first')
+// The place the app will use, worked out once: the start window asks for the kind of start and
+// the boot needs the places, and both must agree.
+let chosen
+const places0 = () => (chosen ??= chooseLocations())
+
+// A throwaway run (DS_BOT_HOME) asks nothing and shows what a later start shows. A real install
+// shows the first-run page only while its data folder is still empty: the saved places are not
+// read any more (the data follows the program), so the data folder is what says whether this
+// is a first start.
+//
+// The place is worked out from the program's own path, the same rule first-run.mjs uses: the data
+// sits beside the program folder. It is worked out here rather than through that module, which is
+// not loaded yet at this point of the boot, and without asking whether the app is packaged —
+// that question is answered later, and it decides whether the app restarts on a canonical path.
+const startKind = () => {
+  if (process.env.DS_BOT_HOME) return 'later'
+  const program = dirname(app.getPath('exe'))
+  const root = dirname(program)
+  const beside = root === program || root === dirname(root) ? undefined : join(root, 'data')
+  const drive = ['D:', 'E:'].find(letter => existsSync(`${letter}\\`)) ?? homedir()
+  const dataDir = beside ?? join(drive, 'LinkBot', 'data')
+  return existsSync(join(dataDir, 'bot', 'state.json')) ? 'later' : 'first'
+}
 
 async function start() {
   setMenu()
@@ -309,11 +330,13 @@ async function prepare() {
     port = await hostPort(join(app.getPath('userData'), 'host-port.json'))
     origin = `http://127.0.0.1:${String(port)}`
   }
-  startWindow.open(startKind())
+  // The modules come first: the start window opens with the kind of start, and that is decided by
+  // the data folder, which the module that picks the places knows.
   if (browserGuests === undefined) {
     await loadModules()
     handleIpc()
   }
+  startWindow.open(startKind())
   // The team window is made once the start window has painted, already on its final rect, and
   // made again when it is gone for good (a cancelled shutdown kept the app without one), so
   // that the next engine has a window to load into.
@@ -441,24 +464,12 @@ async function boot(mine) {
       const teams = teamsAt()
       startWindow.explain(explainOf(teams))
       // A reinstall goes on with its data where it is; a new or copied team can still move.
-      if (teams.team === undefined) tellPlace(defaultPlaces().dataDir)
+      // The line names the place the data will go to, which is the one beside the program.
+      if (teams.team === undefined) tellPlace(places0().dataDir)
     }
-    const where = chooseLocations()
+    const where = places0()
     setPlaces({ dataDir: where.dataDir, workspace: where.workspace })
     importOffer = where.offer
-    // The saved places could not be read: the app starts on the default places, and says
-    // so, so the user is not left wondering where the data went.
-    if (where.recovered !== undefined) {
-      console.error(`LinkBot: the saved data location could not be read; the data goes to ${where.dataDir}`)
-      dialog.showMessageBox({
-        type: 'warning',
-        title: 'LinkBot',
-        message: tx('dialog.location.unreadable'),
-        detail: tx('dialog.location.unreadableDetail', { path: where.dataDir }),
-        buttons: [tx('btn.ok')],
-        noLink: true,
-      })
-    }
     if (first) startWindow.explain(explainOf({ offered: importOffer !== undefined, team: teamIn(where.dataDir) }))
     else tellLowSpace(where.freeAtStart)
   }

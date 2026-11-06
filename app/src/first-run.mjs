@@ -7,7 +7,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { findTeam, userDshHome } from './import.mjs'
 import { installFolder } from './move-data.mjs'
-import { freeSpace } from './place.mjs'
+import { freeSpace, canWrite } from './place.mjs'
 import { langOf, t } from './start/text.mjs'
 
 // The app's picker and the cards in the team window speak the language of the start page
@@ -48,7 +48,9 @@ export const programFolder = () => installFolder(app.getPath('exe'))
  * without asking. An install at <root>\app puts <root>\data and <root>\workspace.
  *
  * Nothing is hardcoded: the places follow wherever the program was put. A parent that is a
- * drive root, or missing, is not fixed either — there is nowhere beside it to put them.
+ * drive root, or missing, is not fixed either — there is nowhere beside it to put them. A
+ * parent that cannot be written (an install under Program Files, for instance) is not fixed
+ * either, because the data could never be made there.
  *
  * @returns {{ dataDir: string, workspace: string } | undefined} the fixed places, or none
  */
@@ -57,6 +59,10 @@ export function fixedPlaces() {
   const program = programFolder()
   const root = dirname(program)
   if (root === program || root === dirname(root)) return undefined
+  if (!canWrite(root)) {
+    console.warn(`LinkBot: ${root} cannot be written, the data goes to the default place instead`)
+    return undefined
+  }
   return { dataDir: join(root, 'data'), workspace: join(root, 'workspace') }
 }
 
@@ -166,10 +172,33 @@ function readSaved(file) {
 }
 
 /**
- * Where the app keeps its data and the Bots' files: the saved places, or at the first start the
- * default ones without a question (the start page says where the data goes and offers
- * 「换个位置…」; windows-onboarding §3). A team in the user's own DSH comes back as `offer`: the
- * places are saved once the import card has its answer, so that quitting before that asks again.
+ * Where the app keeps its data and the Bots' files: the program's own folder decides it.
+ *
+ * A packaged install puts its data beside the program folder (D:\LinkBot\app -> D:\LinkBot\data);
+ * anywhere else the default place is used. A place saved from an earlier start is **not** read: the
+ * data follows the program, so an install that moved decides where its data lives. The consequence
+ * is that 「换个位置」 no longer sticks across restarts — the user chose this over keeping the
+ * saved place, which would leave an install that moved pointing at a folder it no longer owns.
+ *
+ * Nothing is made or written here: the start window asks for the kind of start before the boot
+ * has done anything, and it only needs to know where the data would be.
+ *
+ * @returns {{ dataDir: string, workspace: string }}
+ */
+export function placesFor() {
+  return fixedPlaces() ?? defaultPlaces()
+}
+
+/**
+ * Where the app keeps its data and the Bots' files.
+ *
+ * The places follow the program: a packaged install puts its data beside the program folder
+ * (D:\LinkBot\app -> D:\LinkBot\data), and anywhere else the default place is used. A place
+ * saved from an earlier start is **not** read: the data follows the program, so an install that
+ * moved decides where its data lives. The consequence is that 「换个位置」 no longer sticks
+ * across restarts — the user chose this over keeping the saved place, which would leave an
+ * install that moved pointing at a folder it no longer owns.
+ *
  * A run on throwaway folders (DS_BOT_HOME, for development and tests) asks nothing and copies
  * nothing. `freeAtStart` is the free space of the data's drive that saveLocations() kept, none
  * when it kept none yet.
@@ -177,25 +206,15 @@ function readSaved(file) {
  */
 export function chooseLocations() {
   if (process.env.DS_BOT_HOME) return { dataDir: process.env.DS_BOT_HOME, workspace: process.env.DS_BOT_WORKSPACE || undefined }
-  const file = locationsFile()
-  if (existsSync(file)) {
-    const saved = readSaved(file)
-    // A file that cannot be read, or that names no folder, is no answer at all: the app
-    // starts on the default places rather than refusing to start. The broken file is kept
-    // beside the new one, so nothing the user had is lost.
-    if (saved !== undefined && typeof saved.dataDir === 'string' && saved.dataDir !== '') {
-      return { dataDir: saved.dataDir, workspace: saved.workspace, freeAtStart: roomOf(saved.freeAtStart) }
-    }
-    return fallbackPlaces(file)
-  }
-  const { dataDir, workspace } = defaultPlaces()
+  const { dataDir, workspace } = placesFor()
   // The folders the places name are made right away: the data folder is written to
   // whatever the start does next, and the workspace with it.
   makePlaces(dataDir, workspace)
-  // The places are saved even when there is a team to offer: the offer is answered on the
-  // import card, and the places it copies into are these ones.
-  saveLocations({ dataDir, workspace })
   const offer = offerOf(dataDir)
+  // A first start with a team to offer waits for the answer: the place the user picks on the
+  // card is the one that is saved, so nothing is written before that. Every other start has its
+  // place already, and writes it so that the free space of the drive is measured while it goes on.
+  if (offer === undefined) saveLocations({ dataDir, workspace })
   if (offer !== undefined) return { dataDir, workspace, offer }
   return { dataDir, workspace }
 }
@@ -214,31 +233,5 @@ function makePlaces(dataDir, workspace) {
     } catch (error) {
       console.error(`LinkBot: the folder ${dir} was not made: ${error instanceof Error ? error.message : String(error)}`)
     }
-  }
-}
-
-/**
- * The places to start on when the saved ones cannot be used.
- *
- * A file that cannot be read, or that names no folder, gives no hint about where the
- * data is: the default places are used. The file is moved aside first, so nothing the
- * user had is lost and the new one can be written under its name.
- *
- * @param {string} file - the file that could not be used
- * @returns {{ dataDir: string, workspace?: string, freeAtStart?: number, recovered: 'default' }}
- */
-function fallbackPlaces(file) {
-  keepBroken(file)
-  const { dataDir, workspace } = defaultPlaces()
-  saveLocations({ dataDir, workspace })
-  return { dataDir, workspace, recovered: 'default' }
-}
-
-/** The unreadable file is kept beside the new one, under a name that says what it was. */
-function keepBroken(file) {
-  try {
-    renameSync(file, `${file}.broken-${Date.now()}`)
-  } catch {
-    // A file that cannot be moved is left where it is; the new one is written over it.
   }
 }

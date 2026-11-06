@@ -13,7 +13,7 @@ await installHooks()
 before(async () => {
   // No page of the browser comes through: the first load of the Host fails.
   state.rejectLoads = true
-  await startApp()
+  await startApp({ later: true })
 })
 
 test('a first load that never came through does not carry the token again', async () => {

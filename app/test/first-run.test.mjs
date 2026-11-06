@@ -56,17 +56,18 @@ describe('the packaged Windows install', () => {
     process.env.DSH_HOME = dshHomeWithTeam()
     const signal = new AbortController().signal
     const where = await chooseLocations(signal)
-    // The app's own folders: the program in D:\LinkBot\app, its data in D:\LinkBot\data.
-    assert.equal(where.dataDir, defaultPlaces().dataDir)
-    assert.equal(where.workspace, defaultPlaces().workspace)
+    // The app's own folders: the program in <install>\app, its data in <install>\data.
+    const install = dirname(dirname(paths.exe))
+    assert.equal(where.dataDir, join(install, 'data'), 'the data sits beside the program folder')
+    assert.equal(where.workspace, join(install, 'workspace'), 'the workspace sits beside it too')
     assert.equal(state.dialogs.length, 0, 'no welcome box, no pickers and no import offer')
     assert.equal(existsSync(where.dataDir), true, 'the data folder is made')
     assert.equal(existsSync(where.workspace), true, 'the workspace folder is made')
     const saved = JSON.parse(readFileSync(locationsFile, 'utf8'))
     // The free space of the data's drive is kept with the places, so a later start can
     // tell when the drive has run short.
-    assert.equal(saved.dataDir, defaultPlaces().dataDir)
-    assert.equal(saved.workspace, defaultPlaces().workspace)
+    assert.equal(saved.dataDir, where.dataDir)
+    assert.equal(saved.workspace, where.workspace)
     assert.ok(saved.freeAtStart > 0, 'the free space of the drive is kept')
   })
 
@@ -82,7 +83,31 @@ describe('the packaged Windows install', () => {
     assert.equal(state.dialogs.length, 0, 'the start asks nothing: the start page picks the place')
   })
 
-  test('an existing locations.json keeps its places and asks nothing about the team', async () => {
+  test('a program folder whose parent cannot be written falls back to the default places', { skip: process.platform !== 'win32' && 'the fixed places are a Windows install rule' }, async () => {
+    state.packaged = true
+    process.env.DSH_HOME = dshHomeEmpty()
+    // The parent is a file, so nothing can be made beside the program there: the data could
+    // never live there. The app says so instead of failing quietly.
+    const root = mkdtempSync(join(tmpdir(), 'ds-bot-fr-nowrite-'))
+    const parent = join(root, 'not-a-folder')
+    writeFileSync(parent, 'this is a file')
+    paths.exe = join(parent, 'app', 'LinkBot.exe')
+    const warnings = []
+    const warn = console.warn
+    console.warn = (...args) => { warnings.push(args.join(' ')) }
+    let where
+    try {
+      where = await chooseLocations(new AbortController().signal)
+    } finally {
+      console.warn = warn
+    }
+    assert.equal(where.dataDir, defaultPlaces().dataDir, 'the default places are used')
+    assert.ok(warnings.some(line => line.includes('cannot be written')), `the app says why: ${JSON.stringify(warnings)}`)
+  })
+
+  test('a saved locations.json is ignored: the places follow the program', async () => {
+    // The data follows the program: a place saved from an earlier start is not read any more,
+    // so an install that moved keeps its data beside itself.
     state.packaged = true
     const data = mkdtempSync(join(tmpdir(), 'ds-bot-fr-data-'))
     const workspace = join(data, 'workspace')
@@ -90,9 +115,9 @@ describe('the packaged Windows install', () => {
     write(locationsFile, JSON.stringify({ dataDir: data, workspace }))
     process.env.DSH_HOME = dshHomeWithTeam()
     const where = await chooseLocations(new AbortController().signal)
-    assert.equal(where.dataDir, data, 'the saved places stand')
-    assert.equal(where.workspace, workspace, 'the saved workspace stands')
-    assert.equal(where.offer, undefined, 'no import offer comes back')
+    assert.notEqual(where.dataDir, data, 'the saved place is not used')
+    assert.notEqual(where.workspace, workspace, 'the saved workspace is not used')
+    assert.equal(where.dataDir, fixedPlaces()?.dataDir ?? defaultPlaces().dataDir, 'the places follow the program')
     assert.equal(state.dialogs.length, 0, 'the first start asks nothing')
   })
 
@@ -106,40 +131,40 @@ describe('the packaged Windows install', () => {
   })
 })
 
-describe('a locations.json that cannot be read', () => {
-  test('a file that is not JSON at all falls back to the default places, and is kept', async () => {
+describe('a saved places file that is not usable', () => {
+  // The file is written on every start, so a broken one is simply written over: nothing reads it.
+  test('a file that is not JSON at all is ignored, and the places follow the program', async () => {
     state.packaged = true
     write(locationsFile, '{ this is not json')
     process.env.DSH_HOME = dshHomeEmpty()
     const where = await chooseLocations(new AbortController().signal)
-    assert.equal(where.recovered, 'default', 'the app says the place could not be read')
+    assert.equal(where.recovered, undefined, 'nothing was recovered: the file is not read')
+    assert.equal(where.dataDir, fixedPlaces()?.dataDir ?? defaultPlaces().dataDir, 'the places follow the program')
     assert.equal(state.dialogs.length, 0, 'the app asks nothing')
     const kept = readdirSync(paths.userData).filter(name => name.startsWith('locations.json.broken-'))
-    assert.equal(kept.length, 1, 'the unreadable file is kept beside the new one')
+    assert.equal(kept.length, 0, 'the unreadable file is not kept aside: nothing read it')
     const saved = JSON.parse(readFileSync(locationsFile, 'utf8'))
     assert.equal(saved.dataDir, where.dataDir, 'the new place is saved')
   })
 
-  test('a file that names no folder falls back to the default places, and is kept', async () => {
+  test('a file that names no folder is ignored, and the places follow the program', async () => {
     state.packaged = true
     write(locationsFile, JSON.stringify({ workspace: 'C:\\somewhere' }))
     process.env.DSH_HOME = dshHomeEmpty()
     const where = await chooseLocations(new AbortController().signal)
-    assert.equal(where.recovered, 'default', 'the app says the place could not be read')
-    const kept = readdirSync(paths.userData).filter(name => name.startsWith('locations.json.broken-'))
-    assert.equal(kept.length, 1, 'the unreadable file is kept beside the new one')
+    assert.equal(where.recovered, undefined, 'nothing was recovered: the file is not read')
+    assert.equal(where.dataDir, fixedPlaces()?.dataDir ?? defaultPlaces().dataDir, 'the places follow the program')
   })
 
-  test('a file that names a folder is used as it is', async () => {
+  test('a file that names a folder is ignored too', async () => {
     state.packaged = true
     const data = mkdtempSync(join(tmpdir(), 'ds-bot-fr-data-'))
     mkdirSync(join(data, 'workspace'), { recursive: true })
-    // The file names the folder but has no workspace: the folder is still used.
     write(locationsFile, JSON.stringify({ dataDir: data }))
     process.env.DSH_HOME = dshHomeEmpty()
     const where = await chooseLocations(new AbortController().signal)
-    assert.equal(where.recovered, undefined, 'nothing was recovered: the file was read')
-    assert.equal(where.dataDir, data, 'the data stays where it was')
+    assert.equal(where.recovered, undefined, 'nothing was recovered: the file is not read')
+    assert.notEqual(where.dataDir, data, 'the data does not stay where it was')
   })
 })
 

@@ -11,7 +11,7 @@ await installHooks()
 // The menu of macOS is the menu of the app on macOS.
 Object.defineProperty(process, 'platform', { value: 'darwin' })
 
-before(async () => { await startApp({ packaged: false }) })
+before(async () => { await startApp({ packaged: false, later: true }) })
 
 test('the application menu of macOS has no Quit', async () => {
   await waitFor(() => state.menus.length > 0, 'set the menu')

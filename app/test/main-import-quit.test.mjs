@@ -12,10 +12,10 @@ import { hold, state as hostState } from './helpers/fake-host-process.mjs'
 import { startAct, startState, startWindows, waitFor } from './helpers/app-harness.mjs'
 import { installHooks } from './helpers/register.mjs'
 
-const home = mkdtempSync(join(tmpdir(), 'ds-bot-import-quit-'))
-process.env.HOME = home
-process.env.USERPROFILE = home
-process.env.DSH_HOME = join(home, 'dsh')
+const home = join(paths.root, 'data')
+process.env.HOME = paths.root
+process.env.USERPROFILE = paths.root
+process.env.DSH_HOME = join(paths.root, 'user-dsh')
 delete process.env.DS_BOT_HOME
 delete process.env.DS_BOT_WORKSPACE
 
@@ -25,6 +25,10 @@ write(join(dsh, 'bot', 'state.json'), JSON.stringify({ bots: { b1: { id: 'b1', n
 write(join(dsh, 'sessions', 'g', 's1', 'notes.txt'), 'one')
 
 await installHooks()
+
+// The app is a packaged one: its data goes beside the program folder, which in the test double is
+// <root>\data. The flag comes before the app starts, because that is when the place is picked.
+state.packaged = true
 
 test('quitting during the copy stops it, then quits, and leaves no team behind', async () => {
   mkdirSync(paths.userData, { recursive: true })
@@ -42,7 +46,7 @@ test('quitting during the copy stops it, then quits, and leaves no team behind',
   hostState.release()
   await waitFor(() => startWindows().every(win => win.destroyed), 'close the start window')
 
-  const data = join(home, '.ds-bot')
+  const data = home
   assert.equal(existsSync(join(data, 'bot', 'imported.json')), false, 'no copied team')
   // The check's folder goes once its Host, held until now, has stopped.
   const left = () => (existsSync(data) ? readdirSync(data).filter(name => name.startsWith('.import-')) : [])

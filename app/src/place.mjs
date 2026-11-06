@@ -177,7 +177,7 @@ export function rootOf(picked, { dshHome, program, env = process.env, probe = tr
 }
 
 // Makes only the missing layers, writes and removes a file, and removes what it made.
-function canWrite(folder) {
+export function canWrite(folder) {
   const made = []
   try {
     for (let at = resolve(folder); !existsSync(at); at = dirname(at)) {
