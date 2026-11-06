@@ -57,3 +57,4 @@
 | [启动页文案](2026-10-29-start-copy.md) | 启动页和壳里系统对话框的字：按页面位置分层，每层一条写法规则；`text.mjs` 一张表、旧键到新键的对照、扫全表的测试 |
 | [手机 App](2026-10-24-mobile-app.md) | iOS 和 Android 远程操控电脑上的 Bot 团队：手机不跑 Agent；扫码配对、端到端加密、电脑只往外连；完整功能，高权限操作要解锁手机 |
 | [Office 文档](2026-10-27-office-documents.md) | Bot 离线处理 .docx/.pptx/.xlsx：应用带的 payload、`office.js` 命令行、office 路由换成带 `office-tools` 的版本 |
+| [聊天框里的过程可见与 token 速率](2026-11-06-chat-process-visibility.md) | Bot 的思考与工具调用在聊天框里就地折叠展开（默认折叠、流式实时显示当前步骤）；token 速率取**输出口径**（输出 token ÷ 解码时长），provider 拿不到 usage 时显式显示「不可用」；群成员过程另列第二阶段 |
