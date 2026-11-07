@@ -212,3 +212,79 @@
     FunctionEnd
   !endif
 !macroend
+
+; The plugins and the skills repository the app carries travel in the data directory beside
+; the program (extraFiles puts them in <INSTDIR>\data). The data directory of an install is
+; the one beside the program folder, so the two folders are moved there after the install.
+;
+; Only those two folders are moved. The data directory holds the user's own data (bot/,
+; profiles/, sessions/ ...) and nothing else in it is touched: the installer writes into the
+; app's own two places and leaves the rest as it found it.
+;
+; The skills repository is a git repository the user may have pulled new skills into. A copy
+; that was changed is kept, and the factory one is dropped: an upgrade must not take the
+; user's work away.
+;
+; A move that fails (the parent folder cannot be written, as under Program Files) does not stop
+; the install: the first start reads the folders from <INSTDIR>\data and copies them into the
+; profile from there.
+!macro customInstall
+  ${StdUtils.GetParentPath} $R0 "$INSTDIR"
+  ${If} $R0 == ""
+    Goto dsbDataDone
+  ${EndIf}
+  ; The data folder beside the program.
+  StrCpy $R1 "$R0\data"
+  ; The plugins: the whole folder is replaced, for the folders the build carries are the
+  ; ones the app ships.
+  ${If} ${FileExists} "$INSTDIR\data\plugins\*.*"
+    ClearErrors
+    RMDir /r "$R1\plugins"
+    CopyFiles /SILENT "$INSTDIR\data\plugins" "$R1\plugins"
+    ${If} ${Errors}
+      ; The copy failed: the folder the installer left is still there, and the first start
+      ; reads from it.
+      DetailPrint "LinkBot: the plugins could not be moved to the data folder."
+    ${EndIf}
+  ${EndIf}
+  ; The skills repository: a copy the user changed is kept.
+  ${If} ${FileExists} "$INSTDIR\data\skills-repo\.git\*.*"
+    ${If} ${FileExists} "$R1\skills-repo\.git\*.*"
+      ; The installed repository is there. Whether the user changed it is asked of git, which
+      ; may not be there; without git the copy is kept, because a user who pulled skills in
+      ; has a repository git can read.
+      nsExec::ExecToLog 'cmd /c cd /d "%R1\skills-repo" && git status --porcelain > "%TEMP%\dsb-skills-dirty.txt" 2>nul'
+      ${If} $0 == 0
+        ClearErrors
+        FileOpen $R2 "$TEMP%\dsb-skills-dirty.txt" r
+        ${If} ${Errors}
+          ; The file could not be read: the copy is kept.
+        ${Else}
+          FileRead $R2 $3
+          FileClose $R2
+          Delete "$TEMP%\dsb-skills-dirty.txt"
+          ${If} $3 != ""
+            ; The user changed the repository: it is kept, and the factory one is dropped.
+            DetailPrint "LinkBot: the skills repository was changed and is kept."
+            RMDir /r "$INSTDIR\data\skills-repo"
+            Goto dsbDataDone
+          ${EndIf}
+        ${EndIf}
+      ${Else}
+        ; No git: the copy is kept.
+        DetailPrint "LinkBot: the skills repository was kept."
+        RMDir /r "$INSTDIR\data\skills-repo"
+        Goto dsbDataDone
+      ${EndIf}
+    ${EndIf}
+    ClearErrors
+    RMDir /r "$R1\skills-repo"
+    CopyFiles /SILENT "$INSTDIR\data\skills-repo" "$R1\skills-repo"
+    ${If} ${Errors}
+      DetailPrint "LinkBot: the skills repository could not be moved to the data folder."
+    ${EndIf}
+  ${EndIf}
+  ; The two folders are moved; the data folder the installer made is left empty.
+  RMDir /r "$INSTDIR\data"
+  dsbDataDone:
+!macroend
