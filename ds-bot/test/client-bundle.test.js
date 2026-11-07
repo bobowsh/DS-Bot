@@ -35,7 +35,7 @@ test('client.js registers a factory that exports apply and inject', () => {
   assert.equal(Object.prototype.toString.call(exports), '[object Module]')
   assert.deepEqual(Object.keys(exports), ['apply', 'inject'])
   assert.equal(typeof exports.apply, 'function')
-  // No `configForms`: the client never writes the user's DSH settings, such as the
-  // work-details mode it once held at `verbose`.
-  assert.deepEqual(Array.from(exports.inject), ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout'])
+  // `configForms`: the settings page reads the host's work-details mode through the host's own
+  // config form, so the interface follows the same switch as the rest of DSH.
+  assert.deepEqual(Array.from(exports.inject), ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout', 'configForms'])
 })

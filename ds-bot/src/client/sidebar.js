@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { FishLogo } from './dsh-primitives.js'
 import { isMainOf } from './sources.js'
 import { currentPart, previewOf, relativeShort } from './text.js'
-import { PlusIcon, SearchIcon, SidebarIcon, GaugeIcon, ClockIcon, GearIcon, PinMarkIcon, ConnectorIcon, CloudDownloadIcon, SignInIcon, SignOutIcon, SlidersIcon } from './icons.js'
+import { PlusIcon, SearchIcon, SidebarIcon, GaugeIcon, ClockIcon, GearIcon, PinMarkIcon, ConnectorIcon, CloudDownloadIcon, SignInIcon, SignOutIcon, SlidersIcon, SwitchIcon } from './icons.js'
 import { lookOf, MAIN_LOOK } from './characters.js'
 import { botState, BotMark, BotAvatar, RoomAvatar } from './mark.js'
 import { AgentBadge } from './agent-badge.js'
@@ -1065,6 +1065,22 @@ export function BotReturn({ wide, useSurface, useRoster, actions }) {
   return h('button', { type: 'button', className: 'bt-return', 'aria-label': t('LinkBot'), title: t('LinkBot'), onClick: () => actions.setSurface('bot') },
     h(BotMark, { look: MAIN_LOOK, size: 20 }),
     wide ? h('span', { className: 'bt-return-name' }, t('LinkBot')) : null)
+}
+
+// The one switch between the two surfaces: the Bot team and the classic Agent page.
+// Bot mode offers the way in, Agent mode the way back — the same click, either way.
+export function SurfaceSwitch({ wide, useSurface, useRoster, actions }) {
+  const mode = useSurface(value => value.mode)
+  const ready = useRoster(value => value.ready)
+  // Agent mode draws no team sidebar; there the way back must be reachable first.
+  useReportReady(mode === 'agent' && ready)
+  const toAgent = mode !== 'agent'
+  const label = toAgent ? t('Switch to classic Agent mode') : t('Back to the Bot team')
+  return h('button', {
+    type: 'button', className: 'bt-return', 'aria-label': label, title: label,
+    onClick: () => actions.setSurface(toAgent ? 'agent' : 'bot'),
+  }, h(SwitchIcon),
+  wide ? h('span', { className: 'bt-return-name' }, label) : null)
 }
 
 // Agent mode has none of the shell-group styles, so the return button carries its own.

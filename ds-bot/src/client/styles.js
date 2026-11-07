@@ -1009,28 +1009,6 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 .bt-think-text[data-fade=bottom]{mask-image:linear-gradient(to top,transparent,#000 18px)}
 .bt-think-text[data-fade=both]{mask-image:linear-gradient(to bottom,transparent,#000 18px,#000 calc(100% - 18px),transparent)}
 /* The process of a turn: the tools it called and how fast it wrote. */
-.bt-proc{font-size:12px;line-height:16px;color:var(--bt-ink-2);margin:2px 0 6px;max-width:calc(var(--bt-msg-w) * 100%)}
-body[data-bt-layout=flat] .bt-proc{max-width:calc(var(--bt-flat-w) * 100%)}
-.bt-proc>summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
-.bt-proc>summary::-webkit-details-marker{display:none}
-.bt-proc-title{color:var(--bt-ink-2)}
-.bt-proc-stats{font-variant-numeric:tabular-nums;white-space:nowrap}
-.bt-proc-rate[data-available=no]{color:var(--bt-ink-3)}
-.bt-proc-tokens{font-variant-numeric:tabular-nums;white-space:nowrap}
-.bt-proc-body{display:flex;flex-direction:column;gap:6px;margin-top:6px;padding-left:10px;border-left:2px solid var(--bt-line-2)}
-.bt-proc-block{display:flex;flex-direction:column;gap:2px}
-.bt-proc-label{color:var(--bt-ink-3)}
-.bt-proc-code{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/16px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--bt-ink-2)}
-.bt-proc-calls{display:flex;flex-direction:column;gap:2px}
-.bt-proc-callwrap>summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:6px}
-.bt-proc-callwrap>summary::-webkit-details-marker{display:none}
-.bt-proc-callwrap[data-depth="1"]>summary,.bt-proc-callwrap[data-depth="2"]>summary,.bt-proc-callwrap[data-depth="3"]>summary{padding-left:12px}
-.bt-proc-call{display:inline-flex;align-items:center;gap:6px}
-.bt-proc-call-name{color:var(--bt-ink)}
-.bt-proc-call-state[data-state=running]{color:var(--bt-ink-3)}
-.bt-proc-call-state[data-state=failed]{color:var(--bt-danger)}
-.bt-proc-call-time{font-variant-numeric:tabular-nums;white-space:nowrap}
-.bt-proc-detail{display:flex;flex-direction:column;gap:6px;margin:2px 0 6px 12px}
 .bt-event{display:flex;justify-content:center;align-items:center;gap:2px;min-height:24px;margin:2px 0;font-size:12px;line-height:16px;color:var(--bt-ink-2);flex-wrap:wrap}
 .bt-event>span{padding:0 2px}
 .bt-event button:not(.bt-soft){border:0;background:none;color:inherit;font:inherit;display:inline-flex;align-items:center;gap:4px;cursor:pointer;height:24px;padding:4px 6px 4px 4px;border-radius:999px;box-sizing:border-box;transition:background-color .12s ease}
