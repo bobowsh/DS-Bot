@@ -12483,7 +12483,7 @@ var visibleReasoning = (text) => {
 };
 var ACTIVITY = "▸ ";
 var isActivity = (line) => line.startsWith(ACTIVITY);
-var reasoningText = (step) => step.blocks.filter((block) => block.kind === "reasoning").map((block) => visibleReasoning(block.text)).join("\n");
+var reasoningText = (step) => (step.blocks ?? []).filter((block) => block.kind === "reasoning").map((block) => visibleReasoning(block.text)).join("\n");
 var stepReasoning = (step) => reasoningText(step).split("\n").filter((line) => !isActivity(line)).join("\n").trim();
 var stepActivity = (step) => reasoningText(step).split("\n").filter(isActivity).map((line) => line.slice(ACTIVITY.length).trim()).filter(Boolean);
 
