@@ -509,6 +509,7 @@ var ZH = {
   "Bubble width": "气泡宽度",
   "Text width": "正文宽度",
   "Show thinking": "显示思考过程",
+  "Work details": "工作步骤展示",
   "Enter sends message": "回车发送消息",
   "Bots · {count}": "Bot · {count}",
   "First in the sidebar. Pick another Bot to hand it the role; {name} then stops being a Main Bot.": "排在侧栏最上面。选另一个 Bot 就会把主 Bot 交给它，{name} 随之不再是主 Bot。",
@@ -6123,7 +6124,7 @@ var COMPUTER_CSS = `
 .bt-cstep-shot-open img{max-height:280px;max-width:480px}
 `;
 
-// ../../DS-Bot-03/ds-bot/node_modules/deep-view/src/react/ui.js
+// node_modules/deep-view/src/react/ui.js
 var import_react12 = require("react");
 var FallbackMarkdown = ({ text }) => (0, import_react12.createElement)("span", null, String(text ?? ""));
 var ViewUi = (0, import_react12.createContext)({ t: (key) => key, Markdown: FallbackMarkdown });
@@ -6190,7 +6191,7 @@ function useOptionKeys2(count, onPick, ownRef) {
   return count > 0 && listening <= 1;
 }
 
-// ../../DS-Bot-03/ds-bot/node_modules/deep-view/src/core/formula.js
+// node_modules/deep-view/src/core/formula.js
 var FUNCTIONS = {
   min: { args: [1, Infinity], run: (...values) => Math.min(...values.map(num)) },
   max: { args: [1, Infinity], run: (...values) => Math.max(...values.map(num)) },
@@ -6471,7 +6472,7 @@ function evaluate(tree, lookup) {
   }
 }
 
-// ../../DS-Bot-03/ds-bot/node_modules/deep-view/src/core/views.js
+// node_modules/deep-view/src/core/views.js
 var LAYOUT = ["stack", "row"];
 var DISPLAY = ["text", "metric", "table", "chart", "progress", "callout", "sources", "html"];
 var INPUT_TYPES = ["slider", "choice", "toggle", "number"];
@@ -7103,7 +7104,7 @@ function validateForm(node, values) {
   return { fields };
 }
 
-// ../../DS-Bot-03/ds-bot/node_modules/deep-view/src/react/chart.js
+// node_modules/deep-view/src/react/chart.js
 var import_react13 = require("react");
 var PALETTE = ["var(--dv-accent)", "var(--dv-ink-tangerine)", "var(--dv-ink-green)", "var(--dv-ink-violet)", "var(--dv-ink-sky)", "var(--dv-ink-rose)", "var(--dv-ink-yellow)", "var(--dv-ink-cyan)", "var(--dv-ink-magenta)"];
 var colorAt = (index) => PALETTE[index % PALETTE.length];
@@ -7542,7 +7543,7 @@ var CHART_CSS = `
 @media (prefers-reduced-motion:reduce){.dv-chart-mark,.dv-chart-dot{transition:none}.dv-chart-tip{animation:none}}
 `;
 
-// ../../DS-Bot-03/ds-bot/node_modules/deep-view/src/react/frame.js
+// node_modules/deep-view/src/react/frame.js
 var import_react14 = require("react");
 var THEME_VARS = [
   ["--view-ink", "--bt-ink", "--dv-ink"],
@@ -7624,7 +7625,7 @@ var HTML_CSS = `
 .dv-view-frame-stopped{margin:0;font-size:13px;line-height:18px;color:var(--dv-ink-2)}
 `;
 
-// ../../DS-Bot-03/ds-bot/node_modules/deep-view/src/react/card.js
+// node_modules/deep-view/src/react/card.js
 var import_react15 = require("react");
 var mdLabels = (ui2) => ({ code: { copyLabel: ui2.t("Copy"), copiedLabel: ui2.t("Copied") }, footnotes: ui2.t("Footnotes") });
 var TONES2 = ["good", "warn", "bad"];
@@ -8366,7 +8367,7 @@ ${CHART_CSS}
 ${HTML_CSS}
 `;
 
-// ../../DS-Bot-03/ds-bot/node_modules/deep-view/src/react/styles.js
+// node_modules/deep-view/src/react/styles.js
 var THEME_CSS = `
 body{
 --dv-ink:var(--dsw-alias-label-primary);
@@ -8464,10 +8465,10 @@ button.dv-q-opt:active{background:var(--dv-active)}
 @media (prefers-reduced-motion:reduce){.dv-q,.dv-view-bare,.dv-q-submit,.dv-menu,.dv-q-check{animation:none}}
 `;
 
-// ../../DS-Bot-03/ds-bot/node_modules/deep-view/src/react/index.js
+// node_modules/deep-view/src/react/index.js
 var DEEP_VIEW_CSS = THEME_CSS + QUESTION_CSS + WIDGET_CSS;
 
-// ../../DS-Bot-03/ds-bot/node_modules/deep-view/src/core/reply.js
+// node_modules/deep-view/src/core/reply.js
 var REPLY_KIND = "user-question-reply";
 var REPLY_SOURCE_KIND = "deep-view-reply";
 function viewCardText(args) {
@@ -14278,6 +14279,7 @@ function TeamToolView(props) {
   const sessionId = props.sessionId;
   const roster = props.useRoster?.((value) => value);
   if (roster === void 0) return (0, import_react31.createElement)(CellEmpty);
+  if (isHiddenTurn(roster, sessionId, call2.turn)) return (0, import_react31.createElement)(CellEmpty);
   const actions = props.actions ?? {};
   const heldCards = props.useHeldCards?.((state) => state[sessionId]);
   const useUi = props.useUi;
@@ -14287,7 +14289,7 @@ function TeamToolView(props) {
   const findBot = (nameOrId) => roster.byId[nameOrId] ?? roster.bots.find((bot) => bot.name.toLowerCase() === String(nameOrId ?? "").toLowerCase());
   useShownCards(actions, sessionId, CARDS.has(tool) && call2.callId ? [call2.callId] : []);
   const note = done ? null : toolActivity(tool, (key) => arg(key), findBot, self);
-  useLiveNote(actions, sessionId, `tool:${call2.callId ?? tool}`, note);
+  useLiveNote(actions, sessionId, `tool:${tool}`, note);
   switch (tool) {
     case "message_bot": {
       const target = findBot(arg("to")) ?? { name: arg("to") ?? "…", color: "gray" };
@@ -19752,7 +19754,7 @@ var CONNECTORS_PAGE_CSS = `
 @media (prefers-reduced-motion:reduce){.bt-app[data-fresh]::after,.bt-app[data-fresh] .bt-app-icon,.bt-app[data-fresh] .bt-app-btn-done{animation:none}}
 `;
 
-// ../../DS-Bot-03/ds-bot/node_modules/qrcode-generator/dist/qrcode.mjs
+// node_modules/qrcode-generator/dist/qrcode.mjs
 var qrcode = function(typeNumber, errorCorrectionLevel) {
   const PAD0 = 236;
   const PAD1 = 17;
