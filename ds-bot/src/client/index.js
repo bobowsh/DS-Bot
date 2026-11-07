@@ -814,7 +814,12 @@ export function apply(ctx) {
 // The usage line under the input: the host's own readings of the session.
 const UsageDock = ({ sessionId }) => {
   const values = ctx.sessions.list.getSnapshot().projectionsBySession?.[sessionId]?.values ?? {}
-  return h(UsageLine, { stats: values.sessionStats, usage: values.tokenUsage, pressure: values.contextPressure })
+  return h(UsageLine, {
+    stats: values.sessionStats,
+    usage: values.tokenUsage,
+    pressure: values.contextPressure,
+    breakdown: values.contextBreakdown,
+  })
 }
 
   const face = () => ({ actions, hooks: { roster, ui, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, frame, sidebarPref } })

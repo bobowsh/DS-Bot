@@ -210,6 +210,22 @@ var ZH = {
   "No such connector": "没有这个连接器",
   "Classic Agent mode": "经典 Agent 模式",
   "cache hit {percent}%": "缓存命中 {percent}%",
+  "{value}K": "{value}K",
+  "{value}M": "{value}M",
+  "{tps} tok/s": "{tps} tok/s",
+  "Session statistics": "会话统计",
+  "LLM time": "模型用时",
+  "Tool time": "工具用时",
+  "Avg time to first token (TTFT)": "首 token 平均等待（TTFT）",
+  "Tokens per second (TPS)": "每秒 token 数（TPS）",
+  "Token usage": "Token 用量",
+  "Uncached input": "未缓存输入",
+  "Cached input": "缓存读",
+  "Cache write": "缓存写",
+  "Context used": "上下文已用",
+  "System": "系统",
+  "Tools": "工具",
+  "Conversation": "会话内容",
   "Work details": "工作步骤",
   "Show the work of a turn": "显示这一轮做过的事",
   "{turns} turns, {steps} steps": "{turns} 轮 {steps} 步",
@@ -1987,37 +2003,37 @@ function countCards(state, sessionId, callIds, delta) {
 }
 
 // src/client/team-actions.js
-function teamActions({ call: call2, after, partFor, roster, ui: ui2, live, cards, heldCards, turnClock, panelFolded }) {
+function teamActions({ call: call2, after, partFor, roster, ui: ui3, live, cards, heldCards, turnClock, panelFolded }) {
   const memoryOf = (id) => roster.getSnapshot().roomsById[id] ? { roomId: id } : { botId: id };
   const yieldTo = (state, view) => state.panelYield === true || panelFolded?.(view) === true;
   const openSideChat = (sessionId, chatId) => {
-    ui2.set((state) => ({ ...state, details: sessionId, view: "side", side: chatId ?? null, renaming: false, tab: null, panelYield: yieldTo(state, "side") }));
+    ui3.set((state) => ({ ...state, details: sessionId, view: "side", side: chatId ?? null, renaming: false, tab: null, panelYield: yieldTo(state, "side") }));
   };
   const openSettings = (page = "general", id = null) => {
-    ui2.set((state) => ({ ...state, settings: { page, id }, menu: null, palette: null, newChat: null }));
+    ui3.set((state) => ({ ...state, settings: { page, id }, menu: null, palette: null, newChat: null }));
   };
   return {
     openNewChat: (mode) => {
-      ui2.set((state) => ({ ...state, newChat: mode, menu: null, palette: null }));
+      ui3.set((state) => ({ ...state, newChat: mode, menu: null, palette: null }));
     },
     openPalette: (query = "") => {
-      ui2.set((state) => ({ ...state, palette: { query, token: Date.now() }, newChat: null, menu: null }));
+      ui3.set((state) => ({ ...state, palette: { query, token: Date.now() }, newChat: null, menu: null }));
     },
     // The token keeps a late exit timer from closing a palette opened again since.
     closePalette: (token) => {
-      ui2.set((state) => state.palette && (token === void 0 || state.palette.token === token) ? { ...state, palette: null } : state);
+      ui3.set((state) => state.palette && (token === void 0 || state.palette.token === token) ? { ...state, palette: null } : state);
     },
     openExchange: (a, b) => {
-      if (a && b) ui2.set((state) => ({ ...state, exchange: [a, b] }));
+      if (a && b) ui3.set((state) => ({ ...state, exchange: [a, b] }));
     },
     openVoice: (id) => {
-      if (id) ui2.set((state) => ({ ...state, voice: id, menu: null }));
+      if (id) ui3.set((state) => ({ ...state, voice: id, menu: null }));
     },
     closeVoice: () => {
-      ui2.set((state) => state.voice ? { ...state, voice: null } : state);
+      ui3.set((state) => state.voice ? { ...state, voice: null } : state);
     },
     toggleDetails: (id, force) => {
-      ui2.set((state) => {
+      ui3.set((state) => {
         const details = force || state.details !== id || state.view !== "details" ? id : null;
         if (details === null && panelFolded?.("details") === true) return { ...state, renaming: false, tab: null, details: id, view: "details", panelYield: true };
         return { ...state, renaming: false, tab: null, details, view: "details" };
@@ -2027,7 +2043,7 @@ function teamActions({ call: call2, after, partFor, roster, ui: ui2, live, cards
     // chat, an outside Session) settles on the details view. So does one that
     // does not own the open side chat.
     followPanel: (id) => {
-      ui2.set((state) => {
+      ui3.set((state) => {
         if (!state.details || state.details === id) return state;
         const snap = roster.getSnapshot();
         const view = state.view === "browser" && snap.byId[id] === void 0 ? "details" : state.view === "side" && !(snap.sideChats?.[snap.byId[id]?.id] ?? []).some((chat) => chat?.id === state.side) ? "details" : state.view;
@@ -2035,30 +2051,30 @@ function teamActions({ call: call2, after, partFor, roster, ui: ui2, live, cards
       });
     },
     showDetails: (id, tab = null) => {
-      ui2.set((state) => ({ ...state, details: id, view: "details", renaming: false, tab, panelYield: yieldTo(state, "details") }));
+      ui3.set((state) => ({ ...state, details: id, view: "details", renaming: false, tab, panelYield: yieldTo(state, "details") }));
     },
     // Opening the conversation would move focus to its composer and blur the name field.
     renameBot: (id) => {
-      ui2.set((state) => ({ ...state, details: id, view: "details", renaming: true, tab: null, panelYield: yieldTo(state, "details") }));
+      ui3.set((state) => ({ ...state, details: id, view: "details", renaming: true, tab: null, panelYield: yieldTo(state, "details") }));
     },
     openSettings,
     // LinkBot's own Models page: the providers DSH serves, their keys and models.
     openModels: () => openSettings("models"),
     closeSettings: () => {
-      ui2.set((state) => state.settings ? { ...state, settings: null } : state);
+      ui3.set((state) => state.settings ? { ...state, settings: null } : state);
     },
     openMemory: (id) => {
-      ui2.set((state) => ({ ...state, memory: id, menu: null, palette: null }));
+      ui3.set((state) => ({ ...state, memory: id, menu: null, palette: null }));
     },
     closeMemory: () => {
-      ui2.set((state) => state.memory ? { ...state, memory: null } : state);
+      ui3.set((state) => state.memory ? { ...state, memory: null } : state);
     },
     openConnectors: () => {
-      ui2.set((state) => ({ ...state, settings: { page: "connectors", id: null }, menu: null, palette: null, newChat: null }));
+      ui3.set((state) => ({ ...state, settings: { page: "connectors", id: null }, menu: null, palette: null, newChat: null }));
     },
     setPanelView: (view) => {
       if (view !== "details" && view !== "browser" && view !== "side") return;
-      ui2.set((state) => state.details && state.view !== view ? { ...state, view, panelYield: yieldTo(state, view) } : state);
+      ui3.set((state) => state.details && state.view !== view ? { ...state, view, panelYield: yieldTo(state, view) } : state);
     },
     // A side chat on the panel's own view, opened from the strip, the `···`
     // menus or `/side`. Closing the panel keeps the chats; only a tab's × deletes.
@@ -2074,24 +2090,24 @@ function teamActions({ call: call2, after, partFor, roster, ui: ui2, live, cards
     askSide: (sessionId, chatId, text) => after(call2("side-ask", { sessionId, chatId, text })),
     cancelSide: (chatId, entryId) => after(call2("side-cancel", { chatId, entryId })),
     closeSideChat: (chatId) => {
-      ui2.set((state) => state.details && state.view === "side" && state.side === chatId ? { ...state, view: "details", side: null } : state);
+      ui3.set((state) => state.details && state.view === "side" && state.side === chatId ? { ...state, view: "details", side: null } : state);
       return after(call2("side-close", { chatId }));
     },
     closePanel: () => {
-      ui2.set((state) => state.details ? { ...state, details: null, view: "details", renaming: false, tab: null, side: null } : state);
+      ui3.set((state) => state.details ? { ...state, details: null, view: "details", renaming: false, tab: null, side: null } : state);
     },
-    quote: (sessionId, text) => ui2.set((state) => ({ ...state, quote: { sessionId, text, token: Date.now() } })),
-    clearQuote: (token) => ui2.set((state) => state.quote?.token === token ? { ...state, quote: null } : state),
+    quote: (sessionId, text) => ui3.set((state) => ({ ...state, quote: { sessionId, text, token: Date.now() } })),
+    clearQuote: (token) => ui3.set((state) => state.quote?.token === token ? { ...state, quote: null } : state),
     setFlags: (id, flags) => after(call2("set-flags", { id, ...flags })),
     deleteRoom: (id) => after(call2("delete-room", { id })),
     openMenu: (menu) => {
-      ui2.set((state) => ({ ...state, menu, palette: null }));
+      ui3.set((state) => ({ ...state, menu, palette: null }));
     },
     closeMenu: () => {
-      ui2.set((state) => state.menu ? { ...state, menu: null } : state);
+      ui3.set((state) => state.menu ? { ...state, menu: null } : state);
     },
     closeOverlay: () => {
-      ui2.set((state) => ({ ...state, newChat: null, exchange: null, details: state.newChat || state.exchange ? state.details : null }));
+      ui3.set((state) => ({ ...state, newChat: null, exchange: null, details: state.newChat || state.exchange ? state.details : null }));
     },
     createBot: (payload) => after(call2("create-bot", payload)),
     // The avatar library: photos the user imported once, kept by the host.
@@ -2148,10 +2164,10 @@ function teamActions({ call: call2, after, partFor, roster, ui: ui2, live, cards
     goalControl: (roomId, goalId, action, stopWork) => after(call2("goal-control", { roomId, goalId, action, ...stopWork ? { stopWork: true } : {} })),
     // The goal island: `goalCompose` holds the room whose draft form is open,
     // `goalOpen` the room whose panel is open.
-    composeGoal: (roomId) => ui2.set((state) => ({ ...state, goalCompose: roomId, goalOpen: roomId })),
-    closeGoalCompose: () => ui2.set((state) => state.goalCompose ? { ...state, goalCompose: null } : state),
-    toggleGoal: (roomId) => ui2.set((state) => ({ ...state, goalOpen: state.goalOpen === roomId ? null : roomId })),
-    closeGoal: () => ui2.set((state) => state.goalOpen ? { ...state, goalOpen: null } : state),
+    composeGoal: (roomId) => ui3.set((state) => ({ ...state, goalCompose: roomId, goalOpen: roomId })),
+    closeGoalCompose: () => ui3.set((state) => state.goalCompose ? { ...state, goalCompose: null } : state),
+    toggleGoal: (roomId) => ui3.set((state) => ({ ...state, goalOpen: state.goalOpen === roomId ? null : roomId })),
+    closeGoal: () => ui3.set((state) => state.goalOpen ? { ...state, goalOpen: null } : state),
     // Values go out in these requests and never come back in a response.
     secretSet: (payload) => after(call2("secret-set", payload)),
     secretAllow: (requestId) => after(call2("secret-allow", { requestId })),
@@ -2211,9 +2227,9 @@ function teamActions({ call: call2, after, partFor, roster, ui: ui2, live, cards
     // A failed action away from any form (a menu, the palette) shows as a toast.
     reportError: (error, where = "action") => {
       noteClientError(where, error);
-      ui2.set((state) => ({ ...state, toast: { text: error?.message ?? String(error), token: Date.now() } }));
+      ui3.set((state) => ({ ...state, toast: { text: error?.message ?? String(error), token: Date.now() } }));
     },
-    dismissToast: (token) => ui2.set((state) => state.toast && (token === void 0 || state.toast.token === token) ? { ...state, toast: null } : state),
+    dismissToast: (token) => ui3.set((state) => state.toast && (token === void 0 || state.toast.token === token) ? { ...state, toast: null } : state),
     noteTurnTime: (sessionId, turn, key, time) => {
       if (sessionId === void 0 || !Number.isFinite(turn) || !Number.isFinite(time)) return;
       turnClock.set((state) => {
@@ -7362,9 +7378,9 @@ var TableIcon = () => (0, import_react13.createElement)(
   (0, import_react13.createElement)("path", { d: "M3 8.5h14M8 8.5V16" })
 );
 function ChartTable({ data }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   const { categories, series, unit } = data;
-  const heads = series.map((item, index) => item.name || (series.length === 1 ? unit || ui2.t("Value") : `${ui2.t("Series")} ${index + 1}`));
+  const heads = series.map((item, index) => item.name || (series.length === 1 ? unit || ui3.t("Value") : `${ui3.t("Series")} ${index + 1}`));
   return (0, import_react13.createElement)(
     "div",
     { className: "dv-widget-table" },
@@ -7382,7 +7398,7 @@ function ChartTable({ data }) {
   );
 }
 function WidgetChart({ node, lookup, registerChart, refreshCharts }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   const data = chartData(node, lookup);
   const { kind, categories, series, unit } = data;
   const box = (0, import_react13.useRef)(null);
@@ -7401,7 +7417,7 @@ function WidgetChart({ node, lookup, registerChart, refreshCharts }) {
     if (hidden.includes(index)) setHidden(hidden.filter((item) => item !== index));
     else if (shown.filter(Boolean).length > 1) setHidden([...hidden, index]);
   };
-  const label = typeof node.caption === "string" && node.caption !== "" ? node.caption : ui2.t("Chart");
+  const label = typeof node.caption === "string" && node.caption !== "" ? node.caption : ui3.t("Chart");
   const isDonut = kind === "donut";
   const legendBeside = isDonut && width >= 360;
   const drawn = isDonut ? donut(data, legendBeside ? width - 200 : width, active, setActive) : kind === "hbar" ? rows(data, width, active, shown) : columns(data, width, active, shown);
@@ -7420,7 +7436,7 @@ function WidgetChart({ node, lookup, registerChart, refreshCharts }) {
   const share = (at) => unit === "%" ? withUnit(drawn.values[at], unit) : `${withUnit(drawn.values[at], unit)} · ${drawn.total > 0 ? Math.round(drawn.values[at] / drawn.total * 100) : 0}%`;
   const tipRows = active === null || isDonut ? [] : series.filter((_, index) => shown[index]).map((item) => ({ color: item.color, name: item.name, value: withUnit(item.values[active], unit) }));
   const copy2 = () => {
-    void navigator.clipboard?.writeText(chartCsv(data, ui2.t)).then(() => {
+    void navigator.clipboard?.writeText(chartCsv(data, ui3.t)).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
     });
@@ -7464,7 +7480,7 @@ function WidgetChart({ node, lookup, registerChart, refreshCharts }) {
     className: "dv-chart-key",
     "aria-pressed": shown[index],
     onClick: () => toggle(index)
-  }, (0, import_react13.createElement)("i", { style: { background: item.color } }), item.name || `${ui2.t("Series")} ${index + 1}`))) : null;
+  }, (0, import_react13.createElement)("i", { style: { background: item.color } }), item.name || `${ui3.t("Series")} ${index + 1}`))) : null;
   const plot = (0, import_react13.createElement)(
     "div",
     { className: "dv-chart-plot", style: isDonut ? { width: svgWidth } : void 0 },
@@ -7506,7 +7522,7 @@ function WidgetChart({ node, lookup, registerChart, refreshCharts }) {
     body,
     // The SVG stays mounted under the table, so the image can still be saved from it.
     asTable ? (0, import_react13.createElement)("div", { hidden: true }, plot) : null,
-    copied ? (0, import_react13.createElement)("span", { className: "dv-chart-copied", role: "status" }, ui2.t("Copied")) : null,
+    copied ? (0, import_react13.createElement)("span", { className: "dv-chart-copied", role: "status" }, ui3.t("Copied")) : null,
     typeof node.caption === "string" && node.caption !== "" ? (0, import_react13.createElement)("figcaption", { className: "dv-view-caption" }, node.caption) : null
   );
 }
@@ -7592,7 +7608,7 @@ function frameDocument(html, vars = {}) {
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${FRAME_POLICY}"><style>:root{${root}}html,body{margin:0;padding:0;background:transparent;color:var(--view-ink,var(--bt-ink));font:14px/22px -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}*{box-sizing:border-box}</style><script>${report}<\/script></head><body>${html}</body></html>`;
 }
 function HtmlFrame({ node }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   const frame = (0, import_react14.useRef)(null);
   const loads = (0, import_react14.useRef)(0);
   const [height, setHeight] = (0, import_react14.useState)(Number.isFinite(node.height) ? node.height : 120);
@@ -7613,7 +7629,7 @@ function HtmlFrame({ node }) {
       observer?.disconnect();
     };
   }, []);
-  if (stopped) return (0, import_react14.createElement)("p", { className: "dv-view-frame-stopped" }, ui2.t("This view tried to open a page and was stopped."));
+  if (stopped) return (0, import_react14.createElement)("p", { className: "dv-view-frame-stopped" }, ui3.t("This view tried to open a page and was stopped."));
   return (0, import_react14.createElement)("iframe", {
     ref: frame,
     className: "dv-view-frame",
@@ -7635,7 +7651,7 @@ var HTML_CSS = `
 
 // node_modules/deep-view/src/react/card.js
 var import_react15 = require("react");
-var mdLabels = (ui2) => ({ code: { copyLabel: ui2.t("Copy"), copiedLabel: ui2.t("Copied") }, footnotes: ui2.t("Footnotes") });
+var mdLabels = (ui3) => ({ code: { copyLabel: ui3.t("Copy"), copiedLabel: ui3.t("Copied") }, footnotes: ui3.t("Footnotes") });
 var TONES2 = ["good", "warn", "bad"];
 var CALLOUT_TONES2 = ["info", "good", "warn", "bad"];
 var optionsOf2 = (node) => (Array.isArray(node?.options) ? node.options : []).map((option) => typeof option === "string" ? { label: option } : option).filter((option) => option !== null && typeof option === "object" && option.label !== void 0);
@@ -7655,7 +7671,7 @@ var hasControls = (node) => {
 };
 var answerValues = (answer, node) => answer?.action === node.id ? answer.values : void 0;
 function OptionsInput({ node, onSubmit, keys, busy = false }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   const [picked, setPicked] = (0, import_react15.useState)([]);
   const options = optionsOf2(node);
   const multi = node.multi === true;
@@ -7695,23 +7711,23 @@ function OptionsInput({ node, onSubmit, keys, busy = false }) {
           (0, import_react15.createElement)("span", { className: "dv-q-label" }, option.label),
           option.description ? (0, import_react15.createElement)("span", { className: "dv-q-desc" }, option.description) : null
         ),
-        selected ? (0, import_react15.createElement)("span", { className: "dv-q-check", title: ui2.t("Selected") }, (0, import_react15.createElement)(CheckIcon2)) : null
+        selected ? (0, import_react15.createElement)("span", { className: "dv-q-check", title: ui3.t("Selected") }, (0, import_react15.createElement)(CheckIcon2)) : null
       );
     })),
     multi ? (0, import_react15.createElement)(
       "div",
       { className: "dv-q-foot" },
-      (0, import_react15.createElement)("button", { type: "button", className: "dv-q-submit", disabled: busy || picked.length === 0, onClick: submit }, ui2.t("Submit"))
+      (0, import_react15.createElement)("button", { type: "button", className: "dv-q-submit", disabled: busy || picked.length === 0, onClick: submit }, ui3.t("Submit"))
     ) : null
   );
 }
 function SettledOptions({ node, answer }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   const selected = answerValues(answer, node)?.selected;
   const chosen = Array.isArray(selected) ? selected : [];
   return (0, import_react15.createElement)(
     "div",
-    { className: "dv-q-list", role: "group", "aria-label": ui2.t("Your answer") },
+    { className: "dv-q-list", role: "group", "aria-label": ui3.t("Your answer") },
     optionsOf2(node).map((option) => (0, import_react15.createElement)(
       "div",
       { key: option.label, className: "dv-q-opt" },
@@ -7721,36 +7737,36 @@ function SettledOptions({ node, answer }) {
         (0, import_react15.createElement)("span", { className: "dv-q-label" }, option.label),
         option.description ? (0, import_react15.createElement)("span", { className: "dv-q-desc" }, option.description) : null
       ),
-      chosen.includes(option.label) ? (0, import_react15.createElement)("span", { className: "dv-q-check", title: ui2.t("Selected") }, (0, import_react15.createElement)(CheckIcon2)) : null
+      chosen.includes(option.label) ? (0, import_react15.createElement)("span", { className: "dv-q-check", title: ui3.t("Selected") }, (0, import_react15.createElement)(CheckIcon2)) : null
     ))
   );
 }
 function ConfirmInput({ node, onSubmit, busy = false, footStart = null }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   return (0, import_react15.createElement)(
     "div",
     { className: "dv-q-foot" },
     footStart ? (0, import_react15.createElement)("div", { className: "dv-q-foot-start" }, footStart) : null,
-    (0, import_react15.createElement)("button", { type: "button", className: "dv-q-btn", disabled: busy, onClick: () => onSubmit?.(node.id, { confirmed: false }) }, node.cancelLabel ?? ui2.t("Cancel")),
-    (0, import_react15.createElement)("button", { type: "button", className: "dv-q-submit", disabled: busy, onClick: () => onSubmit?.(node.id, { confirmed: true }) }, node.confirmLabel ?? ui2.t("Confirm"))
+    (0, import_react15.createElement)("button", { type: "button", className: "dv-q-btn", disabled: busy, onClick: () => onSubmit?.(node.id, { confirmed: false }) }, node.cancelLabel ?? ui3.t("Cancel")),
+    (0, import_react15.createElement)("button", { type: "button", className: "dv-q-submit", disabled: busy, onClick: () => onSubmit?.(node.id, { confirmed: true }) }, node.confirmLabel ?? ui3.t("Confirm"))
   );
 }
 function SettledConfirm({ node, answer }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   const confirmed = answerValues(answer, node)?.confirmed;
   if (confirmed !== true && confirmed !== false) {
     return (0, import_react15.createElement)(
       "div",
       { className: "dv-q-foot" },
-      (0, import_react15.createElement)("button", { type: "button", className: "dv-q-btn", disabled: true }, node.cancelLabel ?? ui2.t("Cancel")),
-      (0, import_react15.createElement)("button", { type: "button", className: "dv-q-submit", disabled: true }, node.confirmLabel ?? ui2.t("Confirm"))
+      (0, import_react15.createElement)("button", { type: "button", className: "dv-q-btn", disabled: true }, node.cancelLabel ?? ui3.t("Cancel")),
+      (0, import_react15.createElement)("button", { type: "button", className: "dv-q-submit", disabled: true }, node.confirmLabel ?? ui3.t("Confirm"))
     );
   }
-  const label = confirmed ? node.confirmLabel ?? ui2.t("Confirm") : node.cancelLabel ?? ui2.t("Cancel");
+  const label = confirmed ? node.confirmLabel ?? ui3.t("Confirm") : node.cancelLabel ?? ui3.t("Cancel");
   return (0, import_react15.createElement)("span", { className: "dv-q-badge" }, label);
 }
 function FormInput({ node, onSubmit, busy = false, footStart = null }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   const fields = fieldsOf(node);
   const [draft, setDraft] = (0, import_react15.useState)(() => Object.fromEntries(fields.map((field) => [field.id, field.value ?? ""])));
   const submit = () => {
@@ -7832,17 +7848,17 @@ function FormInput({ node, onSubmit, busy = false, footStart = null }) {
       { className: "dv-q-foot" },
       footStart ? (0, import_react15.createElement)("div", { className: "dv-q-foot-start" }, footStart) : null,
       node.cancelLabel ? (0, import_react15.createElement)("button", { type: "button", className: "dv-q-btn", disabled: busy, onClick: cancel }, node.cancelLabel) : null,
-      (0, import_react15.createElement)("button", { type: "submit", className: "dv-q-submit", disabled: busy }, node.submitLabel ?? ui2.t("Submit"))
+      (0, import_react15.createElement)("button", { type: "submit", className: "dv-q-submit", disabled: busy }, node.submitLabel ?? ui3.t("Submit"))
     )
   );
 }
 function SettledForm({ node, answer }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   const ans = answerValues(answer, node);
   const fields = ans?.fields;
   const values = fields !== null && typeof fields === "object" ? fields : {};
   const canceled = ans?.canceled === true;
-  const badge = canceled ? node.cancelLabel ?? ui2.t("Cancel") : node.cancelLabel !== void 0 && ans !== void 0 ? node.submitLabel ?? ui2.t("Submit") : null;
+  const badge = canceled ? node.cancelLabel ?? ui3.t("Cancel") : node.cancelLabel !== void 0 && ans !== void 0 ? node.submitLabel ?? ui3.t("Submit") : null;
   return (0, import_react15.createElement)(
     "div",
     { className: "dv-widget-form" },
@@ -7874,12 +7890,12 @@ function SettledForm({ node, answer }) {
   );
 }
 function SubmitInput({ node, ctx }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   if (ctx.settled) return null;
   return (0, import_react15.createElement)(
     "div",
     { className: "dv-q-foot" },
-    (0, import_react15.createElement)("button", { type: "button", className: "dv-q-submit", disabled: ctx.busy, onClick: () => ctx.onSubmit?.(node.id, {}) }, node.label || ui2.t("Send"))
+    (0, import_react15.createElement)("button", { type: "button", className: "dv-q-submit", disabled: ctx.busy, onClick: () => ctx.onSubmit?.(node.id, {}) }, node.label || ui3.t("Send"))
   );
 }
 function WidgetTable({ node, lookup }) {
@@ -7905,7 +7921,7 @@ function WidgetTable({ node, lookup }) {
   );
 }
 function WidgetProgress({ node, lookup }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   let percent3;
   if (node.percent !== void 0) percent3 = Number(resolve(node.percent, lookup, 0));
   else {
@@ -7925,7 +7941,7 @@ function WidgetProgress({ node, lookup }) {
       "aria-valuenow": Math.round(percent3),
       "aria-valuemin": 0,
       "aria-valuemax": 100,
-      "aria-label": node.label ?? ui2.t("Progress"),
+      "aria-label": node.label ?? ui3.t("Progress"),
       "aria-valuetext": right
     }, (0, import_react15.createElement)("div", { className: "dv-widget-progress-fill", style: { width: `${percent3}%` } }))
   );
@@ -7942,13 +7958,13 @@ function WidgetMetric({ node, lookup }) {
   );
 }
 function WidgetCallout({ node, lookup }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   const tone = resolve(node.tone, lookup);
   return (0, import_react15.createElement)(
     "div",
     { className: "dv-view-callout", "data-tone": CALLOUT_TONES2.includes(tone) ? tone : "info" },
     (0, import_react15.createElement)("span", { className: "dv-view-callout-icon", "aria-hidden": true }, (0, import_react15.createElement)(InfoIcon2)),
-    (0, import_react15.createElement)("div", { className: "dv-view-callout-text" }, (0, import_react15.createElement)(ui2.Markdown, { text: asText(resolve(node.text, lookup, "")), labels: mdLabels(ui2), variant: "compact" }))
+    (0, import_react15.createElement)("div", { className: "dv-view-callout-text" }, (0, import_react15.createElement)(ui3.Markdown, { text: asText(resolve(node.text, lookup, "")), labels: mdLabels(ui3), variant: "compact" }))
   );
 }
 var LinkIcon = () => (0, import_react15.createElement)(
@@ -7959,11 +7975,11 @@ var LinkIcon = () => (0, import_react15.createElement)(
   (0, import_react15.createElement)("path", { d: "M13 10.5l1.5-1.5A2.5 2.5 0 0 0 11 5.5L9.5 7" })
 );
 function WidgetSources({ node }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   const items = (Array.isArray(node.items) ? node.items : []).filter((item) => typeof item?.url === "string" && /^https?:\/\//i.test(item.url));
   return (0, import_react15.createElement)(
     "div",
-    { className: "dv-view-sources", role: "list", "aria-label": ui2.t("Sources") },
+    { className: "dv-view-sources", role: "list", "aria-label": ui3.t("Sources") },
     items.map((item, index) => (0, import_react15.createElement)("a", { key: index, role: "listitem", className: "dv-view-source", href: item.url, target: "_blank", rel: "noopener noreferrer", title: item.url }, (0, import_react15.createElement)(LinkIcon), item.label))
   );
 }
@@ -8079,7 +8095,7 @@ function ToggleInput({ node, ctx }) {
   );
 }
 function WidgetNode({ node, ctx }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   if (node === null || typeof node !== "object") return null;
   const { lookup } = ctx;
   switch (node.type) {
@@ -8093,7 +8109,7 @@ function WidgetNode({ node, ctx }) {
       );
     }
     case "text": {
-      const text = (0, import_react15.createElement)(ui2.Markdown, { text: asText(resolve(node.text, lookup, "")), labels: mdLabels(ui2), variant: "compact" });
+      const text = (0, import_react15.createElement)(ui3.Markdown, { text: asText(resolve(node.text, lookup, "")), labels: mdLabels(ui3), variant: "compact" });
       return node.tone === "muted" ? (0, import_react15.createElement)("div", { className: "dv-view-muted" }, text) : text;
     }
     case "metric":
@@ -8173,7 +8189,7 @@ function useChartHandles() {
   return { charts: [...charts.current.values()], ...fns.current };
 }
 function ViewMenuList({ charts, pick: pick2 }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   return (0, import_react15.createElement)(
     "div",
     { className: "dv-menu dv-view-menu", role: "menu" },
@@ -8184,16 +8200,16 @@ function ViewMenuList({ charts, pick: pick2 }) {
         import_react15.Fragment,
         null,
         index > 0 ? (0, import_react15.createElement)("div", { className: "dv-menu-sep", role: "separator" }) : null,
-        (0, import_react15.createElement)("div", { className: "dv-view-menu-label" }, chart.label ?? ui2.t("Chart {n}", { n: index + 1 }))
+        (0, import_react15.createElement)("div", { className: "dv-view-menu-label" }, chart.label ?? ui3.t("Chart {n}", { n: index + 1 }))
       ) : null,
-      (0, import_react15.createElement)("button", { type: "button", role: "menuitem", onClick: pick2(chart.toggleTable) }, (0, import_react15.createElement)(TableIcon), chart.asTable ? ui2.t("View as chart") : ui2.t("View as table")),
-      (0, import_react15.createElement)("button", { type: "button", role: "menuitem", onClick: pick2(chart.copy) }, (0, import_react15.createElement)(CopyIcon2), ui2.t("Copy data")),
-      (0, import_react15.createElement)("button", { type: "button", role: "menuitem", onClick: pick2(chart.save) }, (0, import_react15.createElement)(DownloadIcon2), ui2.t("Download image"))
+      (0, import_react15.createElement)("button", { type: "button", role: "menuitem", onClick: pick2(chart.toggleTable) }, (0, import_react15.createElement)(TableIcon), chart.asTable ? ui3.t("View as chart") : ui3.t("View as table")),
+      (0, import_react15.createElement)("button", { type: "button", role: "menuitem", onClick: pick2(chart.copy) }, (0, import_react15.createElement)(CopyIcon2), ui3.t("Copy data")),
+      (0, import_react15.createElement)("button", { type: "button", role: "menuitem", onClick: pick2(chart.save) }, (0, import_react15.createElement)(DownloadIcon2), ui3.t("Download image"))
     ))
   );
 }
 function ViewMenu({ charts }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   const [open, setOpen] = (0, import_react15.useState)(false);
   const root = (0, import_react15.useRef)(null);
   (0, import_react15.useEffect)(() => {
@@ -8218,12 +8234,12 @@ function ViewMenu({ charts }) {
   return (0, import_react15.createElement)(
     "div",
     { ref: root, className: "dv-view-tools", "data-open": open ? "" : void 0 },
-    (0, import_react15.createElement)("button", { type: "button", className: "dv-view-more", "aria-label": ui2.t("Chart options"), "aria-haspopup": "menu", "aria-expanded": open, onClick: () => setOpen((value) => !value) }, (0, import_react15.createElement)(DotsIcon2)),
+    (0, import_react15.createElement)("button", { type: "button", className: "dv-view-more", "aria-label": ui3.t("Chart options"), "aria-haspopup": "menu", "aria-expanded": open, onClick: () => setOpen((value) => !value) }, (0, import_react15.createElement)(DotsIcon2)),
     open ? (0, import_react15.createElement)(ViewMenuList, { charts, pick: pick2 }) : null
   );
 }
 function WidgetCard({ title, icon: icon2, footStart, view, onSubmit, onDismiss, busy = false, raised = false, settled = false, answer = null }) {
-  const ui2 = useViewUi();
+  const ui3 = useViewUi();
   const titleId = (0, import_react15.useId)();
   const { charts, registerChart, refreshCharts } = useChartHandles();
   const framed = raised || hasControls(view);
@@ -8234,7 +8250,7 @@ function WidgetCard({ title, icon: icon2, footStart, view, onSubmit, onDismiss, 
     icon2 ? (0, import_react15.createElement)("span", { className: "dv-view-icon", "aria-hidden": true }, icon2) : null,
     title ? (0, import_react15.createElement)("p", { className: "dv-view-title", id: titleId }, title) : (0, import_react15.createElement)("span", { className: "dv-view-title" }),
     countType(view, "chart") > 0 ? (0, import_react15.createElement)(ViewMenu, { charts }) : null,
-    onDismiss ? (0, import_react15.createElement)("button", { type: "button", className: "dv-q-x", "aria-label": ui2.t("Dismiss view"), title: ui2.t("Dismiss"), onClick: onDismiss, disabled: busy }, (0, import_react15.createElement)(CloseIcon2)) : null
+    onDismiss ? (0, import_react15.createElement)("button", { type: "button", className: "dv-q-x", "aria-label": ui3.t("Dismiss view"), title: ui3.t("Dismiss"), onClick: onDismiss, disabled: busy }, (0, import_react15.createElement)(CloseIcon2)) : null
   ) : null;
   return (0, import_react15.createElement)(
     "div",
@@ -8242,7 +8258,7 @@ function WidgetCard({ title, icon: icon2, footStart, view, onSubmit, onDismiss, 
       className,
       role: "group",
       "aria-labelledby": title ? titleId : void 0,
-      "aria-label": title ? void 0 : ui2.t("View"),
+      "aria-label": title ? void 0 : ui3.t("View"),
       "aria-busy": busy || void 0
     },
     head,
@@ -24168,7 +24184,7 @@ function menuItemFor(key, actions, subject) {
   }
 }
 var sideTitle = (chat) => chat?.entries?.[0]?.question?.trim() || t("Side chat");
-function PanelStrip({ bot, subject, view, ids, active, sides, side, canBrowse, reading, onView, actions, useBrowserPages }) {
+function PanelStrip({ bot, subject, view, ids, active, sides, side, canBrowse, reading: reading2, onView, actions, useBrowserPages }) {
   const pages = useBrowserPages((map) => map);
   const wrap = (0, import_react57.useRef)(null);
   const ind = (0, import_react57.useRef)(null);
@@ -24248,7 +24264,7 @@ function PanelStrip({ bot, subject, view, ids, active, sides, side, canBrowse, r
           title: bot.name,
           onClick: () => onView("details")
         },
-        (0, import_react57.createElement)(BotMark, { bot, size: 20, state: reading ? "searching" : "idle" }),
+        (0, import_react57.createElement)(BotMark, { bot, size: 20, state: reading2 ? "searching" : "idle" }),
         view === "details" ? (0, import_react57.createElement)("span", { className: "bt-ptab-name" }, bot.name) : null
       ),
       ids.map((tabId) => {
@@ -24716,7 +24732,7 @@ function BotPanel({ pane, leaving, room: room2, overlay, roster, actions, useSes
   const [dragging, setDragging] = (0, import_react57.useState)(false);
   const [resizing, setResizing] = (0, import_react57.useState)(false);
   const instant = dragging || resizing;
-  const [reading, setReading] = (0, import_react57.useState)(false);
+  const [reading2, setReading] = (0, import_react57.useState)(false);
   const panelWidth = fitWidth(width ?? (view === "browser" ? DEFAULT_WIDTH : DETAILS_WIDTH), widthRange(view, room2));
   (0, import_react57.useLayoutEffect)(() => {
     if (view === "browser" && width === null) setWidth(DEFAULT_WIDTH);
@@ -24924,7 +24940,7 @@ function BotPanel({ pane, leaving, room: room2, overlay, roster, actions, useSes
     // Over the whole window while dragging: the cursor stays a resize cursor and the
     // pages underneath (the chat, the guest) see no pointer.
     dragging ? (0, import_react_dom9.createPortal)((0, import_react57.createElement)("div", { className: "bt-drag-shield", "aria-hidden": true }), document.body) : null,
-    hasStrip ? (0, import_react57.createElement)(PanelStrip, { bot, subject: pane.id, view, ids: tabState.ids, active, sides: sideChats, side: pane.side, canBrowse, reading, onView: switchView, actions: panelActions, useBrowserPages }) : null,
+    hasStrip ? (0, import_react57.createElement)(PanelStrip, { bot, subject: pane.id, view, ids: tabState.ids, active, sides: sideChats, side: pane.side, canBrowse, reading: reading2, onView: switchView, actions: panelActions, useBrowserPages }) : null,
     view === "browser" && bot ? (0, import_react57.createElement)(BrowserView, { key: `browser:${active}`, bot, tabId: active, leaving, landed: landed && !settling, actions, useBrowserPages, hold }) : view === "side" && sideChat ? (0, import_react57.createElement)("div", { key: `side:${sideChat.id}`, className: "bt-panel-view" }, (0, import_react57.createElement)(SideChatView, { subject: pane.id, chat: sideChat, roster, actions: panelActions })) : (0, import_react57.createElement)(
       "div",
       { key: `details:${pane.id}:${pane.renaming ? "rename" : ""}:${pane.tab ?? ""}`, className: "bt-panel-view" },
@@ -25077,7 +25093,7 @@ var DIALOG_EXIT_MS = 160;
 var MENU_EXIT_MS3 = 120;
 function Overlays({ useRoster, useUi, useSessions, useSessionStatus, useActivity, useWork, useRegistry, useBrowserPages, useBrowserTabs, useBrowserHolds, useUpdate, useFrame, useSidebarPref, actions }) {
   const roster = useRoster((value) => value);
-  const ui2 = useUi((value) => value);
+  const ui3 = useUi((value) => value);
   useRegistry((value) => value);
   const frameSnap = useFrame ? useFrame((value) => value) : { viewport: window.innerWidth, sidebarWidth: FALLBACK_SIDEBAR_WIDTH, collapsedWidth: 0 };
   const pref = useSidebarPref ? useSidebarPref((value) => value) : "open";
@@ -25088,13 +25104,13 @@ function Overlays({ useRoster, useUi, useSessions, useSessionStatus, useActivity
     previous.current = current;
     if (current) actions.followPanel?.(current);
   }, [current]);
-  const open = ui2.details ? { id: ui2.details, view: ui2.view ?? "details", renaming: ui2.renaming, tab: ui2.tab, side: ui2.side } : null;
+  const open = ui3.details ? { id: ui3.details, view: ui3.view ?? "details", renaming: ui3.renaming, tab: ui3.tab, side: ui3.side } : null;
   const layout = frameLayout({
     viewport: frameSnap.viewport,
     sidebarWidth: frameSnap.sidebarWidth,
     pref,
-    drawer: ui2.leftDrawer === true,
-    panel: open ? { view: open.view, yielded: ui2.panelYield === true } : null
+    drawer: ui3.leftDrawer === true,
+    panel: open ? { view: open.view, yielded: ui3.panelYield === true } : null
   });
   const shown = open !== null && layout.panel !== "folded" ? open : null;
   const [kept, setKept] = (0, import_react58.useState)(shown);
@@ -25105,26 +25121,26 @@ function Overlays({ useRoster, useUi, useSessions, useSessionStatus, useActivity
     }
     const timer = setTimeout(() => setKept(null), PANEL_LINGER_MS);
     return () => clearTimeout(timer);
-  }, [ui2.details, ui2.view, ui2.renaming, ui2.tab, shown === null]);
+  }, [ui3.details, ui3.view, ui3.renaming, ui3.tab, shown === null]);
   const pane = shown ?? kept;
-  const [settings, settingsLeaving] = useLinger(ui2.settings, DIALOG_EXIT_MS);
+  const [settings, settingsLeaving] = useLinger(ui3.settings, DIALOG_EXIT_MS);
   const memoryOwner = (id) => {
     const bot = roster.byId[id];
     if (bot) return { id: bot.id, name: bot.name };
     const room2 = roster.roomsById[id];
     return room2 ? { id: room2.id, name: room2.name, group: true } : null;
   };
-  const [memory, memoryLeaving] = useLinger(ui2.memory && memoryOwner(ui2.memory) ? ui2.memory : null, DIALOG_EXIT_MS);
+  const [memory, memoryLeaving] = useLinger(ui3.memory && memoryOwner(ui3.memory) ? ui3.memory : null, DIALOG_EXIT_MS);
   const owner = memory ? memoryOwner(memory) : null;
-  const [menu, menuLeaving] = useLinger(ui2.menu, MENU_EXIT_MS3);
+  const [menu, menuLeaving] = useLinger(ui3.menu, MENU_EXIT_MS3);
   return (0, import_react58.createElement)(
     import_react58.Fragment,
     null,
     pane ? (0, import_react_dom10.createPortal)((0, import_react58.createElement)(BotPanel, { pane, leaving: shown === null, room: layout.room, overlay: layout.panel === "overlay", roster, actions, useSessions, useSessionStatus, useActivity, useWork, useBrowserTabs, useBrowserPages, useBrowserHolds }), document.body) : null,
-    ui2.newChat ? (0, import_react_dom10.createPortal)((0, import_react58.createElement)(NewChat, { key: ui2.newChat, mode: ui2.newChat, roster, actions }), document.body) : null,
-    ui2.palette ? (0, import_react_dom10.createPortal)((0, import_react58.createElement)(CommandPalette, { key: ui2.palette.token, start: ui2.palette.query, token: ui2.palette.token, roster, actions, useSessions }), document.body) : null,
-    ui2.exchange ? (0, import_react_dom10.createPortal)((0, import_react58.createElement)(ExchangeDialog, { pair: ui2.exchange, roster, actions }), document.body) : null,
-    ui2.voice ? (0, import_react_dom10.createPortal)((0, import_react58.createElement)(VoiceMode, { key: ui2.voice, sessionId: ui2.voice, roster, actions, useSessions, useSessionStatus }), document.body) : null,
+    ui3.newChat ? (0, import_react_dom10.createPortal)((0, import_react58.createElement)(NewChat, { key: ui3.newChat, mode: ui3.newChat, roster, actions }), document.body) : null,
+    ui3.palette ? (0, import_react_dom10.createPortal)((0, import_react58.createElement)(CommandPalette, { key: ui3.palette.token, start: ui3.palette.query, token: ui3.palette.token, roster, actions, useSessions }), document.body) : null,
+    ui3.exchange ? (0, import_react_dom10.createPortal)((0, import_react58.createElement)(ExchangeDialog, { pair: ui3.exchange, roster, actions }), document.body) : null,
+    ui3.voice ? (0, import_react_dom10.createPortal)((0, import_react58.createElement)(VoiceMode, { key: ui3.voice, sessionId: ui3.voice, roster, actions, useSessions, useSessionStatus }), document.body) : null,
     menu ? (0, import_react_dom10.createPortal)((0, import_react58.createElement)(ContextMenu, { key: `${menu.kind ?? ""}:${menu.id}:${menu.x}:${menu.y}`, menu, roster, actions, leaving: menuLeaving }), document.body) : null,
     settings ? (0, import_react_dom10.createPortal)((0, import_react58.createElement)(SettingsDialog, { page: settings.page, id: settings.id, roster, actions, useUpdate, leaving: settingsLeaving }), document.body) : null,
     owner ? (0, import_react_dom10.createPortal)((0, import_react58.createElement)(MemoryDialog, { key: owner.id, owner, actions, leaving: memoryLeaving }), document.body) : null
@@ -26940,64 +26956,416 @@ var QUEUE_CSS = `
 
 // src/client/usage-line.js
 var import_react62 = require("react");
-var decodeSpeed = (stats) => {
-  if (stats === void 0 || stats === null) return void 0;
-  if (!(stats.decodeMs > 0) || !(stats.decodeTokens > 0)) return void 0;
-  const tps = stats.decodeTokens / (stats.decodeMs / 1e3);
-  const text = tps >= 100 ? String(Math.round(tps)) : tps.toFixed(1);
-  return `${text} tok/s`;
+var import_react_dom11 = require("react-dom");
+var ui2 = __toESM(require("@deepseek-ai/dsh-client-ui-primitives"), 1);
+var formatTokens2 = (value) => {
+  const scaled = (candidate) => candidate >= 100 ? String(Math.round(candidate)) : String(Math.round(candidate * 10) / 10);
+  if (value < 1e3) return String(value);
+  if (value < 1e6) return t("{value}K", { value: scaled(value / 1e3) });
+  return t("{value}M", { value: scaled(value / 1e6) });
 };
-var shortCount = (value) => {
-  if (value >= 1e6) return `${(value / 1e6).toFixed(1)}M`;
-  if (value >= 1e3) return `${(value / 1e3).toFixed(value >= 1e5 ? 0 : 1)}K`;
-  return String(value);
+var formatExactTokens = (value) => {
+  const digits = String(value);
+  const groups = [];
+  for (let end = digits.length; end > 0; end -= 3) groups.unshift(digits.slice(Math.max(0, end - 3), end));
+  return groups.join(",");
 };
-var contextShare = (pressure) => {
-  if (pressure === void 0 || pressure === null) return void 0;
-  const used = pressure.projectedTokens ?? pressure.pressureTokens;
-  const limit = pressure.contextWindow;
-  if (!(used > 0) || !(limit > 0)) return void 0;
-  return `${Math.min(100, Math.round(used / limit * 100))}%`;
+var roundedPercentUnits = (cacheReadTokens, denominator, decimalPlaces) => {
+  const unitsPerPercent = decimalPlaces === 0 ? 1 : 10;
+  const scale = unitsPerPercent * 100;
+  const doubledScale = scale * 2;
+  const denominatorQuotient = Math.floor(denominator / doubledScale);
+  const denominatorRemainder = denominator % doubledScale;
+  let lower = 0;
+  let upper = scale;
+  while (lower < upper) {
+    const candidate = Math.floor((lower + upper + 1) / 2);
+    const factor = candidate * 2 - 1;
+    const threshold = factor * denominatorQuotient + Math.ceil(factor * denominatorRemainder / doubledScale);
+    if (cacheReadTokens >= threshold) lower = candidate;
+    else upper = candidate - 1;
+  }
+  return lower;
 };
-var billedInput = (usage) => (usage.uncachedInputTokens ?? 0) + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0);
-var cacheHitPercent = (usage) => {
-  const prompt = billedInput(usage);
-  if (!(prompt > 0)) return void 0;
-  return Math.round((usage.cacheReadTokens ?? 0) / prompt * 100);
+var displayPercentUnits = (units, decimalPlaces) => {
+  if (decimalPlaces === 0) return String(units);
+  const whole = Math.floor(units / 10);
+  const tenths = units % 10;
+  return tenths === 0 ? String(whole) : `${whole}.${tenths}`;
 };
-function UsageLine({ stats, usage, pressure }) {
-  const parts = (0, import_react62.useMemo)(() => {
-    const left2 = [];
-    const right2 = [];
-    if (stats !== void 0 && stats !== null && stats.steps !== 0) {
-      left2.push(t("{turns} turns, {steps} steps", { turns: stats.turns, steps: stats.steps }));
-      const speed = decodeSpeed(stats);
-      if (speed !== void 0) left2.push(speed);
+var formatCacheHitPercent = (cacheReadTokens, promptTokens, decimalPlaces = 0) => {
+  if (promptTokens === 0) return null;
+  const missedInputTokens = promptTokens - cacheReadTokens;
+  if (missedInputTokens === 0) return "100";
+  const roundedUnits = roundedPercentUnits(cacheReadTokens, promptTokens, decimalPlaces);
+  const fullHitUnits = decimalPlaces === 0 ? 100 : 1e3;
+  if (roundedUnits < fullHitUnits) return displayPercentUnits(roundedUnits, decimalPlaces);
+  let distinguishingPlaces = 1;
+  let scaledDoubleGap = missedInputTokens * 200;
+  const denominatorTens = Math.floor(promptTokens / 10);
+  while (scaledDoubleGap <= denominatorTens) {
+    scaledDoubleGap *= 10;
+    distinguishingPlaces += 1;
+  }
+  const denominatorOnes = promptTokens % 10;
+  let roundedLoss = 5;
+  for (let loss = 1; loss < 5; loss += 1) {
+    const factor = loss * 2 + 1;
+    const threshold = factor * denominatorTens + Math.floor(factor * denominatorOnes / 10);
+    if (scaledDoubleGap <= threshold) {
+      roundedLoss = loss;
+      break;
     }
-    if (usage !== void 0 && usage !== null) {
-      const total = billedInput(usage) + (usage.outputTokens ?? 0);
-      if (total > 0) {
-        right2.push(`${shortCount(total)} tok`);
-        const hit = cacheHitPercent(usage);
-        if (hit !== void 0) right2.push(t("cache hit {percent}%", { percent: hit }));
-      }
-    }
-    const share = contextShare(pressure);
-    if (share !== void 0) right2.push(share);
-    return [left2, right2];
-  }, [stats, usage, pressure]);
-  const [left, right] = parts;
-  if (left.length === 0 && right.length === 0) return null;
+  }
+  return `99.${"9".repeat(distinguishingPlaces - 1)}${10 - roundedLoss}`;
+};
+var formatTokensPerSecond = (tps) => {
+  const clamped = Math.max(0, tps);
+  return clamped >= 10 ? String(Math.round(clamped)) : String(Math.round(clamped * 10) / 10);
+};
+var billedInputTokens = (usage) => usage.uncachedInputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
+var cacheHitPercent = (usage) => formatCacheHitPercent(usage.cacheReadTokens, billedInputTokens(usage));
+var exactCount = (value) => formatExactTokens(value);
+var reading = (first, second) => {
+  if (second === null) return { label: first, text: first };
+  return {
+    label: (0, import_react62.createElement)(
+      import_react62.Fragment,
+      null,
+      first,
+      (0, import_react62.createElement)("span", { className: "bt-stat-sep", "aria-hidden": true }, "·"),
+      second
+    ),
+    text: `${first} · ${second}`
+  };
+};
+var FULL_READING_TOOLTIP = { side: "top", portal: true, delayMs: 200, onlyWhenClipped: true };
+var PlainPill = ({ stat, icon: icon2, label, text }) => (0, import_react62.createElement)(
+  "span",
+  { className: "bt-stat-anchor", "data-composer-stat": stat },
+  (0, import_react62.createElement)(
+    ui2.Tooltip,
+    { label: text, ...FULL_READING_TOOLTIP, openOnClick: true },
+    (0, import_react62.createElement)(
+      "span",
+      { className: "bt-stat-pill" },
+      icon2,
+      (0, import_react62.createElement)("span", { className: "bt-stat-label" }, label)
+    )
+  )
+);
+var DialogPill = ({ stat, icon: icon2, label, text, title, titleValue, children }) => {
+  const [open, setOpen] = (0, import_react62.useState)(false);
+  const rootRef = (0, import_react62.useRef)(null);
+  const panelRef = (0, import_react62.useRef)(null);
+  const pos = ui2.useAnchoredPosition({ open, anchorRef: rootRef, panelRef, side: "top", gap: 8, margin: 12 });
+  ui2.useDismissOnOutsidePointer(rootRef, open, setOpen, panelRef);
+  (0, import_react62.useEffect)(() => {
+    if (!open) return void 0;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    const onClick = (e) => {
+      if (e.target instanceof Node && rootRef.current?.contains(e.target) !== true && panelRef.current?.contains(e.target) !== true) setOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [open]);
+  return (0, import_react62.createElement)(
+    "span",
+    { ref: rootRef, className: "bt-stat-anchor", "data-composer-stat": stat },
+    (0, import_react62.createElement)(
+      ui2.Tooltip,
+      { label: text, ...FULL_READING_TOOLTIP, disabled: open },
+      (0, import_react62.createElement)(
+        "button",
+        {
+          type: "button",
+          className: "bt-stat-pill",
+          "aria-haspopup": "dialog",
+          "aria-expanded": open,
+          "aria-label": text,
+          onClick: () => {
+            setOpen(!open);
+          }
+        },
+        icon2,
+        (0, import_react62.createElement)("span", { className: "bt-stat-label" }, label)
+      )
+    ),
+    open && (0, import_react_dom11.createPortal)(
+      (0, import_react62.createElement)(
+        "div",
+        { ref: panelRef, className: "bt-stat-panel", role: "dialog", "aria-label": title, style: pos ?? { visibility: "hidden", left: 0, top: 0 } },
+        (0, import_react62.createElement)(
+          "div",
+          { className: "bt-stat-title" },
+          (0, import_react62.createElement)("span", { className: "bt-stat-titleLabel" }, icon2, title),
+          titleValue !== void 0 && (0, import_react62.createElement)("span", { className: "bt-stat-titleValue" }, titleValue)
+        ),
+        (0, import_react62.createElement)("div", { className: "bt-stat-titleRule", "aria-hidden": true }),
+        children
+      ),
+      document.body
+    )
+  );
+};
+var ActivityPill = (0, import_react62.memo)(function ActivityPill2({ stats }) {
+  if (stats === void 0 || stats === null || stats.steps === 0) return null;
+  const speed = stats.decodeMs > 0 ? t("{tps} tok/s", { tps: formatTokensPerSecond(stats.decodeTokens / (stats.decodeMs / 1e3)) }) : null;
+  const icon2 = (0, import_react62.createElement)(ui2.IconGaugeOutlineRegular);
+  const counts2 = t("{turns} turns, {steps} steps", { turns: stats.turns, steps: stats.steps });
+  const content = { stat: "activity", icon: icon2, ...reading(counts2, speed) };
+  if (stats.llmMs <= 0 && stats.toolMs <= 0 && stats.ttftSteps <= 0 && speed === null) return (0, import_react62.createElement)(PlainPill, content);
+  const duration = (ms) => {
+    const s = ms / 1e3;
+    if (s < 60) return `${Math.round(s * 10) / 10}s`;
+    const whole = Math.round(s);
+    return `${Math.floor(whole / 60)}m${whole % 60}s`;
+  };
+  return (0, import_react62.createElement)(
+    DialogPill,
+    {
+      ...content,
+      title: t("Session statistics"),
+      titleValue: counts2
+    },
+    (0, import_react62.createElement)(
+      "dl",
+      { className: "bt-stat-details" },
+      stats.llmMs > 0 && [
+        (0, import_react62.createElement)("dt", null, t("LLM time")),
+        (0, import_react62.createElement)("dd", null, duration(stats.llmMs))
+      ],
+      stats.toolMs > 0 && [
+        (0, import_react62.createElement)("dt", null, t("Tool time")),
+        (0, import_react62.createElement)("dd", null, duration(stats.toolMs))
+      ],
+      stats.ttftSteps > 0 && [
+        (0, import_react62.createElement)("dt", null, t("Avg time to first token (TTFT)")),
+        (0, import_react62.createElement)("dd", null, duration(stats.ttftMs / stats.ttftSteps))
+      ],
+      speed !== null && [
+        (0, import_react62.createElement)("dt", null, t("Tokens per second (TPS)")),
+        (0, import_react62.createElement)("dd", null, speed)
+      ]
+    )
+  );
+});
+var UsagePill = (0, import_react62.memo)(function UsagePill2({ usage }) {
+  if (usage === void 0 || usage === null) return null;
+  if (billedInputTokens(usage) === 0 && usage.outputTokens === 0) return null;
+  const cacheHit = cacheHitPercent(usage);
+  const cacheHitText = cacheHit !== null ? t("cache hit {percent}%", { percent: cacheHit }) : null;
+  const icon2 = (0, import_react62.createElement)(ui2.IconDatabaseOutlineRegular);
+  const total = billedInputTokens(usage) + usage.outputTokens;
+  return (0, import_react62.createElement)(
+    DialogPill,
+    {
+      stat: "usage",
+      icon: icon2,
+      ...reading(formatTokens2(total), cacheHitText),
+      title: t("Token usage"),
+      titleValue: exactCount(total)
+    },
+    (0, import_react62.createElement)(
+      "dl",
+      { className: "bt-stat-details" },
+      cacheHit !== null && [
+        (0, import_react62.createElement)("dt", null, t("Cache hit")),
+        (0, import_react62.createElement)("dd", null, `${cacheHit}%`)
+      ],
+      (0, import_react62.createElement)("dt", null, t("Uncached input")),
+      (0, import_react62.createElement)("dd", null, exactCount(usage.uncachedInputTokens)),
+      (0, import_react62.createElement)("dt", null, t("Cached input")),
+      (0, import_react62.createElement)("dd", null, exactCount(usage.cacheReadTokens)),
+      usage.cacheWriteTokens !== 0 && [
+        (0, import_react62.createElement)("dt", null, t("Cache write")),
+        (0, import_react62.createElement)("dd", null, exactCount(usage.cacheWriteTokens))
+      ],
+      (0, import_react62.createElement)("dt", null, t("Output")),
+      (0, import_react62.createElement)("dd", null, exactCount(usage.outputTokens))
+    )
+  );
+});
+var RADIUS = 5.5;
+var CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+var contextOccupancy = (pressure) => {
+  const usedTokens = pressure?.projectedTokens ?? pressure?.pressureTokens;
+  if (usedTokens === void 0 || pressure?.contextWindow === void 0) return null;
+  return {
+    percent: Math.min(100, Math.round(usedTokens / pressure.contextWindow * 100)),
+    usedTokens,
+    contextWindow: pressure.contextWindow
+  };
+};
+var ContextMeter = (0, import_react62.memo)(function ContextMeter2({ pressure, breakdown }) {
+  const context = contextOccupancy(pressure);
+  if (context === null) return null;
+  const percent3 = context.percent;
+  const reading_ = `${percent3}%`;
+  const headBefore = t("Context used");
+  const headAfter = "";
+  const breakdownTotal2 = breakdown === void 0 || breakdown === null ? 0 : breakdown.systemTokens + breakdown.toolsTokens + breakdown.messageTokens;
+  const parts = breakdown === void 0 || breakdown === null || breakdownTotal2 === 0 ? [{ key: "total", color: void 0, width: percent3 }] : [
+    { key: "systemTokens", color: "bt-ctx-system", width: percent3 * breakdown.systemTokens / breakdownTotal2 },
+    { key: "toolsTokens", color: "bt-ctx-tools", width: percent3 * breakdown.toolsTokens / breakdownTotal2 },
+    { key: "messageTokens", color: "bt-ctx-messages", width: percent3 * breakdown.messageTokens / breakdownTotal2 }
+  ];
+  const segments = parts.filter((part) => part.width > 0);
+  return (0, import_react62.createElement)(ContextMeterPanel, { context, percent: percent3, reading: reading_, headBefore, headAfter, segments, breakdown });
+});
+var ContextMeterPanel = ({ context, percent: percent3, reading: reading_, headBefore, headAfter, segments, breakdown }) => {
+  const [open, setOpen] = (0, import_react62.useState)(false);
+  const rootRef = (0, import_react62.useRef)(null);
+  const panelRef = (0, import_react62.useRef)(null);
+  const position = ui2.useAnchoredPosition({ open, anchorRef: rootRef, panelRef, side: "top", gap: 8, margin: 12 });
+  ui2.useDismissOnOutsidePointer(rootRef, open, setOpen, panelRef);
+  (0, import_react62.useEffect)(() => {
+    if (!open) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+  return (0, import_react62.createElement)(
+    "span",
+    { ref: rootRef, className: "bt-ctx-root" },
+    (0, import_react62.createElement)(
+      ui2.Tooltip,
+      { label: `${headBefore} ${reading_}`, side: "top", delayMs: 200, disabled: open },
+      (0, import_react62.createElement)(
+        "button",
+        {
+          type: "button",
+          className: "bt-ctx-trigger",
+          "aria-label": `${headBefore} ${reading_}`,
+          "aria-haspopup": "dialog",
+          "aria-expanded": open,
+          onClick: () => {
+            setOpen(!open);
+          }
+        },
+        (0, import_react62.createElement)(
+          "svg",
+          { viewBox: "0 0 14 14", width: "14", height: "14", "aria-hidden": true },
+          (0, import_react62.createElement)("circle", { className: "bt-ctx-track", cx: "7", cy: "7", r: RADIUS }),
+          (0, import_react62.createElement)("circle", {
+            className: "bt-ctx-fill",
+            cx: "7",
+            cy: "7",
+            r: RADIUS,
+            strokeDasharray: `${CIRCUMFERENCE * percent3 / 100} ${CIRCUMFERENCE}`,
+            transform: "rotate(-90 7 7)"
+          })
+        ),
+        (0, import_react62.createElement)("span", null, reading_)
+      )
+    ),
+    open && (0, import_react_dom11.createPortal)(
+      (0, import_react62.createElement)(
+        "div",
+        {
+          ref: panelRef,
+          className: "bt-ctx-panel",
+          style: position ?? { visibility: "hidden", left: 0, top: 0 },
+          role: "dialog",
+          "aria-label": headBefore
+        },
+        (0, import_react62.createElement)(
+          "div",
+          { className: "bt-ctx-header" },
+          (0, import_react62.createElement)("span", { className: "bt-ctx-headline" }, headBefore),
+          (0, import_react62.createElement)("span", { className: "bt-ctx-percent" }, reading_),
+          (0, import_react62.createElement)("span", { className: "bt-ctx-headline" }, headAfter),
+          (0, import_react62.createElement)("span", { className: "bt-ctx-figures" }, `~${formatTokens2(context.usedTokens)} / ${formatTokens2(context.contextWindow)}`)
+        ),
+        (0, import_react62.createElement)(
+          "div",
+          { className: "bt-ctx-bar" },
+          segments.map((segment) => (0, import_react62.createElement)("div", {
+            key: segment.key,
+            className: segment.color === void 0 ? "bt-ctx-segment" : `bt-ctx-segment ${segment.color}`,
+            style: { width: `${segment.width}%` }
+          }))
+        ),
+        breakdown !== void 0 && breakdown !== null && breakdownTotal(breakdown) > 0 && (0, import_react62.createElement)(
+          "dl",
+          { className: "bt-ctx-rows" },
+          [
+            ["systemTokens", t("System"), "bt-ctx-system"],
+            ["toolsTokens", t("Tools"), "bt-ctx-tools"],
+            ["messageTokens", t("Conversation"), "bt-ctx-messages"]
+          ].map(([key, label, color]) => (0, import_react62.createElement)(
+            "div",
+            { key, className: "bt-ctx-row" },
+            (0, import_react62.createElement)("dt", null, (0, import_react62.createElement)("span", { className: `bt-ctx-swatch ${color}`, "aria-hidden": true }), label),
+            (0, import_react62.createElement)("dd", null, `~${formatTokens2(breakdown[key])}`)
+          ))
+        )
+      ),
+      document.body
+    )
+  );
+};
+var breakdownTotal = (breakdown) => breakdown.systemTokens + breakdown.toolsTokens + breakdown.messageTokens;
+function UsageLine({ stats, usage, pressure, breakdown }) {
   return (0, import_react62.createElement)(
     "div",
     { className: "bt-usage" },
-    left.length > 0 ? (0, import_react62.createElement)("span", { className: "bt-usage-part" }, left.join(" · ")) : null,
-    right.length > 0 ? (0, import_react62.createElement)("span", { className: "bt-usage-part" }, right.join(" · ")) : null
+    (0, import_react62.createElement)(ActivityPill, { stats }),
+    (0, import_react62.createElement)(UsagePill, { usage }),
+    (0, import_react62.createElement)(ContextMeter, { pressure, breakdown })
   );
 }
 var USAGE_LINE_CSS = `
-.bt-usage{display:flex;align-items:center;gap:10px;margin:2px 0 4px;padding:0 10px;font-size:12px;line-height:18px;color:var(--bt-ink-2);min-width:0}
-.bt-usage-part{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.bt-usage{display:inline-flex;align-items:center;gap:2px;min-width:0;max-width:100%;overflow:hidden}
+.bt-stat-anchor{display:inline-flex;min-width:0;font-size:calc(var(--dsh-content-font-size-secondary,13px) - 1px);line-height:calc(20px + var(--dsh-content-font-delta-secondary,0px))}
+.bt-stat-pill{display:inline-flex;align-items:center;gap:6px;box-sizing:border-box;max-width:100%;padding:1px 8px;border:none;border-radius:var(--dsw-radius-sm,4px);background:transparent;color:var(--bt-ink-3);font:inherit;font-variant-numeric:tabular-nums;line-height:inherit;white-space:nowrap}
+.bt-stat-pill svg{width:14px;height:14px;flex:none}
+button.bt-stat-pill{cursor:pointer}
+button.bt-stat-pill[aria-expanded=true]{background:var(--bt-hover);color:var(--bt-ink-2)}
+@media(hover:hover){button.bt-stat-pill:hover{background:var(--bt-hover);color:var(--bt-ink-2)}}
+.bt-stat-label{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.bt-stat-sep{color:var(--bt-line-2);margin:0 6px}
+.bt-stat-panel{position:fixed;z-index:1100;box-sizing:border-box;width:max-content;min-width:min(300px,calc(100vw - 24px));max-width:min(440px,calc(100vw - 24px));padding:16px;border:0;border-radius:10px;background:var(--bt-card);box-shadow:var(--bt-glass-shadow);font-size:12px;line-height:18px;color:var(--bt-ink-2);cursor:default}
+.bt-stat-title{display:flex;justify-content:space-between;gap:16px;margin-bottom:8px;color:var(--bt-ink);font-weight:500}
+.bt-stat-titleRule{margin-bottom:10px;border-top:.5px solid var(--bt-line)}
+.bt-stat-titleValue{font-variant-numeric:tabular-nums}
+.bt-stat-titleLabel{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.bt-stat-titleLabel svg{width:14px;height:14px;flex:none}
+.bt-stat-details{display:grid;grid-template-columns:minmax(76px,auto) minmax(0,1fr);gap:6px 16px;margin:0;color:var(--bt-ink-3)}
+.bt-stat-details dt,.bt-stat-details dd{min-width:0;margin:0}
+.bt-stat-details dd{color:var(--bt-ink-2);font-variant-numeric:tabular-nums;text-align:right}
+.bt-ctx-root{display:inline-flex;flex:none}
+.bt-ctx-trigger{display:inline-flex;align-items:center;gap:6px;flex:none;padding:1px 8px;border:none;border-radius:var(--dsw-radius-sm,4px);background:transparent;color:var(--bt-ink-3);font-family:inherit;font-size:var(--dsh-content-font-size-secondary,13px);font-variant-numeric:tabular-nums;line-height:calc(20px + var(--dsh-content-font-delta-secondary,0px));white-space:nowrap;cursor:pointer}
+.bt-ctx-trigger[aria-expanded=true]{background:var(--bt-hover);color:var(--bt-ink-2)}
+@media(hover:hover){.bt-ctx-trigger:hover{background:var(--bt-hover);color:var(--bt-ink-2)}}
+.bt-ctx-track{fill:none;stroke:var(--bt-line-2);stroke-width:2}
+.bt-ctx-fill{fill:none;stroke:var(--bt-ink-3);stroke-width:2;stroke-linecap:round}
+.bt-ctx-panel{position:fixed;z-index:1100;box-sizing:border-box;width:min(264px,calc(100vw - 24px));padding:12px;border:0;border-radius:10px;background:var(--bt-card);box-shadow:var(--bt-glass-shadow);font-size:12px;line-height:20px;color:var(--bt-ink-2);cursor:default}
+.bt-ctx-header{display:flex;align-items:center;gap:6px}
+.bt-ctx-figures{margin-left:auto;font-weight:500;font-variant-numeric:tabular-nums;color:var(--bt-ink)}
+.bt-ctx-percent{font-weight:500;color:var(--bt-ink)}
+.bt-ctx-headline{color:var(--bt-ink-3)}
+.bt-ctx-headline:empty{display:none}
+.bt-ctx-bar{display:flex;gap:1px;margin:10px 0 12px;height:4px;border-radius:999px;background:var(--bt-hover);overflow:hidden}
+.bt-ctx-segment{flex:none;min-width:2px;height:100%;border-radius:0;background:var(--meter-tint,var(--bt-ink-3))}
+.bt-ctx-swatch{display:inline-block;margin-right:6px;width:8px;height:8px;border-radius:0;background:var(--meter-tint);vertical-align:baseline}
+.bt-ctx-system{--meter-tint:var(--bt-ink-3)}
+.bt-ctx-tools{--meter-tint:var(--bt-accent)}
+.bt-ctx-messages{--meter-tint:var(--bt-accent)}
+.bt-ctx-rows{margin:6px 0 0}
+.bt-ctx-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:2px 0}
+.bt-ctx-row dt{color:var(--bt-ink-2)}
+.bt-ctx-row dd{margin:0;font-variant-numeric:tabular-nums;color:var(--bt-ink)}
 `;
 
 // src/client/approval-notices.js
@@ -27075,7 +27443,7 @@ function apply(ctx) {
   const reactionStore = sharedMap(STORAGE.reactions);
   const seenStore = sharedMap(STORAGE.seen);
   let seenAt = seenStore.read();
-  const ui2 = createSource({ details: null, view: "details", renaming: false, tab: null, side: null, newChat: null, exchange: null, menu: null, voice: null, palette: null, quote: null, settings: null, memory: null, toast: null, signIn: null, renameAgent: null, unread: unreadStore.read(), reactions: reactionStore.read(), visits: {}, panelYield: false, leftDrawer: false });
+  const ui3 = createSource({ details: null, view: "details", renaming: false, tab: null, side: null, newChat: null, exchange: null, menu: null, voice: null, palette: null, quote: null, settings: null, memory: null, toast: null, signIn: null, renameAgent: null, unread: unreadStore.read(), reactions: reactionStore.read(), visits: {}, panelYield: false, leftDrawer: false });
   let sidebarSaved = readSidebar();
   const sidebarPref = createSource(sidebarSaved.pref);
   const frame = createSource({ viewport: typeof window === "undefined" ? 0 : window.innerWidth, sidebarWidth: sidebarSaved.width, collapsedWidth: 0, collapsed: false });
@@ -27096,21 +27464,21 @@ function apply(ctx) {
   };
   let expected2 = null;
   const setPlain = (plain) => surface.set((state) => state.plain === plain ? state : { ...state, plain });
-  const dropPanels = () => ui2.set((state) => state.details || state.renaming ? { ...state, details: null, view: "details", renaming: false, tab: null } : state);
+  const dropPanels = () => ui3.set((state) => state.details || state.renaming ? { ...state, details: null, view: "details", renaming: false, tab: null } : state);
   const seenKey = (id) => roster.getSnapshot().byId?.[id]?.id ?? roster.getSnapshot().roomsById?.[id]?.id ?? id;
   const leaveVisits = (ids) => {
     seenAt = seenStore.update((seen) => noteLeft(seen, ids.map(seenKey), Date.now()), seenAt);
   };
   ctx.effect(() => {
-    const onPageHide = () => leaveVisits(Object.keys(ui2.getSnapshot().visits ?? {}));
+    const onPageHide = () => leaveVisits(Object.keys(ui3.getSnapshot().visits ?? {}));
     window.addEventListener("pagehide", onPageHide);
     return () => window.removeEventListener("pagehide", onPageHide);
   }, "ds-bot: remember visits on page hide");
   ctx.effect(() => {
     const onStorage = (event) => {
       if (event.storageArea !== localStorage) return;
-      if (event.key === null || event.key === unreadStore.key) ui2.set((state) => ({ ...state, unread: unreadStore.read(state.unread) }));
-      if (event.key === null || event.key === reactionStore.key) ui2.set((state) => ({ ...state, reactions: reactionStore.read(state.reactions) }));
+      if (event.key === null || event.key === unreadStore.key) ui3.set((state) => ({ ...state, unread: unreadStore.read(state.unread) }));
+      if (event.key === null || event.key === reactionStore.key) ui3.set((state) => ({ ...state, reactions: reactionStore.read(state.reactions) }));
       if (event.key === null || event.key === seenStore.key) seenAt = seenStore.read(seenAt);
     };
     window.addEventListener("storage", onStorage);
@@ -27146,8 +27514,8 @@ function apply(ctx) {
     savedPrefs = {};
   }
   const writeUnread = (id, value) => {
-    const unread = unreadStore.update((marks) => setUnread(marks, id, value), ui2.getSnapshot().unread);
-    ui2.set((state) => JSON.stringify(state.unread) === JSON.stringify(unread) ? state : { ...state, unread });
+    const unread = unreadStore.update((marks) => setUnread(marks, id, value), ui3.getSnapshot().unread);
+    ui3.set((state) => JSON.stringify(state.unread) === JSON.stringify(unread) ? state : { ...state, unread });
   };
   const refreshed = /* @__PURE__ */ new Set();
   let pulls = 0;
@@ -27304,7 +27672,7 @@ function apply(ctx) {
           stopReads = null;
         }
         void browsers.retain(snapshot.bots.map((bot) => bot.id));
-        ui2.set((state) => state.details && state.view === "browser" && (!on || !snapshot.byId[state.details]) ? { ...state, view: "details" } : state);
+        ui3.set((state) => state.details && state.view === "browser" && (!on || !snapshot.byId[state.details]) ? { ...state, view: "details" } : state);
       };
       sync();
       const offRoster = roster.subscribe(sync);
@@ -27435,7 +27803,7 @@ function apply(ctx) {
     ctx.uiWorkspace.openSession(target);
   }, current: mainView });
   const panelFolded = (view) => {
-    const state = ui2.getSnapshot();
+    const state = ui3.getSnapshot();
     if (state.details === null) return false;
     const f = frame.getSnapshot();
     return frameLayout({ viewport: f.viewport, sidebarWidth: f.sidebarWidth, pref: sidebarPref.getSnapshot(), drawer: state.leftDrawer, panel: { view: view ?? state.view, yielded: state.panelYield === true } }).panel === "folded";
@@ -27483,7 +27851,7 @@ function apply(ctx) {
     }
   };
   const actions = {
-    ...teamActions({ call, after, partFor, roster, ui: ui2, live, cards, heldCards, turnClock, panelFolded }),
+    ...teamActions({ call, after, partFor, roster, ui: ui3, live, cards, heldCards, turnClock, panelFolded }),
     // The work details of the host's own chat live in the host's settings, so
     // the row in DS Bot's own settings writes the host's field.
     workDetails: () => workDetails.getSnapshot(),
@@ -27494,7 +27862,7 @@ function apply(ctx) {
     isAgentSession: (id) => isAgentSessionId(id),
     openSession: (id) => {
       if (isAgentSessionId(id)) return actions.openAgentSession(id);
-      ui2.set((state) => state.newChat || state.exchange || state.menu || state.palette ? { ...state, newChat: null, exchange: null, menu: null, palette: null } : state);
+      ui3.set((state) => state.newChat || state.exchange || state.menu || state.palette ? { ...state, newChat: null, exchange: null, menu: null, palette: null } : state);
       setPlain(false);
       const target = partFor(id);
       show2(target);
@@ -27502,7 +27870,7 @@ function apply(ctx) {
     // The conversation replacements withdraw for a plain Session; set the surface
     // before the navigation so the Bot skin never flashes.
     openAgentSession: (sessionId) => {
-      ui2.set((state) => ({ ...state, newChat: null, exchange: null, menu: null, palette: null, details: null, view: "details", renaming: false, tab: null }));
+      ui3.set((state) => ({ ...state, newChat: null, exchange: null, menu: null, palette: null, details: null, view: "details", renaming: false, tab: null }));
       setPlain(true);
       show2(sessionId);
     },
@@ -27542,8 +27910,8 @@ function apply(ctx) {
       else if (roster.getSnapshot().mainBotId) actions.openSession(roster.getSnapshot().mainBotId);
     },
     renameAgentSession: (agentId, sessionId, title) => after(call("agent-rename", { agentId, sessionId, title })),
-    beginAgentRename: (sessionId) => ui2.set((state) => ({ ...state, renameAgent: sessionId })),
-    endAgentRename: () => ui2.set((state) => state.renameAgent ? { ...state, renameAgent: null } : state),
+    beginAgentRename: (sessionId) => ui3.set((state) => ({ ...state, renameAgent: sessionId })),
+    endAgentRename: () => ui3.set((state) => state.renameAgent ? { ...state, renameAgent: null } : state),
     // Removing the Agent archives every Session it owns; one of them may fill the
     // main view, and it must not stay there wearing the Bot surface afterwards.
     removeAgent: async (agentId) => {
@@ -27579,7 +27947,7 @@ function apply(ctx) {
       sidebarPref.set(next);
     },
     toggleLeftHidden: () => {
-      ui2.set((state) => state.leftDrawer || state.panelYield ? { ...state, leftDrawer: false, panelYield: false } : state);
+      ui3.set((state) => state.leftDrawer || state.panelYield ? { ...state, leftDrawer: false, panelYield: false } : state);
       actions.setSidebarPref(toggledPref(sidebarPref.getSnapshot(), sidebarSaved.shown));
     },
     setSidebarWidth: (width) => {
@@ -27587,8 +27955,8 @@ function apply(ctx) {
       writeSidebar(sidebarSaved);
       frame.set((state) => state.sidebarWidth === width ? state : { ...state, sidebarWidth: width });
     },
-    setLeftDrawer: (on) => ui2.set((state) => state.leftDrawer === on ? state : { ...state, leftDrawer: on }),
-    setPanelYield: (on) => ui2.set((state) => state.panelYield === on ? state : { ...state, panelYield: on }),
+    setLeftDrawer: (on) => ui3.set((state) => state.leftDrawer === on ? state : { ...state, leftDrawer: on }),
+    setPanelYield: (on) => ui3.set((state) => state.panelYield === on ? state : { ...state, panelYield: on }),
     // Agent mode hands the surface back to the shell; everything open on the Bot
     // surface closes first so nothing stale reopens on the way back.
     setSurface: (mode) => {
@@ -27598,7 +27966,7 @@ function apply(ctx) {
         return;
       }
       if (mode === "agent") {
-        ui2.set((state) => ({ ...state, details: null, view: "details", settings: null, palette: null, newChat: null, menu: null, voice: null, exchange: null, memory: null, toast: null }));
+        ui3.set((state) => ({ ...state, details: null, view: "details", settings: null, palette: null, newChat: null, menu: null, voice: null, exchange: null, memory: null, toast: null }));
       }
       writeMode(mode);
       surface.set((state) => ({ ...state, mode }));
@@ -27610,11 +27978,11 @@ function apply(ctx) {
     beginVisit: (id) => {
       const made = roster.getSnapshot().byId[id] ?? roster.getSnapshot().roomsById[id];
       const seen = seenAt[seenKey(id)] ?? (made?.createdBy && Number.isFinite(made.createdAt) ? made.createdAt : null);
-      ui2.set((state) => ({ ...state, visits: { ...state.visits, [id]: { seen, entered: Date.now() } } }));
+      ui3.set((state) => ({ ...state, visits: { ...state.visits, [id]: { seen, entered: Date.now() } } }));
     },
     endVisit: (id) => {
       leaveVisits([id]);
-      ui2.set((state) => {
+      ui3.set((state) => {
         if (!(id in (state.visits ?? {}))) return state;
         const visits = { ...state.visits };
         delete visits[id];
@@ -27622,8 +27990,8 @@ function apply(ctx) {
       });
     },
     toggleReaction: (key, index, emoji) => {
-      const reactions = reactionStore.update((saved) => toggleReaction(saved, key, index, emoji), ui2.getSnapshot().reactions);
-      ui2.set((state) => ({ ...state, reactions }));
+      const reactions = reactionStore.update((saved) => toggleReaction(saved, key, index, emoji), ui3.getSnapshot().reactions);
+      ui3.set((state) => ({ ...state, reactions }));
     },
     clearUnread: (id) => writeUnread(id, false)
   };
@@ -27635,7 +28003,7 @@ function apply(ctx) {
         if (!bot) return;
         browsers.ensureTabs(bot.id);
         if (browsers.tabs.getSnapshot()[bot.id]?.active == null) browsers.openTab(bot.id);
-        ui2.set((state) => ({ ...state, details: id, view: "browser", renaming: false, tab: null, panelYield: yieldBrowser(state) }));
+        ui3.set((state) => ({ ...state, details: id, view: "browser", renaming: false, tab: null, panelYield: yieldBrowser(state) }));
       },
       // '+' on the strip or the drawer's new-tab card: a blank tab in the browser view.
       browserNewTab: (id) => {
@@ -27643,7 +28011,7 @@ function apply(ctx) {
         if (!bot) return null;
         browsers.ensureTabs(bot.id);
         const tabId = browsers.openTab(bot.id);
-        ui2.set((state) => ({ ...state, details: id, view: "browser", renaming: false, tab: null, panelYield: yieldBrowser(state) }));
+        ui3.set((state) => ({ ...state, details: id, view: "browser", renaming: false, tab: null, panelYield: yieldBrowser(state) }));
         return tabId;
       },
       // A drawer card: its tab active, the panel on the browser view.
@@ -27651,7 +28019,7 @@ function apply(ctx) {
         const bot = roster.getSnapshot().byId[id];
         if (!bot) return;
         browsers.activate(bot.id, tabId);
-        ui2.set((state) => ({ ...state, details: id, view: "browser", panelYield: yieldBrowser(state) }));
+        ui3.set((state) => ({ ...state, details: id, view: "browser", panelYield: yieldBrowser(state) }));
       },
       browserEnsure: (botId) => browsers.ensureTabs(botId),
       browserCloseTab: (botId, tabId) => browsers.closeTab(botId, tabId),
@@ -27689,8 +28057,8 @@ function apply(ctx) {
   }
   actions.signInEntry = () => ctx.slots.entries?.("settings.models.sign-in")?.[0] ?? null;
   actions.canSignIn = () => Boolean(actions.signInEntry());
-  actions.signIn = () => ui2.set((state) => ({ ...state, signIn: (state.signIn ?? 0) + 1 }));
-  actions.closeSignIn = () => ui2.set((state) => ({ ...state, signIn: null }));
+  actions.signIn = () => ui3.set((state) => ({ ...state, signIn: (state.signIn ?? 0) + 1 }));
+  actions.closeSignIn = () => ui3.set((state) => ({ ...state, signIn: null }));
   actions.accountT = () => ctx.get("locale").bind("settings.account");
   actions.speech = () => ctx.get("remote.speech") ?? void 0;
   actions.openHarnessSettings = openHarnessSettings;
@@ -27704,7 +28072,7 @@ function apply(ctx) {
     const navigation = ctx.get("pluginNavigation");
     return navigation ? () => navigation.openBundle(VOICE_BUNDLE) : null;
   };
-  actions.seatAccount = (on) => ui2.set((state) => state.accountSeated === on ? state : { ...state, accountSeated: on });
+  actions.seatAccount = (on) => ui3.set((state) => state.accountSeated === on ? state : { ...state, accountSeated: on });
   actions.installUpdate = async () => {
     const value = await call("update-install");
     update.set((previous) => ({ ...previous, ...value }));
@@ -27819,15 +28187,20 @@ function apply(ctx) {
   }
   const UsageDock = ({ sessionId }) => {
     const values = ctx.sessions.list.getSnapshot().projectionsBySession?.[sessionId]?.values ?? {};
-    return (0, import_react63.createElement)(UsageLine, { stats: values.sessionStats, usage: values.tokenUsage, pressure: values.contextPressure });
+    return (0, import_react63.createElement)(UsageLine, {
+      stats: values.sessionStats,
+      usage: values.tokenUsage,
+      pressure: values.contextPressure,
+      breakdown: values.contextBreakdown
+    });
   };
-  const face = () => ({ actions, hooks: { roster, ui: ui2, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, frame, sidebarPref } });
+  const face = () => ({ actions, hooks: { roster, ui: ui3, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, frame, sidebarPref } });
   const teamToolFace = (sessionId) => ({
     actions,
     sessionId,
     hooks: {
       roster,
-      ui: ui2,
+      ui: ui3,
       work,
       heldCards,
       browserPages,
@@ -27927,7 +28300,7 @@ function apply(ctx) {
       const next = rightColumnOpen(document);
       const opening = next && !open;
       open = next;
-      const verdict = opening ? columnOpened(ui2.getSnapshot().details !== null, switchWindow.pending) : null;
+      const verdict = opening ? columnOpened(ui3.getSnapshot().details !== null, switchWindow.pending) : null;
       if (verdict === "close-drawer") actions.closePanel();
       else if (verdict === "collapse-column") collapseColumn();
     });
@@ -27937,9 +28310,9 @@ function apply(ctx) {
       attributeFilter: RIGHTBAR_ATTRIBUTES
     });
     const offMounted = sidebar.mounted.subscribe(() => switchWindow.moved());
-    let drawer = ui2.getSnapshot().details !== null;
-    const offUi = ui2.subscribe(() => {
-      const next = ui2.getSnapshot().details !== null;
+    let drawer = ui3.getSnapshot().details !== null;
+    const offUi = ui3.subscribe(() => {
+      const next = ui3.getSnapshot().details !== null;
       if (next && !drawer && drawerOpened(rightColumnOpen(document)) === "collapse-column") collapseColumn();
       drawer = next;
     });
@@ -27986,9 +28359,9 @@ function apply(ctx) {
     controller.toggleSource(CHATS_SOURCE, { trigger: "@", query: "", quoted: false, position: "inline", span });
   };
   const installFrameSync = () => {
-    let lastDetails = ui2.getSnapshot().details;
+    let lastDetails = ui3.getSnapshot().details;
     const sync = () => {
-      const s = ui2.getSnapshot();
+      const s = ui3.getSnapshot();
       const f = frame.getSnapshot();
       const opened = s.details !== null && lastDetails === null;
       lastDetails = s.details;
@@ -27999,7 +28372,7 @@ function apply(ctx) {
       else if (s.panelYield && layout.panel === "shown") actions.setPanelYield(false);
       if (s.leftDrawer === true && layout.left !== "drawer") actions.setLeftDrawer(false);
     };
-    const offs = [ui2.subscribe(sync), frame.subscribe(sync), sidebarPref.subscribe(sync)];
+    const offs = [ui3.subscribe(sync), frame.subscribe(sync), sidebarPref.subscribe(sync)];
     return () => {
       for (const off of offs) off();
     };
