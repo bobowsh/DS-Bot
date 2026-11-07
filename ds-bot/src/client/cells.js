@@ -253,7 +253,7 @@ function useFileMentions({ node, openFile, fileMentions, useTurnData }) {
   }, [fileMentions, openFile, seq, tail, turn])
 }
 
-export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useWorkDetails, turnProcess, actions }) {
+export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useWorkDetails, actions }) {
   const roster = useRoster(value => value)
   const data = node.data
   const steps = useTurnSteps(String(data.turn))
@@ -267,10 +267,6 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   // compact folds it away, the rest show its first line. The team follows it, so
   // the chat and the host's settings never disagree.
   const shown = reasoningShown(useWorkDetails?.(value => value))
-  // The host works out whether this turn's process rows fold (it follows the
-  // work-details mode the reader chose) and hands the answer over with the node. The team
-  // draws the rows itself, so it hides them while the host says they are folded.
-  const folded = turnProcess !== undefined && turnProcess.foldable && !turnProcess.open
   // The host folds a finished turn's process rows behind the turn's own control, except in
   // the fully expanded mode. The team draws the rows itself, so it makes the same decision
   // here: a turn that is still running keeps its rows, a finished one folds them and leaves
@@ -308,8 +304,8 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
       })
     }),
     head ? h(SpeakerHead, { bot: speaker, time: data.time }) : null,
-    !folded && activity.length ? h('div', { className: 'bt-agent-activity' }, activity.map((line, index) => h('div', { key: index, className: 'bt-agent-act', title: line }, h('span', { className: 'bt-agent-act-mark', 'aria-hidden': true }), h('span', { className: 'bt-agent-act-text' }, activityParts(line))))) : null,
-    !folded && reasoning ? h(ThinkingRow, {
+    activity.length ? h('div', { className: 'bt-agent-activity' }, activity.map((line, index) => h('div', { key: index, className: 'bt-agent-act', title: line }, h('span', { className: 'bt-agent-act-mark', 'aria-hidden': true }), h('span', { className: 'bt-agent-act-text' }, activityParts(line))))) : null,
+    reasoning ? h(ThinkingRow, {
       text: reasoning, live: thinking !== undefined, viewKey: `${sessionId}:${data.turn}`,
       // The live clock counts the settled steps too: backing `at` by the settled
       // time makes one Elapsed show settled + running.
@@ -755,35 +751,6 @@ function NewDivider() {
   return h('div', { className: 'bt-new-sep', role: 'separator', 'aria-label': t('New messages') }, h('span', null, t('New')))
 }
 
-export function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTurnClock, actions }) {
-  const turn = node?.location?.turn?.turn ?? node?.data?.turn
-  const start = node?.location?.turn?.start?.time
-  const hidden = useRoster(roster => isHiddenTurn(roster, sessionId, turn))
-  // Exchange turns hide their replies but still show their trigger chip, so their start
-  // counts for separators too.
-  useEffect(() => {
-    actions.noteTurnTime(sessionId, turn, 'first', start)
-  }, [sessionId, turn, start])
-  // The reply to a turn the user saw begin arrived while the user was away.
-  const visit = useUi(state => state.visits?.[sessionId])
-  const fresh = useTurnClock((state) => {
-    const own = state[sessionId]?.[turn]
-    return !hidden && typeof visit?.seen === 'number' && own?.first !== undefined && own.first <= visit.seen
-      && own.end !== undefined && own.end > visit.seen && own.end <= visit.entered
-  })
-  // The host's own header: the reader opens the rows with the host's toggle, and the
-  // host tells the rows whether they are open.
-  const foldable = turnProcess !== undefined && turnProcess.foldable
-  const open = turnProcess === undefined || !foldable || turnProcess.open
-  const header = foldable ? h('button', {
-    type: 'button',
-    className: 'bt-fold-header',
-    'aria-expanded': open,
-    onClick: () => { turnProcess.setOpen(!open) },
-  }, h('span', { className: 'bt-fold-header-mark', 'aria-hidden': true }),
-  h('span', { className: 'bt-fold-header-text' }, t(open ? 'Hide the work of this turn' : 'Show the work of this turn'))) : null
-  return h(Fragment, null, header, fresh ? h(NewDivider) : h(CellEmpty))
-}
 
 export function Nothing() { return null }
 

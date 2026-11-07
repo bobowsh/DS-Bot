@@ -22,7 +22,7 @@ import { AnsweredReply, WidgetDock, WIDGET_CSS } from './widget-cell.js'
 import { HandoffDock, HANDOFF_CSS } from './handoff-card.js'
 import { AppAccessDock, ComputerHandoffDock, ComputerIndicator, COMPUTER_CSS } from './computer.js'
 import { installHeaderNavigation } from './header-navigation.js'
-import { AssistantCell, TriggerCell, TurnProcessCell, Nothing, CellEmpty, TurnTailCell, TEAM_TOOLS, TeamToolView } from './cells.js'
+import { AssistantCell, TriggerCell, Nothing, CellEmpty, TurnTailCell, TEAM_TOOLS, TeamToolView } from './cells.js'
 import { Overlays } from './overlays.js'
 import { createBotBrowsers, serveBrowserReads } from './bot-browsers.js'
 import { BROWSER_CSS } from './browser-pane.js'
@@ -1079,7 +1079,6 @@ export function apply(ctx) {
     // The tool rows are the host's own: DSH's tool tree draws every call as a
     // folded row with its arguments, its result and how long it took. The team's
     // own tools keep their rows through the host's keyed tool view slot.
-    () => shadow('conversation.chat.node', { key: 'turn-process', priority: BOT_PRIORITY, locale: 'chat', inject: face }, TurnProcessCell),
     // DSH's own turn tail stays, so what other plugins add there shows, such as the
     // cards of the files a turn delivered; its copy and branch row is hidden.
     () => shadow('conversation.chat.turnTail', { id: 'bot-turn-separators', order: 1000, inject: face }, TurnTailCell),

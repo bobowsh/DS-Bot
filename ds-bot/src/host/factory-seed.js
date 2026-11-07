@@ -136,7 +136,7 @@ export function install(rt) {
       else {
         try {
           await createSeedBot(seedBot)
-        } catch (error) {
+        } catch {
           // The race is gone by the time the second attempt comes, so the Bot is created
           // after all.
           try {

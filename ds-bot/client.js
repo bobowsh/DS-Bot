@@ -13456,7 +13456,7 @@ function useFileMentions({ node, openFile, fileMentions, useTurnData }) {
     return tail?.closing?.finalNode.seq === seq ? fileMentions({ turn, seq, openFile }) : void 0;
   }, [fileMentions, openFile, seq, tail, turn]);
 }
-function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useWorkDetails, turnProcess, actions }) {
+function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useWorkDetails, actions }) {
   const roster = useRoster((value) => value);
   const data = node.data;
   const steps = useTurnSteps(String(data.turn));
@@ -13467,7 +13467,6 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
   const running = data.status === "running";
   const members = steps.length ? steps : [data];
   const shown = reasoningShown(useWorkDetails?.((value) => value));
-  const folded = turnProcess !== void 0 && turnProcess.foldable && !turnProcess.open;
   const reasoning = groupPart === "response" || !shown ? "" : turnReasoning(steps, data);
   const thinking = groupPart === "response" || !shown ? void 0 : thinkingStep(members);
   const ms = useThinkingMs({ sessionId, turn: data.turn, settledSteps: members.filter((step) => step.status !== "running").length, skip: hidden || reasoning === "" });
@@ -13496,8 +13495,8 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
       });
     }),
     head ? (0, import_react31.createElement)(SpeakerHead, { bot: speaker, time: data.time }) : null,
-    !folded && activity.length ? (0, import_react31.createElement)("div", { className: "bt-agent-activity" }, activity.map((line, index) => (0, import_react31.createElement)("div", { key: index, className: "bt-agent-act", title: line }, (0, import_react31.createElement)("span", { className: "bt-agent-act-mark", "aria-hidden": true }), (0, import_react31.createElement)("span", { className: "bt-agent-act-text" }, activityParts(line))))) : null,
-    !folded && reasoning ? (0, import_react31.createElement)(ThinkingRow, {
+    activity.length ? (0, import_react31.createElement)("div", { className: "bt-agent-activity" }, activity.map((line, index) => (0, import_react31.createElement)("div", { key: index, className: "bt-agent-act", title: line }, (0, import_react31.createElement)("span", { className: "bt-agent-act-mark", "aria-hidden": true }), (0, import_react31.createElement)("span", { className: "bt-agent-act-text" }, activityParts(line))))) : null,
+    reasoning ? (0, import_react31.createElement)(ThinkingRow, {
       text: reasoning,
       live: thinking !== void 0,
       viewKey: `${sessionId}:${data.turn}`,
@@ -13940,35 +13939,6 @@ function TriggerCell({ node, sessionId, useRoster, useSessions, useTurnClock, us
 }
 function NewDivider() {
   return (0, import_react31.createElement)("div", { className: "bt-new-sep", role: "separator", "aria-label": t("New messages") }, (0, import_react31.createElement)("span", null, t("New")));
-}
-function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTurnClock, actions }) {
-  const turn = node?.location?.turn?.turn ?? node?.data?.turn;
-  const start = node?.location?.turn?.start?.time;
-  const hidden = useRoster((roster) => isHiddenTurn(roster, sessionId, turn));
-  (0, import_react31.useEffect)(() => {
-    actions.noteTurnTime(sessionId, turn, "first", start);
-  }, [sessionId, turn, start]);
-  const visit = useUi((state) => state.visits?.[sessionId]);
-  const fresh = useTurnClock((state) => {
-    const own = state[sessionId]?.[turn];
-    return !hidden && typeof visit?.seen === "number" && own?.first !== void 0 && own.first <= visit.seen && own.end !== void 0 && own.end > visit.seen && own.end <= visit.entered;
-  });
-  const foldable = turnProcess !== void 0 && turnProcess.foldable;
-  const open = turnProcess === void 0 || !foldable || turnProcess.open;
-  const header = foldable ? (0, import_react31.createElement)(
-    "button",
-    {
-      type: "button",
-      className: "bt-fold-header",
-      "aria-expanded": open,
-      onClick: () => {
-        turnProcess.setOpen(!open);
-      }
-    },
-    (0, import_react31.createElement)("span", { className: "bt-fold-header-mark", "aria-hidden": true }),
-    (0, import_react31.createElement)("span", { className: "bt-fold-header-text" }, t(open ? "Hide the work of this turn" : "Show the work of this turn"))
-  ) : null;
-  return (0, import_react31.createElement)(import_react31.Fragment, null, header, fresh ? (0, import_react31.createElement)(NewDivider) : (0, import_react31.createElement)(CellEmpty));
 }
 function Nothing() {
   return null;
@@ -28019,7 +27989,6 @@ function apply(ctx) {
     // The tool rows are the host's own: DSH's tool tree draws every call as a
     // folded row with its arguments, its result and how long it took. The team's
     // own tools keep their rows through the host's keyed tool view slot.
-    () => shadow("conversation.chat.node", { key: "turn-process", priority: BOT_PRIORITY, locale: "chat", inject: face }, TurnProcessCell),
     // DSH's own turn tail stays, so what other plugins add there shows, such as the
     // cards of the files a turn delivered; its copy and branch row is hidden.
     () => shadow("conversation.chat.turnTail", { id: "bot-turn-separators", order: 1e3, inject: face }, TurnTailCell),
