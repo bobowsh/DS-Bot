@@ -9,7 +9,7 @@ import { build } from 'esbuild'
 const { outputFiles } = await build({
   stdin: {
     contents: [
-      "export { ToolCell, TriggerCell, callTree, CellEmpty, Bubbles } from './src/client/cells.js'",
+      "export { TeamToolView, TriggerCell, callTree, CellEmpty, Bubbles } from './src/client/cells.js'",
       "export { stackReplies } from './src/shared/group-replies.js'",
       "export { QuestionDock, SettledQuestion } from './src/client/questions.js'",
       "export { SecretDock } from './src/client/secret-card.js'",
@@ -65,7 +65,7 @@ runInNewContext(outputFiles[0].text, {
     throw new Error(`Unexpected platform module ${name}`)
   },
 })
-const { ToolCell, TriggerCell, callTree, stackReplies, CellEmpty, Bubbles, QuestionDock, SettledQuestion, SecretDock, countCards, ViewMenuList, WidgetView } = module.exports
+const { TeamToolView, TriggerCell, callTree, stackReplies, CellEmpty, Bubbles, QuestionDock, SettledQuestion, SecretDock, countCards, ViewMenuList, WidgetView } = module.exports
 
 // Runs the effects collected since the last render; returns the cleanups.
 const mount = () => {
@@ -105,9 +105,9 @@ const question = (callId, over = {}) => ({ id: 'question', callId, question: 'Wh
 const request = (callId, over = {}) => ({ id: 'request', callId, sessionId: chief.id, name: 'DEMO_TOKEN', purpose: 'Test card', status: 'pending', kind: 'fill', ...over })
 
 const text$ = value => [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value) }]
-const call = (name, callId, { args = {}, content = '', subCalls = [], running = false, isError = false, error } = {}) => (running
-  ? { phase: 'start', name, callId, argsRaw: JSON.stringify(args), subCalls, turn: 0 }
-  : { kind: 'tool-result', name, callId, call: { name, argsRaw: JSON.stringify(args) }, content: text$(content), isError, ...(error === undefined ? {} : { error }), subCalls })
+const call = (name, callId, { args = {}, content = '', subCalls = [], running = false, isError = false, error, turn } = {}) => (running
+  ? { phase: 'start', name, callId, argsRaw: JSON.stringify(args), subCalls, ...(turn === undefined ? {} : { turn }) }
+  : { kind: 'tool-result', name, callId, ...(turn === undefined ? {} : { turn }), call: { name, argsRaw: JSON.stringify(args) }, content: text$(content), isError, ...(error === undefined ? {} : { error }), subCalls })
 const program = (subCalls, over = {}) => call('run_code', 'program', { subCalls, ...over })
 
 test('a member\'s messages in a row stack under its name, and an event line starts a new block', () => {
@@ -218,15 +218,48 @@ test('a group post drawn from its trigger shows the time it came in', () => {
   effects = []
 })
 
+// #1: the host draws the tool rows and dispatches each call to the view
+// registered under its wire name. The team's tools register there, so the test
+// drives that view the way the host does.
 const props = (root, { sessionId = chief.id, roster = team(), actions = {}, turn = 1, held = {} } = {}) => ({
-  node: { key: 'node', data: { root }, location: { turn: { turn } } }, sessionId,
-  useRoster: select => select(roster), useUi: select => select({ reactions: {}, visits: {} }), actions,
+  sessionId,
+  toolName: root?.name ?? root?.call?.name ?? '',
+  phase: root?.kind === 'tool-result' ? 'result' : 'start',
+  block: root?.kind === 'tool-result'
+    ? { ...root, turn: root.turn ?? turn }
+    : { phase: 'start', name: root?.name ?? root?.call?.name ?? '', argsRaw: root?.argsRaw ?? root?.call?.argsRaw ?? '', subCalls: root?.subCalls ?? [], turn: root?.turn ?? turn },  useRoster: select => select(roster), useUi: select => select({ reactions: {}, visits: {} }), actions,
   useHeldCards: select => select(held),
 })
+
+// The host walks the call tree and dispatches every call to the view under its
+// wire name. The team has a view for its own tools and none for the rest, so
+// the test walks the tree the same way: the team's calls draw, the others do not.
+const TEAM = new Set([
+  'message_bot', 'stop_bot', 'create_bot', 'update_bot', 'group_relay',
+  'create_group', 'update_group', 'delete_group', 'post_to_group', 'ask_user',
+  'request_secret', 'request_connector', 'mail_send', 'ask_user_question',
+  'show_view', 'browser_handoff', 'computer_handoff', 'read_group_chat',
+  'remember', 'forget',
+])
+const nameOf = call => call?.name ?? call?.call?.name ?? ''
+const isTeam = call => TEAM.has(nameOf(call))
+// The host's own tree: a program is a container, so its own row is the generic
+// one and its sub-calls are the team's rows. A call that appears twice in the
+// tree is one call, so it draws once.
 const show = (root, options) => {
-  const out = expand(ToolCell(props(root, options)))
+  const out = []
+  const seen = new Set()
+  const visit = call => {
+    if (call === undefined || call === null) return
+    const id = call.callId ?? call
+    if (seen.has(id)) return
+    seen.add(id)
+    if (isTeam(call)) out.push(expand(TeamToolView(props(call, options))))
+    for (const child of call.subCalls ?? []) visit(child)
+  }
+  visit(root)
   effects = []
-  return out
+  return out.flat()
 }
 const shown = (root, options) => text(show(root, options))
 
@@ -302,15 +335,15 @@ test('each sub-call shows its own state, not its program\'s', () => {
   assert.match(shown(program([refused, posted])), /Couldn't post in the group.*Posted in.*Ops/)
 })
 
-// #1: a program is a container, so it draws no row of its own; the tools it
-// dispatched are the rows, folded, with their arguments and their results.
-test('a program draws no row of its own, and its tools show folded', () => {
-  assert.ok(emptied(ToolCell(props(program([])))))
-  const out = shown(program([call('bash', 'program:ptc:1'), call('read_file', 'program:ptc:2')]))
-  assert.match(out, /bash/)
-  assert.match(out, /read_file/)
-  // The program itself is not listed beside the tools it ran.
-  assert.doesNotMatch(out, /run_code/)
+// #1: the host draws every tool call, so a program is a container and its own
+// row is the host's generic one; the tools it dispatched are the host's rows.
+// The team draws only its own tools.
+test('the host draws the ordinary tools, and the team draws only its own', () => {
+  // An ordinary tool is not the team's, so the team has no view for it.
+  assert.ok(emptied(TeamToolView(props(call('bash', 'direct')))))
+  // A program is a container: its sub-calls are the rows, not the program.
+  assert.ok(emptied(TeamToolView(props(program([])))))
+  assert.ok(emptied(TeamToolView(props(program([call('bash', 'program:ptc:1')])))))
   effects = []
 })
 
@@ -342,7 +375,7 @@ test('every call that draws nothing leaves only the empty mark, so its seat can 
     call('ask_user_question', 'aq-call', { args: { questions: [{ question: 'Ship it?' }] }, running: true }),
     call('remember', 'm-call', { running: true }),
   ]) {
-    assert.ok(onlyMarks(ToolCell(props(root, { roster, held }))), `${root.name} leaves only marks`)
+    assert.ok(onlyMarks(TeamToolView(props(root, { roster, held }))), `${root.name} leaves only marks`)
     effects = []
   }
 })
@@ -369,16 +402,16 @@ const slotOf = (out) => {
 test('a node holding a visible event next to a mark is not emptied', () => {
   const actions = { noteLive() {}, noteCards() {} }
   // Marks alone: emptied, so the row or seat wrapping the slot may hide.
-  const alone = slotOf(ToolCell(props(call('ask_user', 'direct'), { actions })))
+  const alone = slotOf(TeamToolView(props(call('ask_user', 'direct'), { actions })))
   mount()
   assert.equal(alone.dataset.btEmptied, '')
 
-  // A run_code node holding "Messaged Writer" and an answered question's mark:
+  // The host's tree holds "Messaged Writer" and an answered question's mark:
   // the event stays, so the node is not emptied.
-  const mixed = slotOf(ToolCell(props(program([
-    call('message_bot', 'program:ptc:1', { args: { to: 'Writer' } }),
-    call('ask_user', 'program:ptc:2'),
-  ]), { actions })))
+  const mixed = slotOf([
+    expand(TeamToolView(props(call('message_bot', 'program:ptc:1', { args: { to: 'Writer' } }), { actions }))),
+    expand(TeamToolView(props(call('ask_user', 'program:ptc:2'), { actions }))),
+  ])
   mount()
   assert.ok(mixed.childNodes.some(kid => kid.hasAttribute('data-bt-empty')), 'the answered question marks itself')
   assert.ok(mixed.childNodes.some(kid => !kid.hasAttribute('data-bt-empty')), 'the event shows')
@@ -427,7 +460,7 @@ test('a slot keeps its emptied state in step with what it holds', () => {
 
 test('a hidden Bot-to-Bot turn draws none of its sub-calls', () => {
   const roster = team({ exchangeTurns: { chief: [1] }, secretRequests: { chief: [request('program:ptc:1')] } })
-  const root = program([call('request_secret', 'program:ptc:1', { args: { name: 'DEMO_TOKEN' } }), call('message_bot', 'program:ptc:2', { args: { to: 'Writer' } })])
+  const root = program([call('request_secret', 'program:ptc:1', { args: { name: 'DEMO_TOKEN' }, turn: 1 }), call('message_bot', 'program:ptc:2', { args: { to: 'Writer' }, turn: 1 })])
   assert.equal(shown(root, { roster }), '')
   assert.match(shown(root, { roster, turn: 2 }), /Chief needs a key.*Messaged/)
 })
@@ -538,30 +571,43 @@ test('a message line opens the exchange of the chat\'s Bot, from any part', () =
   assert.deepEqual(JSON.parse(JSON.stringify(opened)), [['chief', 'writer'], ['chief', 'writer']])
 })
 
-// The activity row reads one note per chat node.
+// The activity row reads one note per chat node. The host dispatches each call
+// to the view under its wire name, so the note comes from the team's view.
 const notes = (root, options = {}) => {
   const log = []
-  ToolCell(props(root, { ...options, actions: { noteLive: (sessionId, id, entry) => log.push({ sessionId, id, entry }) } }))
+  const actions = { noteLive: (sessionId, id, entry) => log.push({ sessionId, id, entry }) }
+  const seen = new Set()
+  const visit = call => {
+    if (call === undefined || call === null) return
+    const id = call.callId ?? call
+    if (seen.has(id)) return
+    seen.add(id)
+    if (isTeam(call)) TeamToolView(props(call, { ...options, actions }))
+    for (const child of call.subCalls ?? []) visit(child)
+  }
+  visit(root)
   const unmount = mount()
   unmount()
   return JSON.parse(JSON.stringify(log))
 }
 
-test('the live note follows the running sub-call of a program', () => {
-  const asking = notes(program([call('message_bot', 'program:ptc:1', { args: { to: 'Writer' }, running: true })], { running: true }))
+// #1: the host dispatches each call to the view under its wire name, so the
+// live note follows the call the host is drawing.
+test('the live note follows the running call the host draws', () => {
+  const asking = notes(call('message_bot', 'program:ptc:1', { args: { to: 'Writer' }, running: true }))
   assert.deepEqual(asking, [
-    { sessionId: 'chief', id: 'tool:program', entry: { label: 'Asking Writer', state: 'sending' } },
-    { sessionId: 'chief', id: 'tool:program', entry: null },
+    { sessionId: 'chief', id: 'tool:message_bot', entry: { label: 'Asking Writer', state: 'sending' } },
+    { sessionId: 'chief', id: 'tool:message_bot', entry: null },
   ])
-  const relaying = notes(program([call('message_bot', 'program:ptc:1', { args: { to: 'Writer' } }), call('group_relay', 'program:ptc:2', { running: true })], { running: true }))
+  const relaying = notes(call('group_relay', 'program:ptc:2', { running: true }))
   assert.equal(relaying[0].entry.relay, true)
-  const shell = notes(program([call('bash', 'program:ptc:1', { running: true })], { running: true }))
-  assert.equal(shell[0].entry.label, 'Running shell commands')
-  const between = notes(program([call('message_bot', 'program:ptc:1', { args: { to: 'Writer' } })], { running: true }))
+  // A call the team has no view for is the host's, and the host notes it.
+  const shell = notes(call('bash', 'program:ptc:1', { running: true }))
+  assert.deepEqual(shell, [])
+  const between = notes(call('message_bot', 'program:ptc:1', { args: { to: 'Writer' } }))
   assert.equal(between[0].entry.label, null)
-  assert.deepEqual(notes(program([call('message_bot', 'program:ptc:1', { args: { to: 'Writer' }, running: true })])), [])
   const roster = team({ exchangeTurns: { chief: [1] } })
-  assert.deepEqual(notes(program([call('message_bot', 'program:ptc:1', { args: { to: 'Writer' }, running: true })], { running: true }), { roster }), [])
+  assert.deepEqual(notes(call('message_bot', 'program:ptc:1', { args: { to: 'Writer' }, running: true }), { roster }), [])
   assert.equal(notes(call('message_bot', 'direct', { args: { to: 'Writer' }, running: true }))[0].entry.label, 'Asking Writer')
 })
 
@@ -573,7 +619,7 @@ const cardStore = () => {
 }
 const draw = (root, store, options = {}) => {
   effects = []
-  ToolCell(props(root, { ...options, actions: { noteCards: store.noteCards } }))
+  TeamToolView(props(root, { ...options, actions: { noteCards: store.noteCards } }))
   const unmount = mount()
   return { out: show(root, options), unmount }
 }
@@ -581,16 +627,16 @@ const draw = (root, store, options = {}) => {
 test('a cell tells the docks which card calls it draws, until it unmounts', () => {
   const store = cardStore()
   const root = program([call('ask_user', 'program:ptc:1'), call('request_secret', 'program:ptc:2'), call('message_bot', 'program:ptc:3')])
-  ToolCell(props(root, { actions: { noteCards: store.noteCards } }))
+  TeamToolView(props(root, { actions: { noteCards: store.noteCards } }))
   const unmount = mount()
   assert.deepEqual(JSON.parse(JSON.stringify(store.state)), { chief: { 'program:ptc:1': 1, 'program:ptc:2': 1 } })
-  ToolCell(props(root, { actions: { noteCards: store.noteCards } }))
+  TeamToolView(props(root, { actions: { noteCards: store.noteCards } }))
   const second = mount()
   assert.equal(store.state.chief['program:ptc:1'], 2)
   second()
   unmount()
   assert.deepEqual(JSON.parse(JSON.stringify(store.state)), { chief: {} })
-  ToolCell(props(root, { actions: { noteCards: store.noteCards }, roster: team({ exchangeTurns: { chief: [1] } }) }))
+  TeamToolView(props(root, { actions: { noteCards: store.noteCards }, roster: team({ exchangeTurns: { chief: [1] } }) }))
   mount()
   assert.deepEqual(JSON.parse(JSON.stringify(store.state)), { chief: {} })
 })
@@ -799,7 +845,7 @@ test('a PTC group relay shows its replies from the sub-call, live and after relo
   const asked = []
   const actions = { roomProgress: async (id) => { asked.push(id); return progress } }
   const running = program([call('group_relay', 'call-1-1:ptc:1', { running: true })], { running: true })
-  const relay = find(ToolCell(props(running, { sessionId: 'room', actions })), node => node.type?.name === 'GroupReplies')
+  const relay = find(TeamToolView(props(running, { sessionId: 'room', actions })), node => node.type?.name === 'GroupReplies')
   effects = []
   sets.length = 0
   relay.type(relay.props)
