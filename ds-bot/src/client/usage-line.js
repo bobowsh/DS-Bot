@@ -23,20 +23,31 @@ const shortCount = value => {
   return String(value)
 }
 
-/** The share of the context the session fills, when the host knows it. */
-const contextShare = usage => {
-  const total = (usage.uncachedInputTokens ?? 0) + (usage.cachedInputTokens ?? 0) + (usage.outputTokens ?? 0)
-  if (total <= 0) return undefined
-  const limit = usage.contextLimit ?? usage.contextWindow ?? 0
-  if (!(limit > 0)) return undefined
-  return `${Math.round((total / limit) * 100)}%`
+/** The share of the context the next request fills, from the host's pressure projection. */
+const contextShare = pressure => {
+  if (pressure === undefined || pressure === null) return undefined
+  const used = pressure.projectedTokens ?? pressure.pressureTokens
+  const limit = pressure.contextWindow
+  if (!(used > 0) || !(limit > 0)) return undefined
+  return `${Math.min(100, Math.round((used / limit) * 100))}%`
+}
+
+/** The three disjoint prompt-side billing buckets, as the host's UsagePill sums them. */
+const billedInput = usage =>
+  (usage.uncachedInputTokens ?? 0) + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
+
+/** The cache-hit share the host shows: cache reads over billed prompt input. */
+const cacheHitPercent = usage => {
+  const prompt = billedInput(usage)
+  if (!(prompt > 0)) return undefined
+  return Math.round(((usage.cacheReadTokens ?? 0) / prompt) * 100)
 }
 
 /**
  * The line the host's composer shows under the input: turns and steps, the rate, the
  * tokens of the context, the cache hit and the share of the context.
  */
-export function UsageLine({ stats, usage }) {
+export function UsageLine({ stats, usage, pressure }) {
   const parts = useMemo(() => {
     const left = []
     const right = []
@@ -46,18 +57,17 @@ export function UsageLine({ stats, usage }) {
       if (speed !== undefined) left.push(speed)
     }
     if (usage !== undefined && usage !== null) {
-      const total = (usage.uncachedInputTokens ?? 0) + (usage.cachedInputTokens ?? 0) + (usage.outputTokens ?? 0)
+      const total = billedInput(usage) + (usage.outputTokens ?? 0)
       if (total > 0) {
         right.push(`${shortCount(total)} tok`)
-        const cached = usage.cachedInputTokens ?? 0
-        const uncached = usage.uncachedInputTokens ?? 0
-        if (cached + uncached > 0) right.push(t('cache hit {percent}%', { percent: Math.round((cached / (cached + uncached)) * 100) }))
-        const share = contextShare(usage)
-        if (share !== undefined) right.push(share)
+        const hit = cacheHitPercent(usage)
+        if (hit !== undefined) right.push(t('cache hit {percent}%', { percent: hit }))
       }
     }
+    const share = contextShare(pressure)
+    if (share !== undefined) right.push(share)
     return [left, right]
-  }, [stats, usage])
+  }, [stats, usage, pressure])
   const [left, right] = parts
   if (left.length === 0 && right.length === 0) return null
   return h('div', { className: 'bt-usage' },

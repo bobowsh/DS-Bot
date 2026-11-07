@@ -26952,14 +26952,20 @@ var shortCount = (value) => {
   if (value >= 1e3) return `${(value / 1e3).toFixed(value >= 1e5 ? 0 : 1)}K`;
   return String(value);
 };
-var contextShare = (usage) => {
-  const total = (usage.uncachedInputTokens ?? 0) + (usage.cachedInputTokens ?? 0) + (usage.outputTokens ?? 0);
-  if (total <= 0) return void 0;
-  const limit = usage.contextLimit ?? usage.contextWindow ?? 0;
-  if (!(limit > 0)) return void 0;
-  return `${Math.round(total / limit * 100)}%`;
+var contextShare = (pressure) => {
+  if (pressure === void 0 || pressure === null) return void 0;
+  const used = pressure.projectedTokens ?? pressure.pressureTokens;
+  const limit = pressure.contextWindow;
+  if (!(used > 0) || !(limit > 0)) return void 0;
+  return `${Math.min(100, Math.round(used / limit * 100))}%`;
 };
-function UsageLine({ stats, usage }) {
+var billedInput = (usage) => (usage.uncachedInputTokens ?? 0) + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0);
+var cacheHitPercent = (usage) => {
+  const prompt = billedInput(usage);
+  if (!(prompt > 0)) return void 0;
+  return Math.round((usage.cacheReadTokens ?? 0) / prompt * 100);
+};
+function UsageLine({ stats, usage, pressure }) {
   const parts = (0, import_react62.useMemo)(() => {
     const left2 = [];
     const right2 = [];
@@ -26969,18 +26975,17 @@ function UsageLine({ stats, usage }) {
       if (speed !== void 0) left2.push(speed);
     }
     if (usage !== void 0 && usage !== null) {
-      const total = (usage.uncachedInputTokens ?? 0) + (usage.cachedInputTokens ?? 0) + (usage.outputTokens ?? 0);
+      const total = billedInput(usage) + (usage.outputTokens ?? 0);
       if (total > 0) {
         right2.push(`${shortCount(total)} tok`);
-        const cached = usage.cachedInputTokens ?? 0;
-        const uncached = usage.uncachedInputTokens ?? 0;
-        if (cached + uncached > 0) right2.push(t("cache hit {percent}%", { percent: Math.round(cached / (cached + uncached) * 100) }));
-        const share = contextShare(usage);
-        if (share !== void 0) right2.push(share);
+        const hit = cacheHitPercent(usage);
+        if (hit !== void 0) right2.push(t("cache hit {percent}%", { percent: hit }));
       }
     }
+    const share = contextShare(pressure);
+    if (share !== void 0) right2.push(share);
     return [left2, right2];
-  }, [stats, usage]);
+  }, [stats, usage, pressure]);
   const [left, right] = parts;
   if (left.length === 0 && right.length === 0) return null;
   return (0, import_react62.createElement)(
@@ -27814,7 +27819,7 @@ function apply(ctx) {
   }
   const UsageDock = ({ sessionId }) => {
     const values = ctx.sessions.list.getSnapshot().projectionsBySession?.[sessionId]?.values ?? {};
-    return (0, import_react63.createElement)(UsageLine, { stats: values.sessionStats, usage: values.tokenUsage });
+    return (0, import_react63.createElement)(UsageLine, { stats: values.sessionStats, usage: values.tokenUsage, pressure: values.contextPressure });
   };
   const face = () => ({ actions, hooks: { roster, ui: ui2, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, frame, sidebarPref } });
   const teamToolFace = (sessionId) => ({
