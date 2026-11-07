@@ -790,17 +790,18 @@ export function apply(ctx) {
     const binding = ctx.sessions.binding(sessionId)
     if (binding === undefined) throw new Error(`ds-bot: unknown session "${sessionId}"`)
     const chat = ctx.uiConversation.binding(binding).target('chat')
+    const ofTurn = kind => (turn) => {
+      const snapshot = chat.getSnapshot()
+      if (snapshot === undefined) throw new Error('ds-bot: Chat target is unavailable')
+      return snapshot.nodes.turnDataSource(Number(turn), kind)
+    }
     return { ...face(), keyedHooks: {
-      turnSteps: (turn) => {
-        const snapshot = chat.getSnapshot()
-        if (snapshot === undefined) throw new Error('ds-bot: Chat target is unavailable')
-        return snapshot.nodes.turnDataSource(Number(turn), 'assistant-step')
-      },
-      turnContext: (turn) => {
-        const snapshot = chat.getSnapshot()
-        if (snapshot === undefined) throw new Error('ds-bot: Chat target is unavailable')
-        return snapshot.nodes.turnDataSource(Number(turn), 'context')
-      },
+      turnSteps: ofTurn('assistant-step'),
+      turnContext: ofTurn('context'),
+      // The tools of a turn, and its own token accounting, so the chat can show
+      // what the Bot ran and how fast it wrote.
+      turnTools: ofTurn('tool-call'),
+      turnTail: ofTurn('turn-tail'),
     } }
   }
 

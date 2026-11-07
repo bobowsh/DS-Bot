@@ -302,10 +302,15 @@ test('each sub-call shows its own state, not its program\'s', () => {
   assert.match(shown(program([refused, posted])), /Couldn't post in the group.*Posted in.*Ops/)
 })
 
-test('a program with no known sub-call draws nothing, as before', () => {
+// #1: a program is a container, so it draws no row of its own; the tools it
+// dispatched are the rows, folded, with their arguments and their results.
+test('a program draws no row of its own, and its tools show folded', () => {
   assert.ok(emptied(ToolCell(props(program([])))))
-  assert.ok(emptied(ToolCell(props(program([call('bash', 'program:ptc:1'), call('read_file', 'program:ptc:2')])))))
-  assert.ok(emptied(ToolCell(props(call('bash', 'direct')))))
+  const out = shown(program([call('bash', 'program:ptc:1'), call('read_file', 'program:ptc:2')]))
+  assert.match(out, /bash/)
+  assert.match(out, /read_file/)
+  // The program itself is not listed beside the tools it ran.
+  assert.doesNotMatch(out, /run_code/)
   effects = []
 })
 

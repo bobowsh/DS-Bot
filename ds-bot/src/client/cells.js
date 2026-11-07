@@ -18,6 +18,7 @@ import { t } from './i18n.js'
 import { call } from './api.js'
 import { failureLabel } from './diagnostics.js'
 import { turnReasoning, thinkingStep, opensReply, stepActivity } from './turn-reasoning.js'
+import { CallDisclosure, ProcessView } from './process.js'
 import { parseReplies, stackReplies } from '../shared/group-replies.js'
 import { FOLD_AT, FOLD_HUGE, stripLongNote, useFold } from './fold.js'
 import { noHover, useViewport, viewBottom } from './motion.js'
@@ -252,17 +253,23 @@ function useFileMentions({ node, openFile, fileMentions, useTurnData }) {
   }, [fileMentions, openFile, seq, tail, turn])
 }
 
-export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, actions }) {
+export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useTurnTools, useTurnTail, actions }) {
   const roster = useRoster(value => value)
   const data = node.data
   const steps = useTurnSteps(String(data.turn))
   const contexts = useTurnContext(String(data.turn))
+  const tools = useTurnTools?.(String(data.turn)) ?? []
+  const tails = useTurnTail?.(String(data.turn)) ?? []
+  const tail = tails[0]
   const mentions = useFileMentions({ node, openFile, fileMentions, useTurnData })
   const hidden = Boolean(roster.roomsById[sessionId]) || isHiddenTurn(roster, sessionId, data.turn)
   const texts = groupPart === 'reasoning' ? [] : data.blocks.filter(block => block.kind === 'text' && block.text.trim() !== '').map(block => block.text)
   const running = data.status === 'running'
   const members = steps.length ? steps : [data]
   const shown = thinkingShown(roster.prefs)
+  // The thought stays behind the reader's switch: the process fold below shows
+  // the tools and the speed, not the thought, so the two do not repeat each
+  // other.
   const reasoning = groupPart === 'response' || !shown ? '' : turnReasoning(steps, data)
   // A live step of the same Turn keeps the row ticking even when it sits on an
   // earlier step's cell.
@@ -276,7 +283,14 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   // once, in the step's first cell.
   const relays = relayPart(data, groupPart) ? relaysBefore(contexts, steps, data) : []
   const activity = groupPart === 'response' ? [] : stepActivity(data)
-  if (texts.length === 0 && !reasoning && relays.length === 0 && activity.length === 0) return h(CellEmpty)
+  // The turn's process is one row, on the step that closes the turn: every step
+  // of the turn would otherwise draw its own copy of it. It holds the tools the
+  // Bot ran and how fast it wrote.
+  const closing = members.at(-1)?.step === data.step
+  const process = !hidden && groupPart === 'response' && closing
+    ? h(ProcessView, { steps: members, tools, tail, running, sessionId, turn: data.turn })
+    : null
+  if (texts.length === 0 && !reasoning && relays.length === 0 && activity.length === 0 && process === null) return h(CellEmpty)
   const selfId = roster.byId[sessionId]?.id ?? sessionId
   // The flat layout heads a reply with who speaks, once per Turn: in the step that opens
   // it, in that step's reasoning part when the reasoning shows there.
@@ -303,6 +317,7 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
       // time makes one Elapsed show settled + running.
       ...(thinking !== undefined ? { at: typeof thinking.time === 'number' ? thinking.time - (ms ?? 0) : undefined } : { ms }),
     }) : null,
+    process,
     texts.length ? h(Bubbles, { texts, roster, selfId, actions, streaming: running, sessionId, msgKey: `${sessionId}:${data.turn}:${node.key ?? data.seq ?? ''}`, useUi, mentions, fold: FOLD_HUGE, time: speaker === undefined ? data.time : undefined }) : null)
 }
 
@@ -1170,13 +1185,20 @@ export function ToolCell({ node, sessionId, useRoster, useUi, useWork, useHeldCa
   const findBot = nameOrId => roster.byId[nameOrId] ?? roster.bots.find(bot => bot.name.toLowerCase() === String(nameOrId ?? '').toLowerCase())
   const calls = hidden ? [] : callTree(root)
   const drawn = calls.filter(call => DRAWN.has(toolName(call)) || isComputerCall(toolName(call)))
+  // A tool the team has no line of its own still shows its row, folded, so the
+  // reader can see what the Bot ran, with what arguments, and what it got
+  // back. A program is a container: the tools it ran are the rows, so it is
+  // not listed beside them.
+  const plain = calls.filter(call => !drawn.includes(call) && toolName(call) !== 'run_code' && (call.subCalls ?? []).length === 0)
   // The newest call still running names the work, so a program reads as the tool it is in.
   const running = root.kind === 'tool-result' ? undefined : calls.findLast(call => call.kind !== 'tool-result')
   const note = running ? toolActivity(toolName(running), toolArgs(running).text, findBot, roster.byId[sessionId]) : null
   // A running tool shows only as the activity row's phrase.
   useLiveNote(actions, sessionId, `tool:${root.callId ?? node.key}`, note)
   useShownCards(actions, sessionId, drawn.filter(call => (CARDS.has(toolName(call)) || isComputerCall(toolName(call))) && call.callId).map(call => call.callId))
-  if (drawn.length === 0) return h(CellEmpty)
+  if (drawn.length === 0 && plain.length === 0) return h(CellEmpty)
   const env = { sessionId, roster, actions, useUi, useWork, findBot, heldCards, hooks: { useBrowserHolds, useBrowserTabs, useBrowserPages, useComputer } }
-  return h(Fragment, null, drawn.map((call, index) => h(Fragment, { key: call.callId ?? index }, renderCall(call, env))))
+  return h(Fragment, null,
+    drawn.map((call, index) => h(Fragment, { key: call.callId ?? index }, renderCall(call, env))),
+    plain.map((call, index) => h(CallDisclosure, { key: call.callId ?? `plain:${index}`, call, depth: 0 })))
 }
