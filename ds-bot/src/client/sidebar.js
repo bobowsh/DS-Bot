@@ -1069,18 +1069,15 @@ export function BotReturn({ wide, useSurface, useRoster, actions }) {
 
 // The one switch between the two surfaces: the Bot team and the classic Agent page.
 // Bot mode offers the way in, Agent mode the way back — the same click, either way.
-export function SurfaceSwitch({ wide, useSurface, useRoster, actions }) {
+export function SurfaceSwitch({ useSurface, actions }) {
   const mode = useSurface(value => value.mode)
-  const ready = useRoster(value => value.ready)
-  // Agent mode draws no team sidebar; there the way back must be reachable first.
-  useReportReady(mode === 'agent' && ready)
-  const toAgent = mode !== 'agent'
-  const label = toAgent ? t('Switch to classic Agent mode') : t('Back to the Bot team')
+  // Agent mode keeps the return chip for the way back; this one only leads out.
+  if (mode === 'agent') return null
+  const label = t('Switch to classic Agent mode')
   return h('button', {
     type: 'button', className: 'bt-return', 'aria-label': label, title: label,
-    onClick: () => actions.setSurface(toAgent ? 'agent' : 'bot'),
-  }, h(SwitchIcon),
-  wide ? h('span', { className: 'bt-return-name' }, label) : null)
+    onClick: () => actions.setSurface('agent'),
+  }, h(SwitchIcon))
 }
 
 // Agent mode has none of the shell-group styles, so the return button carries its own.

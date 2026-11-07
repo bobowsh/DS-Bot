@@ -15778,24 +15778,17 @@ function BotReturn({ wide, useSurface, useRoster, actions }) {
     wide ? (0, import_react33.createElement)("span", { className: "bt-return-name" }, t("LinkBot")) : null
   );
 }
-function SurfaceSwitch({ wide, useSurface, useRoster, actions }) {
+function SurfaceSwitch({ useSurface, actions }) {
   const mode = useSurface((value) => value.mode);
-  const ready = useRoster((value) => value.ready);
-  useReportReady(mode === "agent" && ready);
-  const toAgent = mode !== "agent";
-  const label = toAgent ? t("Switch to classic Agent mode") : t("Back to the Bot team");
-  return (0, import_react33.createElement)(
-    "button",
-    {
-      type: "button",
-      className: "bt-return",
-      "aria-label": label,
-      title: label,
-      onClick: () => actions.setSurface(toAgent ? "agent" : "bot")
-    },
-    (0, import_react33.createElement)(SwitchIcon),
-    wide ? (0, import_react33.createElement)("span", { className: "bt-return-name" }, label) : null
-  );
+  if (mode === "agent") return null;
+  const label = t("Switch to classic Agent mode");
+  return (0, import_react33.createElement)("button", {
+    type: "button",
+    className: "bt-return",
+    "aria-label": label,
+    title: label,
+    onClick: () => actions.setSurface("agent")
+  }, (0, import_react33.createElement)(SwitchIcon));
 }
 var RETURN_CSS = `
 .bt-return{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:0;border-radius:999px;background:none;color:inherit;font:inherit;font-size:14px;line-height:20px;cursor:pointer;transition:background-color .12s ease}
