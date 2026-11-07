@@ -174,6 +174,12 @@ export function install(rt) {
       if (body.enterToSend === false) state.prefs.enterToSend = false
       else if (body.enterToSend === true || body.enterToSend === null) delete state.prefs.enterToSend
     }
+    // Whether the Bot chat draws the work of a turn. False hides the process rows
+    // whatever the host's own work-details mode says.
+    if (body.processShown !== undefined) {
+      if (body.processShown === false) state.prefs.processShown = false
+      else if (body.processShown === true || body.processShown === null) delete state.prefs.processShown
+    }
     return rt.save()
   }
 
