@@ -1,10 +1,11 @@
-// The plugins the installer carries: they travel in the data directory beside the program, as
-// plain folders, and the app copies them into the profile on every start.
-//
-// The folder name is flattened (`@scope/name` -> `scope-name`), so the package name comes from
-// the folder's own manifest.
-import { readFileSync, readdirSync } from 'node:fs'
+// The factory plugins the installer carries: they live in the data directory (the app's DSH
+// home) under the profile's own node_modules, as plain folders. The build writes a factory list
+// naming them, so the first start can tell them apart from plugins the user installed later.
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+/** The profile inside the data directory whose node_modules holds the plugins. */
+export const PROFILE = 'ds-bot'
 
 /** A folder's package manifest, or undefined when it has none. */
 function readManifestSync(folder) {
@@ -15,36 +16,39 @@ function readManifestSync(folder) {
   }
 }
 
-/**
- * The plugins the installer carries, as folders in the data directory beside the program. Each
- * folder holds the plugin and the packages it depends on.
- * @param {string} dataDir - the data directory
- * @returns {{ name: string, folder: string, version: string }[]}
- */
-export function bundledPlugins(dataDir) {
-  const dir = join(dataDir, 'plugins')
-  let entries
+/** The names on the factory list the build shipped, or [] when there is none. */
+function factoryNames(dataDir) {
   try {
-    entries = readdirSync(dir, { withFileTypes: true })
+    const list = JSON.parse(readFileSync(join(dataDir, 'factory', 'plugins.json'), 'utf8'))
+    if (!Array.isArray(list.plugins)) return []
+    return list.plugins.map(p => (typeof p === 'string' ? p : p.name)).filter(n => typeof n === 'string')
   } catch {
     return []
   }
+}
+
+/**
+ * The factory plugins the installer carries, as folders in the data directory. Only names on the
+ * shipped factory list are returned, so a plugin the user installed never becomes "factory".
+ * @param {string} dataDir - the data directory (DSH home)
+ * @returns {{ name: string, folder: string, version: string }[]}
+ */
+export function bundledPlugins(dataDir) {
+  const root = join(dataDir, 'profiles', PROFILE, 'node_modules')
   const found = []
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue
-    const folder = join(dir, entry.name)
+  for (const name of factoryNames(dataDir)) {
+    const folder = join(root, ...name.split('/'))
     const manifest = readManifestSync(folder)
     if (manifest === undefined) continue
-    const name = typeof manifest.name === 'string' ? manifest.name : undefined
     const version = typeof manifest.version === 'string' ? manifest.version : undefined
-    if (name === undefined || version === undefined) continue
+    if (version === undefined) continue
     found.push({ name, folder, version })
   }
   return found.sort((a, b) => a.name.localeCompare(b.name, 'en'))
 }
 
 /**
- * The plugin folder the installer carries for one package, by its package name.
+ * The factory plugin folder for one package, by its package name.
  * @param {string} dataDir - the data directory
  * @param {string} name - the plugin's package name
  * @returns {{ folder: string, version: string } | undefined}

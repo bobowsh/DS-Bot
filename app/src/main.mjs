@@ -87,18 +87,18 @@ let installFactoryResources, pullSkillsRepo, removeDshHomeVariableWithNotice
 let installImportPlugin
 
 /**
- * The folder the installer left the plugins in, when the data directory beside the program does
- * not hold them: the installer moves them there, but it cannot when the parent folder cannot be
- * written (as under Program Files), and the first start copies them from where they are.
- * @param {string} dataDir - the data directory
- * @returns {string | undefined} the folder the plugins are in
+ * Where the factory plugins live. The installer moves its data tree beside the program, but a
+ * parent it cannot write to (as under Program Files) leaves the copy in the program folder, and
+ * the first start reads it from there instead.
+ * @param {string} dataDir - the data directory beside the program
+ * @returns {string} the data directory whose profiles/<profile>/node_modules holds the plugins
  */
-export function bundledPluginFolder(dataDir) {
-  const beside = join(dataDir, 'plugins')
-  if (existsSync(beside)) return beside
-  const program = dirname(app.getPath('exe'))
-  const fallback = join(program, 'data', 'plugins')
-  return existsSync(fallback) ? fallback : undefined
+export function bundledDataHome(dataDir) {
+  const programData = join(dirname(app.getPath('exe')), 'data')
+  const hasPlugins = root => existsSync(join(root, 'factory', 'plugins.json'))
+  if (hasPlugins(dataDir)) return dataDir
+  if (hasPlugins(programData)) return programData
+  return dataDir
 }
 
 let mainWindow
@@ -461,11 +461,12 @@ async function boot(mine) {
   // Also the check that the data folder can be written.
   mkdirSync(profileDir(), { recursive: true })
   // The bundled plugins belong to the profile, not to the app: the user may turn each one off in
-  // the plugin manager. They travel with the installer and are unpacked into the profile here,
-  // before the Host starts, so the profile already holds them when DSH composes the bundle list.
-  // A plugin turned off stays off: installImportPlugin reads the profile's own manifest and does
-  // not put a bundle back into a list the user removed it from.
-  for (const entry of bundledPlugins(places.dataDir)) {
+  // the plugin manager. They travel with the installer in a DSH home tree and are recorded in the
+  // profile before the Host starts, so the profile already holds them when DSH composes the
+  // bundle list. A plugin turned off stays off: installImportPlugin reads the profile's own
+  // manifest and does not put a bundle back into a list the user removed it from.
+  const factoryHome = bundledDataHome(places.dataDir)
+  for (const entry of bundledPlugins(factoryHome)) {
     await installImportPlugin({
       profileDir: profileDir(),
       folder: entry.folder,

@@ -1,20 +1,20 @@
 // The import plugin, put into the profile the way a plugin the user installed would be.
 //
-// The plugin travels with the installer as a plain folder in the data directory and is copied
-// into the profile's own node_modules on every start, so the install never reaches the network
-// and an updated app brings an updated plugin. It is deliberately not a dependency of the app:
-// a package the app itself provides is shown as part of the installation and offers no switch,
-// while one the profile owns is a plugin the user may turn off in the plugin manager.
+// The data directory the installer ships is a DSH home: the factory plugins already sit in the
+// profile's own node_modules. The first start only records each one in the profile's manifest
+// (and refreshes it when a newer installer carries a newer version), so the install never
+// reaches the network and an updated app brings an updated plugin. When the installer could not
+// move its tree into the data directory, the app copies the folders in from the program folder.
+// It is deliberately not a dependency of the app: a package the app itself provides is shown as
+// part of the installation and offers no switch, while one the profile owns is a plugin the user
+// may turn off in the plugin manager.
 //
 // The plugin manager removes a bundle from the profile's bundle list when the user turns it off
 // and leaves the package in the profile's dependencies. The app reads that: a plugin the profile
 // depends on but does not list was turned off, and putting it back would undo the choice.
-//
-// The package is copied, not linked: the profile's node_modules belongs to the profile, and the
-// files in the data directory are read once at the start.
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 
 export const PLUGIN_NAME = 'dsh-chat-import'
 
@@ -99,14 +99,17 @@ export async function installImportPlugin({ profileDir, folder, name = PLUGIN_NA
   // same version is left alone, and so is one that is newer than the installer (a user who put
   // a newer plugin in place keeps it).
   const updated = targetVersion !== sourceVersion && newerVersion(sourceVersion, targetVersion ?? '0.0.0')
-  if (!existsSync(target) || updated) {
+  // When the data directory is itself the profile's home, the folder is already the target: do
+  // not copy a directory onto itself. The manifest still records the plugin so DSH lists it.
+  const same = resolve(target) === resolve(folder)
+  if (!same && (!existsSync(target) || updated)) {
     if (existsSync(target)) await rm(target, { recursive: true, force: true })
     if (!existsSync(folder)) return { installed: false, updated: false, listed: false }
     // The plugin's own dependencies travel in the folder's node_modules; they belong beside
     // the plugin in the profile, where Node resolves a package's imports from. A plugin
     // without dependencies has no such folder.
     if (existsSync(join(folder, 'node_modules'))) {
-      await cp(join(folder, 'node_modules'), join(profileDir, 'node_modules'), { recursive: true })
+      await cp(join(folder, 'node_modules'), join(profileDir, 'node_modules'), { recursive: true, force: true })
     }
     await cp(folder, target, { recursive: true })
   }
