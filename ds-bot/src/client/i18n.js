@@ -172,6 +172,8 @@ const ZH = {
   'This DSH cannot load connectors': '这个 DSH 不能加载连接器',
   'No such connector': '没有这个连接器',
   'Classic Agent mode': '经典 Agent 模式',
+  'cache hit {percent}%': '缓存命中 {percent}%',
+  '{turns} turns, {steps} steps': '{turns} 轮 {steps} 步',
   'Show the work of this turn': '展开这一轮做过的事',
   'Hide the work of this turn': '收起这一轮做过的事',
   'Switch to classic Agent mode': '切换经典 Agent 模式',

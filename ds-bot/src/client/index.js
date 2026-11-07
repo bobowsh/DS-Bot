@@ -1,3 +1,4 @@
+import { createElement as h } from 'react'
 import { call } from './api.js'
 import { isHex, inkText, paintCss } from './inks.js'
 import { DEFAULT_MASK, SHAPES, markupCache, maskOf } from './characters.js'
@@ -37,7 +38,6 @@ import { TURN_ERROR_CSS } from './turn-error.js'
 import { GOAL_CSS } from './goal.js'
 import { GROUP_SETTINGS_CSS } from './group-settings.js'
 import { FOLDER_CSS } from './folder-menu.js'
-import { USAGE_CSS } from './usage-page.js'
 import { SCHEDULE_CSS } from './schedules.js'
 import { STORAGE, migrateStorage } from './storage.js'
 import { noteLeft, setUnread, sharedMap, toggleReaction } from './shared-map.js'
@@ -51,6 +51,7 @@ import { MEMBER_CSS, MemberDock } from './member-status.js'
 import { IM_CSS } from './im-page.js'
 import { USER_MESSAGE_CSS, UserMessageCell, canDrawUserMessages } from './user-message.js'
 import { QueueDock, QUEUE_CSS } from './queue-dock.js'
+import { UsageLine, USAGE_LINE_CSS } from './usage-line.js'
 import { noticeApprovals } from './approval-notices.js'
 import { listedOpener } from './open-listed.js'
 
@@ -806,6 +807,16 @@ export function apply(ctx) {
       else if (kind === 'letgo') void actions.computerAllowForeground(botId)
     })
   }
+  // The host's own projection values for a session: its session statistics (turns, steps,
+  // the rate it measured) and its token usage. They come from the session list's own snapshot,
+  // which is the public way to read them.
+
+// The usage line under the input: the host's own readings of the session.
+const UsageDock = ({ sessionId }) => {
+  const values = ctx.sessions.list.getSnapshot().projectionsBySession?.[sessionId]?.values ?? {}
+  return h(UsageLine, { stats: values.sessionStats, usage: values.tokenUsage })
+}
+
   const face = () => ({ actions, hooks: { roster, ui, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, frame, sidebarPref } })
   // The face a team tool view gets: the team's own state, plus the browser and
   // computer hooks the handover cards read.
@@ -1036,7 +1047,7 @@ export function apply(ctx) {
     () => installCompiledStyles(SECRET_CSS + CONNECTOR_CSS + CONNECTORS_PAGE_CSS, 'secrets'),
     () => installCompiledStyles(LEARNING_CSS, 'learning'),
     () => installCompiledStyles(MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + GROUP_SETTINGS_CSS + AVATAR_LIBRARY_CSS, 'models'),
-    () => installCompiledStyles(USAGE_CSS, 'usage'),
+    () => installCompiledStyles(USAGE_LINE_CSS, 'usage'),
     () => installCompiledStyles(SCHEDULE_CSS, 'schedules'),
     () => installCompiledStyles(FEEDBACK_CSS, 'feedback'),
     () => installCompiledStyles(ABOUT_CSS, 'about'),
@@ -1071,6 +1082,7 @@ export function apply(ctx) {
     () => installCompiledStyles(CONVERSATION_CSS, 'conversation'),
     () => installCompiledStyles(TURN_ERROR_CSS, 'turn-errors'),
     () => installCompiledStyles(QUEUE_CSS, 'queue'),
+    
     () => installMentions(),
     () => installAtMenu(),
     installHeader,
@@ -1108,6 +1120,7 @@ export function apply(ctx) {
       priority: BOT_PRIORITY,
       select: owner => (owner.pendingInteraction?.kind === 'question' ? owner.pendingInteraction : null),
     }, QuestionCard),
+    () => shadow('conversation.input.dock', { id: 'bot-usage', order: -125, inject: face }, UsageDock),
     () => shadow('conversation.input.dock', { id: 'bot-members', order: -120, inject: face }, MemberDock),
     () => shadow('conversation.input.dock', { id: 'bot-model', order: -110, inject: face }, ModelChoiceDock),
     () => shadow('conversation.input.dock', { id: 'bot-question', order: -100, inject: face }, QuestionDock),

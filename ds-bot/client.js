@@ -209,6 +209,8 @@ var ZH = {
   "This DSH cannot load connectors": "这个 DSH 不能加载连接器",
   "No such connector": "没有这个连接器",
   "Classic Agent mode": "经典 Agent 模式",
+  "cache hit {percent}%": "缓存命中 {percent}%",
+  "{turns} turns, {steps} steps": "{turns} 轮 {steps} 步",
   "Show the work of this turn": "展开这一轮做过的事",
   "Hide the work of this turn": "收起这一轮做过的事",
   "Switch to classic Agent mode": "切换经典 Agent 模式",
@@ -1892,8 +1894,8 @@ function bodyOf(def, paint, flat = false) {
     return "";
   }
 }
-var eyeMarkup = ([cx, cy, w, h59, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><rect class="bt-eye" x="${-w / 2}" y="${-h59 / 2}" width="${w}" height="${h59}" rx="${w / 2}"/></g>`;
-var happyEyeMarkup = ([cx, cy, w, h59, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><path class="bt-eye-happy" opacity="0" d="M${-w * 0.62} ${h59 * 0.14}Q0 ${-h59 * 0.42} ${w * 0.62} ${h59 * 0.14}" fill="none" stroke="#000" stroke-width="${w * 0.5}" stroke-linecap="round"/></g>`;
+var eyeMarkup = ([cx, cy, w, h61, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><rect class="bt-eye" x="${-w / 2}" y="${-h61 / 2}" width="${w}" height="${h61}" rx="${w / 2}"/></g>`;
+var happyEyeMarkup = ([cx, cy, w, h61, tilt]) => `<g transform="translate(${cx} ${cy}) rotate(${tilt})"><path class="bt-eye-happy" opacity="0" d="M${-w * 0.62} ${h61 * 0.14}Q0 ${-h61 * 0.42} ${w * 0.62} ${h61 * 0.14}" fill="none" stroke="#000" stroke-width="${w * 0.5}" stroke-linecap="round"/></g>`;
 var maskBox = (size) => `maskUnits="userSpaceOnUse" x="${-size}" y="${-size}" width="${size * 3}" height="${size * 3}"`;
 var holes = (def, eyes) => `<rect x="${-def.size}" y="${-def.size}" width="${def.size * 3}" height="${def.size * 3}" fill="#fff"/>${eyes}`;
 var MASK_ID = "%MASK%";
@@ -2702,12 +2704,12 @@ function liveSprings(apply2) {
     const dt = Math.min(0.5, Math.max(1e-3, (now - last) / 1e3));
     last = now;
     const steps = Math.ceil(dt * 240);
-    const h59 = dt / steps;
+    const h61 = dt / steps;
     let moving = false;
     for (const [key, value] of values) {
       for (let index = 0; index < steps; index += 1) {
-        value.v += (-value.k * (value.x - value.to) - value.c * value.v) * h59;
-        value.x += value.v * h59;
+        value.v += (-value.k * (value.x - value.to) - value.c * value.v) * h61;
+        value.x += value.v * h61;
       }
       if (Math.abs(value.x - value.to) < 0.05 && Math.abs(value.v) < 1) {
         value.x = value.to;
@@ -26926,6 +26928,63 @@ var QUEUE_CSS = `
 .bt-queue-action:disabled{cursor:default;opacity:.45}
 `;
 
+// src/client/usage-line.js
+var import_react62 = require("react");
+var decodeSpeed = (stats) => {
+  if (stats === void 0 || stats === null) return void 0;
+  if (!(stats.decodeMs > 0) || !(stats.decodeTokens > 0)) return void 0;
+  const tps = stats.decodeTokens / (stats.decodeMs / 1e3);
+  const text = tps >= 100 ? String(Math.round(tps)) : tps.toFixed(1);
+  return `${text} tok/s`;
+};
+var shortCount = (value) => {
+  if (value >= 1e6) return `${(value / 1e6).toFixed(1)}M`;
+  if (value >= 1e3) return `${(value / 1e3).toFixed(value >= 1e5 ? 0 : 1)}K`;
+  return String(value);
+};
+var contextShare = (usage) => {
+  const total = (usage.uncachedInputTokens ?? 0) + (usage.cachedInputTokens ?? 0) + (usage.outputTokens ?? 0);
+  if (total <= 0) return void 0;
+  const limit = usage.contextLimit ?? usage.contextWindow ?? 0;
+  if (!(limit > 0)) return void 0;
+  return `${Math.round(total / limit * 100)}%`;
+};
+function UsageLine({ stats, usage }) {
+  const parts = (0, import_react62.useMemo)(() => {
+    const left2 = [];
+    const right2 = [];
+    if (stats !== void 0 && stats !== null && stats.steps !== 0) {
+      left2.push(t("{turns} turns, {steps} steps", { turns: stats.turns, steps: stats.steps }));
+      const speed = decodeSpeed(stats);
+      if (speed !== void 0) left2.push(speed);
+    }
+    if (usage !== void 0 && usage !== null) {
+      const total = (usage.uncachedInputTokens ?? 0) + (usage.cachedInputTokens ?? 0) + (usage.outputTokens ?? 0);
+      if (total > 0) {
+        right2.push(`${shortCount(total)} tok`);
+        const cached = usage.cachedInputTokens ?? 0;
+        const uncached = usage.uncachedInputTokens ?? 0;
+        if (cached + uncached > 0) right2.push(t("cache hit {percent}%", { percent: Math.round(cached / (cached + uncached) * 100) }));
+        const share = contextShare(usage);
+        if (share !== void 0) right2.push(share);
+      }
+    }
+    return [left2, right2];
+  }, [stats, usage]);
+  const [left, right] = parts;
+  if (left.length === 0 && right.length === 0) return null;
+  return (0, import_react62.createElement)(
+    "div",
+    { className: "bt-usage" },
+    left.length > 0 ? (0, import_react62.createElement)("span", { className: "bt-usage-part" }, left.join(" · ")) : null,
+    right.length > 0 ? (0, import_react62.createElement)("span", { className: "bt-usage-part" }, right.join(" · ")) : null
+  );
+}
+var USAGE_LINE_CSS = `
+.bt-usage{display:flex;align-items:center;gap:10px;margin:2px 0 4px;padding:0 10px;font-size:12px;line-height:18px;color:var(--bt-ink-2);min-width:0}
+.bt-usage-part{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+`;
+
 // src/client/approval-notices.js
 function noticeApprovals({ work, roster, shownSession, openSession, since = Date.now() }) {
   const told = /* @__PURE__ */ new Set();
@@ -26991,6 +27050,7 @@ function listedOpener({ list, open, refresh, current }) {
 }
 
 // src/client/index.js
+var import_react63 = require("react");
 var inject = ["sessions", "uiWorkspace", "uiConversation", "slots", "theme", "layout", "configForms"];
 function apply(ctx) {
   ctx.effect(() => installLocale(ctx.get("locale")), "ds-bot: interface copy");
@@ -27742,6 +27802,10 @@ function apply(ctx) {
       else if (kind === "letgo") void actions.computerAllowForeground(botId);
     });
   }
+  const UsageDock = ({ sessionId }) => {
+    const values = ctx.sessions.list.getSnapshot().projectionsBySession?.[sessionId]?.values ?? {};
+    return (0, import_react63.createElement)(UsageLine, { stats: values.sessionStats, usage: values.tokenUsage });
+  };
   const face = () => ({ actions, hooks: { roster, ui: ui2, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, frame, sidebarPref } });
   const teamToolFace = (sessionId) => ({
     actions,
@@ -27943,7 +28007,7 @@ function apply(ctx) {
     () => installCompiledStyles(SECRET_CSS + CONNECTOR_CSS + CONNECTORS_PAGE_CSS, "secrets"),
     () => installCompiledStyles(LEARNING_CSS, "learning"),
     () => installCompiledStyles(MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + GROUP_SETTINGS_CSS + AVATAR_LIBRARY_CSS, "models"),
-    () => installCompiledStyles(USAGE_CSS, "usage"),
+    () => installCompiledStyles(USAGE_LINE_CSS, "usage"),
     () => installCompiledStyles(SCHEDULE_CSS, "schedules"),
     () => installCompiledStyles(FEEDBACK_CSS, "feedback"),
     () => installCompiledStyles(ABOUT_CSS, "about"),
@@ -28015,6 +28079,7 @@ function apply(ctx) {
       priority: BOT_PRIORITY,
       select: (owner) => owner.pendingInteraction?.kind === "question" ? owner.pendingInteraction : null
     }, QuestionCard),
+    () => shadow("conversation.input.dock", { id: "bot-usage", order: -125, inject: face }, UsageDock),
     () => shadow("conversation.input.dock", { id: "bot-members", order: -120, inject: face }, MemberDock),
     () => shadow("conversation.input.dock", { id: "bot-model", order: -110, inject: face }, ModelChoiceDock),
     () => shadow("conversation.input.dock", { id: "bot-question", order: -100, inject: face }, QuestionDock),
