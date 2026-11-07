@@ -7,7 +7,6 @@
 // DevTools Protocol to the app's page, because the group header is rendered by
 // Chromium: it has no accessibility handle to invoke, so the only reliable way
 // to turn it is the element's own click.
-import { readFileSync } from 'node:fs'
 
 const port = process.argv[2] ?? '9240'
 const roundsArg = process.argv.find(arg => arg.startsWith('--rounds='))
