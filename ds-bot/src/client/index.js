@@ -7,7 +7,7 @@ import { themeCss, shellTokens, registry, registerShape, registerTheme, allTheme
 import { MENTION_ORIGIN, currentPart } from './text.js'
 import { SHELL_CSS, CONVERSATION_CSS, installStyles, installCompiledStyles } from './styles.js'
 import { lookOf } from './mark.js'
-import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, BotReturn, SIDEBAR_CSS, RETURN_CSS, holdShellShortcuts, openHarnessOnboarding, openHarnessSettings, MODELS_STEP, MODELS_STEP_ORDER, OpenModelsStep } from './sidebar.js'
+import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, BotReturn, SurfaceSwitch, SIDEBAR_CSS, RETURN_CSS, holdShellShortcuts, openHarnessOnboarding, openHarnessSettings, MODELS_STEP, MODELS_STEP_ORDER, OpenModelsStep } from './sidebar.js'
 import { frameLayout, readSidebar, writeSidebar, toggledPref, DSH_NARROW } from './frame-layout.js'
 import { installFrameWatch } from './frame-watch.js'
 import { HeaderPill } from './header.js'
@@ -425,11 +425,20 @@ export function apply(ctx) {
   // host exposes it, so the row waits for it.
   const chatSettings = ctx.get('configForms')?.get('ui-chat')
   if (chatSettings !== undefined) {
+    // A profile that never chose a work-details mode opens on the host's default, which
+    // folds a settled turn's process rows away. The team's point is showing what the Bots
+    // ran, so an unchosen mode is put on the one that keeps those rows; a mode the user
+    // picked is never overwritten.
+    const ensureMode = () => {
+      const value = chatSettings.getSnapshot().value
+      if (value?.transcriptView === undefined) void chatSettings.set('transcriptView', 'verbose').catch(() => {})
+    }
     const adopt = () => {
       const value = chatSettings.getSnapshot().value
       workDetails.set(value?.transcriptView)
     }
     ctx.effect(() => {
+      ensureMode()
       adopt()
       return chatSettings.subscribe(adopt)
     }, 'ds-bot: the host work details')
@@ -1110,6 +1119,9 @@ export function apply(ctx) {
   ctx.effect(() => installCompiledStyles(RETURN_CSS, 'return'), 'ds-bot: return styles')
   ctx.effect(() => installCompiledStyles(COMPUTER_CSS, 'computer'), 'ds-bot: computer styles')
   shadow('sidebar.footer.action', { id: 'bot-return', order: -300, inject: face }, BotReturn)
+  // The way between the Bot team and the classic Agent page, one click either way. It sits
+  // next to the return button and shows in both modes, so a way back always exists.
+  shadow('sidebar.footer.action', { id: 'bot-surface', order: -290, inject: face }, SurfaceSwitch)
 
   // The main view decides `plain`: a DSH Agent Session keeps the Bot shell but
   // withdraws the conversation replacements, so the native dsh page shows. A jump

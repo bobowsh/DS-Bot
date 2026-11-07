@@ -87,10 +87,14 @@ function WidthSlider({ label, value, save }) {
 function WorkDetailsRow({ label, mode, setMode }) {
   if (mode === undefined) return null
   return h(SetRow, { label },
-    h(Choice, {
-      label, value: mode, options: WORK_DETAILS,
-      pick: id => { setMode(id) },
-    }))
+    h('div', null,
+      h(Choice, {
+        label, value: mode, options: WORK_DETAILS,
+        pick: id => { setMode(id) },
+      }),
+      // Only the fully expanded mode keeps the process rows of a turn that has
+      // settled: the others fold them away as soon as the reply is done.
+      h('div', { className: 'bt-set-hint' }, t('Only “Full details” keeps the process rows of a finished turn.'))))
 }
 
 function GeneralPage({ roster, actions, run }) {
