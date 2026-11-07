@@ -210,6 +210,8 @@ var ZH = {
   "No such connector": "没有这个连接器",
   "Classic Agent mode": "经典 Agent 模式",
   "cache hit {percent}%": "缓存命中 {percent}%",
+  "Work details": "工作步骤",
+  "Show the work of a turn": "显示这一轮做过的事",
   "{turns} turns, {steps} steps": "{turns} 轮 {steps} 步",
   "Show the work of this turn": "展开这一轮做过的事",
   "Hide the work of this turn": "收起这一轮做过的事",
@@ -516,7 +518,6 @@ var ZH = {
   "Bubble width": "气泡宽度",
   "Text width": "正文宽度",
   "Show thinking": "显示思考过程",
-  "Work details": "工作步骤展示",
   "Enter sends message": "回车发送消息",
   "Bots · {count}": "Bot · {count}",
   "First in the sidebar. Pick another Bot to hand it the role; {name} then stops being a Main Bot.": "排在侧栏最上面。选另一个 Bot 就会把主 Bot 交给它，{name} 随之不再是主 Bot。",
@@ -13465,7 +13466,7 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
   const running = data.status === "running";
   const members = steps.length ? steps : [data];
   const shown = reasoningShown(useWorkDetails?.((value) => value));
-  const folded = turnProcess !== void 0 && turnProcess.foldable && !turnProcess.open;
+  const folded = roster.prefs?.processShown === false || turnProcess !== void 0 && turnProcess.foldable && !turnProcess.open;
   const reasoning = groupPart === "response" || !shown ? "" : turnReasoning(steps, data);
   const thinking = groupPart === "response" || !shown ? void 0 : thinkingStep(members);
   const ms = useThinkingMs({ sessionId, turn: data.turn, settledSteps: members.filter((step) => step.status !== "running").length, skip: hidden || reasoning === "" });
@@ -22951,6 +22952,15 @@ function GeneralPage({ roster, actions, run: run2 }) {
         SetRow,
         { label: t("Enter sends message") },
         (0, import_react53.createElement)(Switch, { label: t("Enter sends message"), on: prefs.enterToSend !== false, onChange: (enterToSend) => run2(actions.setPrefs({ enterToSend })) })
+      )
+    ),
+    (0, import_react53.createElement)(
+      SetSection,
+      { key: "work", title: t("Work details") },
+      (0, import_react53.createElement)(
+        SetRow,
+        { label: t("Show the work of a turn") },
+        (0, import_react53.createElement)(Switch, { label: t("Show the work of a turn"), on: prefs.processShown !== false, onChange: (processShown) => run2(actions.setPrefs({ processShown })) })
       )
     ),
     actions.setSurface ? (0, import_react53.createElement)(

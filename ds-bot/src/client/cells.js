@@ -271,7 +271,10 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   // toggle turns it, and the answer comes back here. The team draws the rows themselves,
   // so they follow the same state: while the host says the turn is folded, they are not
   // drawn, and the reader opens them with the host's own header.
-  const folded = turnProcess !== undefined && turnProcess.foldable && !turnProcess.open
+  // The reader can turn the work of a turn off in the Bot settings: then the rows are
+  // not drawn at all, whatever the host's own mode says.
+  const folded = roster.prefs?.processShown === false
+    || (turnProcess !== undefined && turnProcess.foldable && !turnProcess.open)
   // The host folds a finished turn's process rows behind the turn's own control, except in
   // the fully expanded mode. The team draws the rows itself, so it makes the same decision
   // here: a turn that is still running keeps its rows, a finished one folds them and leaves
