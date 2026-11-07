@@ -227,7 +227,7 @@ const props = (root, { sessionId = chief.id, roster = team(), actions = {}, turn
   phase: root?.kind === 'tool-result' ? 'result' : 'start',
   block: root?.kind === 'tool-result'
     ? { ...root, turn: root.turn ?? turn }
-    : { phase: 'start', name: root?.name ?? root?.call?.name ?? '', argsRaw: root?.argsRaw ?? root?.call?.argsRaw ?? '', subCalls: root?.subCalls ?? [], turn: root?.turn ?? turn },  useRoster: select => select(roster), useUi: select => select({ reactions: {}, visits: {} }), actions,
+    : { phase: 'start', name: root?.name ?? root?.call?.name ?? '', callId: root?.callId, argsRaw: root?.argsRaw ?? root?.call?.argsRaw ?? '', subCalls: root?.subCalls ?? [], turn: root?.turn ?? turn },  useRoster: select => select(roster), useUi: select => select({ reactions: {}, visits: {} }), actions,
   useHeldCards: select => select(held),
 })
 
@@ -460,9 +460,13 @@ test('a slot keeps its emptied state in step with what it holds', () => {
 
 test('a hidden Bot-to-Bot turn draws none of its sub-calls', () => {
   const roster = team({ exchangeTurns: { chief: [1] }, secretRequests: { chief: [request('program:ptc:1')] } })
-  const root = program([call('request_secret', 'program:ptc:1', { args: { name: 'DEMO_TOKEN' }, turn: 1 }), call('message_bot', 'program:ptc:2', { args: { to: 'Writer' }, turn: 1 })])
-  assert.equal(shown(root, { roster }), '')
-  assert.match(shown(root, { roster, turn: 2 }), /Chief needs a key.*Messaged/)
+  // The host dispatches each call with the turn it belongs to, so the calls of the
+  // exchange turn are the team's business and show nowhere.
+  const exchange = program([call('request_secret', 'program:ptc:1', { args: { name: 'DEMO_TOKEN' }, turn: 1 }), call('message_bot', 'program:ptc:2', { args: { to: 'Writer' }, turn: 1 })])
+  assert.equal(shown(exchange, { roster }), '')
+  // The same calls on the following turn are the user's answer, and they draw.
+  const answer = program([call('request_secret', 'program:ptc:1', { args: { name: 'DEMO_TOKEN' }, turn: 2 }), call('message_bot', 'program:ptc:2', { args: { to: 'Writer' }, turn: 2 })])
+  assert.match(shown(answer, { roster }), /Chief needs a key.*Messaged/)
 })
 
 // The line a memory write that changed nothing draws.
@@ -605,7 +609,8 @@ test('the live note follows the running call the host draws', () => {
   const shell = notes(call('bash', 'program:ptc:1', { running: true }))
   assert.deepEqual(shell, [])
   const between = notes(call('message_bot', 'program:ptc:1', { args: { to: 'Writer' } }))
-  assert.equal(between[0].entry.label, null)
+  // A call that has settled notes nothing: the host's activity row is the only one left.
+  assert.deepEqual(between, [])
   const roster = team({ exchangeTurns: { chief: [1] } })
   assert.deepEqual(notes(call('message_bot', 'program:ptc:1', { args: { to: 'Writer' }, running: true }), { roster }), [])
   assert.equal(notes(call('message_bot', 'direct', { args: { to: 'Writer' }, running: true }))[0].entry.label, 'Asking Writer')
@@ -619,25 +624,35 @@ const cardStore = () => {
 }
 const draw = (root, store, options = {}) => {
   effects = []
-  TeamToolView(props(root, { ...options, actions: { noteCards: store.noteCards } }))
-  const unmount = mount()
-  return { out: show(root, options), unmount }
+  const unmounts = []
+  const seen = new Set()
+  const visit = call => {
+    if (call === undefined || call === null) return
+    const id = call.callId ?? call
+    if (seen.has(id)) return
+    seen.add(id)
+    if (isTeam(call)) {
+      TeamToolView(props(call, { ...options, actions: { noteCards: store.noteCards } }))
+      unmounts.push(mount())
+    }
+    for (const child of call.subCalls ?? []) visit(child)
+  }
+  visit(root)
+  return { out: show(root, options), unmount: () => { for (const unmount of unmounts) unmount() } }
 }
 
 test('a cell tells the docks which card calls it draws, until it unmounts', () => {
   const store = cardStore()
   const root = program([call('ask_user', 'program:ptc:1'), call('request_secret', 'program:ptc:2'), call('message_bot', 'program:ptc:3')])
-  TeamToolView(props(root, { actions: { noteCards: store.noteCards } }))
-  const unmount = mount()
+  const first = draw(root, store)
   assert.deepEqual(JSON.parse(JSON.stringify(store.state)), { chief: { 'program:ptc:1': 1, 'program:ptc:2': 1 } })
-  TeamToolView(props(root, { actions: { noteCards: store.noteCards } }))
-  const second = mount()
+  const second = draw(root, store)
   assert.equal(store.state.chief['program:ptc:1'], 2)
-  second()
-  unmount()
+  second.unmount()
+  first.unmount()
   assert.deepEqual(JSON.parse(JSON.stringify(store.state)), { chief: {} })
-  TeamToolView(props(root, { actions: { noteCards: store.noteCards }, roster: team({ exchangeTurns: { chief: [1] } }) }))
-  mount()
+  // A hidden turn draws none of its calls, so it tells the docs of none either.
+  draw(root, store, { roster: team({ exchangeTurns: { chief: [1] } }) })
   assert.deepEqual(JSON.parse(JSON.stringify(store.state)), { chief: {} })
 })
 
@@ -845,7 +860,8 @@ test('a PTC group relay shows its replies from the sub-call, live and after relo
   const asked = []
   const actions = { roomProgress: async (id) => { asked.push(id); return progress } }
   const running = program([call('group_relay', 'call-1-1:ptc:1', { running: true })], { running: true })
-  const relay = find(TeamToolView(props(running, { sessionId: 'room', actions })), node => node.type?.name === 'GroupReplies')
+  // The host dispatches the relay sub-call itself, not the program around it.
+  const relay = find(TeamToolView(props(running.subCalls[0], { sessionId: 'room', actions })), node => node.type?.name === 'GroupReplies')
   effects = []
   sets.length = 0
   relay.type(relay.props)
