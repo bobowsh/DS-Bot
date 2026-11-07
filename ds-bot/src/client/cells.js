@@ -253,7 +253,7 @@ function useFileMentions({ node, openFile, fileMentions, useTurnData }) {
   }, [fileMentions, openFile, seq, tail, turn])
 }
 
-export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useWorkDetails, actions }) {
+export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useWorkDetails, turnProcess, actions }) {
   const roster = useRoster(value => value)
   const data = node.data
   const steps = useTurnSteps(String(data.turn))
@@ -267,6 +267,18 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   // compact folds it away, the rest show its first line. The team follows it, so
   // the chat and the host's settings never disagree.
   const shown = reasoningShown(useWorkDetails?.(value => value))
+  // The host draws the header of a folded turn and keeps the state of the fold: its own
+  // toggle turns it, and the answer comes back here. The team draws the rows themselves,
+  // so they follow the same state: while the host says the turn is folded, they are not
+  // drawn, and the reader opens them with the host's own header.
+  // The reader can turn the work of a turn off in the Bot settings: then the rows are
+  // not drawn at all, whatever the host's own mode says.
+  const folded = roster.prefs?.processShown === false
+    || (turnProcess !== undefined && turnProcess.foldable && !turnProcess.open)
+  // The host folds a finished turn's process rows behind the turn's own control, except in
+  // the fully expanded mode. The team draws the rows itself, so it makes the same decision
+  // here: a turn that is still running keeps its rows, a finished one folds them and leaves
+  // a header the reader can open.
   const reasoning = groupPart === 'response' || !shown ? '' : turnReasoning(steps, data)
   // A live step of the same Turn keeps the row ticking even when it sits on an
   // earlier step's cell.
@@ -300,8 +312,8 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
       })
     }),
     head ? h(SpeakerHead, { bot: speaker, time: data.time }) : null,
-    activity.length ? h('div', { className: 'bt-agent-activity' }, activity.map((line, index) => h('div', { key: index, className: 'bt-agent-act', title: line }, h('span', { className: 'bt-agent-act-mark', 'aria-hidden': true }), h('span', { className: 'bt-agent-act-text' }, activityParts(line))))) : null,
-    reasoning ? h(ThinkingRow, {
+    !folded && activity.length ? h('div', { className: 'bt-agent-activity' }, activity.map((line, index) => h('div', { key: index, className: 'bt-agent-act', title: line }, h('span', { className: 'bt-agent-act-mark', 'aria-hidden': true }), h('span', { className: 'bt-agent-act-text' }, activityParts(line))))) : null,
+    !folded && reasoning ? h(ThinkingRow, {
       text: reasoning, live: thinking !== undefined, viewKey: `${sessionId}:${data.turn}`,
       // The live clock counts the settled steps too: backing `at` by the settled
       // time makes one Elapsed show settled + running.
@@ -747,28 +759,6 @@ function NewDivider() {
   return h('div', { className: 'bt-new-sep', role: 'separator', 'aria-label': t('New messages') }, h('span', null, t('New')))
 }
 
-export function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTurnClock, actions }) {
-  const open = turnProcess === undefined || !turnProcess.foldable || turnProcess.open
-  useEffect(() => {
-    if (!open) turnProcess.setOpen(true)
-  }, [open, turnProcess])
-  const turn = node?.location?.turn?.turn ?? node?.data?.turn
-  const start = node?.location?.turn?.start?.time
-  const hidden = useRoster(roster => isHiddenTurn(roster, sessionId, turn))
-  // Exchange turns hide their replies but still show their trigger chip, so their start
-  // counts for separators too.
-  useEffect(() => {
-    actions.noteTurnTime(sessionId, turn, 'first', start)
-  }, [sessionId, turn, start])
-  // The reply to a turn the user saw begin arrived while the user was away.
-  const visit = useUi(state => state.visits?.[sessionId])
-  const fresh = useTurnClock((state) => {
-    const own = state[sessionId]?.[turn]
-    return !hidden && typeof visit?.seen === 'number' && own?.first !== undefined && own.first <= visit.seen
-      && own.end !== undefined && own.end > visit.seen && own.end <= visit.entered
-  })
-  return fresh ? h(NewDivider) : h(CellEmpty)
-}
 
 export function Nothing() { return null }
 

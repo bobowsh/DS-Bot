@@ -1024,13 +1024,9 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 [class*="_scroll"]>[class*="_column"]::before{content:var(--bt-first-sep,none);display:block;flex:none;height:28px;margin:17px 0 12px;font-size:12px;line-height:28px;text-align:center;color:var(--bt-ink-2);white-space:nowrap}
 .bt-activity{display:flex;align-items:center;gap:10px;margin:8px 0 4px 2px;font-size:14px;color:var(--bt-ink-2)}
 .bt-group-replies{display:contents}
-/* A Bot chat is flat in every work-details mode, without changing the user's mode
-   (it is a DSH-wide setting): step groups lose their header and stay open, and what a
-   mode folds away in a finished turn stays shown. TurnProcessCell also opens that
-   fold; these rules cover the first frame before it does. */
-[data-step-process]>div:first-child{display:none!important}
-[data-step-process]>[data-step-process-body]{display:block!important;content-visibility:visible!important;max-height:none!important;overflow:visible!important;mask-image:none!important;scrollbar-gutter:auto!important}
-:is([data-step-process],[data-turn-process-hidden])[hidden]{content-visibility:visible!important}
+/* The work-details mode is the Host's own setting, and it decides what a finished
+   turn folds away. The team follows it: the Host draws the header and the fold, and the
+   rules below only take the empty seats away. */
 [class*="_flowItem"]:has(> [data-slot="conversation.chat.node"]:empty, > [data-slot="conversation.chat.node"][data-bt-emptied]){display:none!important}
 /* A turn's process seat is a flow child of its own, not a flowItem: a seat whose
    member cells all emptied themselves (a hidden exchange turn, a turn whose
@@ -1248,6 +1244,9 @@ div:has(> nav [class*="_marks"]){display:none!important}
 .bt-agent-session.is-current{background:var(--bt-hover);cursor:default;font-weight:600}
 .bt-agent-session-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .bt-agent-session-meta{flex:0 0 auto;font-size:12px;font-weight:400;color:var(--bt-ink-3,var(--bt-ink-2))}
+.bt-fold-header{display:inline-flex;align-items:center;gap:8px;margin:2px 0 4px;padding:2px 8px;border:0;border-radius:999px;background:none;color:var(--bt-ink-2);font:inherit;font-size:12.5px;line-height:18px;cursor:pointer;transition:background-color .12s ease}
+.bt-fold-header:hover{background:var(--bt-hover)}
+.bt-fold-header-mark{flex:none;width:0;height:0;border-left:5px solid var(--bt-ink-3,currentColor);border-top:4px solid transparent;border-bottom:4px solid transparent;opacity:.6}
 .bt-agent-activity{display:flex;flex-direction:column;gap:2px;margin:4px 0 6px;max-width:100%}
 .bt-agent-act{display:flex;align-items:center;gap:8px;min-height:22px;font-size:12.5px;line-height:18px;color:var(--bt-ink-2);min-width:0}
 .bt-agent-act-mark{flex:0 0 6px;width:6px;height:6px;border-radius:50%;background:var(--bt-ink-3,currentColor);opacity:.55}

@@ -483,6 +483,10 @@ async function boot(mine) {
   }
   // Also the check that the data folder can be written.
   mkdirSync(profileDir(), { recursive: true })
+  // The Host's workspace storage races its own first session on a brand-new data
+  // directory: the first session attaches while the storage file is still going through
+  // its temporary file, and every factory Bot fails to attach. That is a Host defect (the
+  // storage is not ours to write), so the app does not seed it; the upstream issue tracks it.
   // The bundled plugins belong to the profile, not to the app: the user may turn each one off in
   // the plugin manager. They travel with the installer and are unpacked into the profile here,
   // before the Host starts, so the profile already holds them when DSH composes the bundle list.
