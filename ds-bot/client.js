@@ -27978,6 +27978,7 @@ function apply(ctx) {
       name: "tool.call.toolview",
       key,
       locale: "conversation",
+      priority: BOT_PRIORITY,
       inject: (sessionId) => teamToolFace(sessionId)
     }, TeamToolView)));
     return () => {

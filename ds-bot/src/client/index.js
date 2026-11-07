@@ -1010,9 +1010,14 @@ export function apply(ctx) {
   // The team's own tools ride the host's tool view slot: the host draws every
   // call as a folded row and dispatches it by wire name, so the team keeps its
   // own rows while every other tool falls through to the host's.
+  //
+  // The priority is what lets the team shadow a plugin that already registered
+  // the same wire name: the host refuses a second entry for a key at the same
+  // priority, and that refusal takes the whole shell group down with it, so the
+  // team interface never comes up. A lower priority wins the key.
   const installTeamTools = () => {
     const disposers = TEAM_TOOLS.map(key => ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
-      name: 'tool.call.toolview', key, locale: 'conversation', inject: sessionId => teamToolFace(sessionId),
+      name: 'tool.call.toolview', key, locale: 'conversation', priority: BOT_PRIORITY, inject: sessionId => teamToolFace(sessionId),
     }, TeamToolView)))
     return () => { for (const dispose of disposers) dispose() }
   }
