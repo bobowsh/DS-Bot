@@ -209,6 +209,7 @@ var ZH = {
   "This DSH cannot load connectors": "这个 DSH 不能加载连接器",
   "No such connector": "没有这个连接器",
   "Classic Agent mode": "经典 Agent 模式",
+  "Show the work of this turn": "展开这一轮做过的事",
   "Switch to classic Agent mode": "切换经典 Agent 模式",
   "Back to the Bot team": "回到 Bot 团队界面",
   "Only “Full details” keeps the process rows of a finished turn.": "只有「完全展开」会保留已完成轮次的过程行。",
@@ -4251,6 +4252,9 @@ div:has(> nav [class*="_marks"]){display:none!important}
 .bt-agent-session.is-current{background:var(--bt-hover);cursor:default;font-weight:600}
 .bt-agent-session-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .bt-agent-session-meta{flex:0 0 auto;font-size:12px;font-weight:400;color:var(--bt-ink-3,var(--bt-ink-2))}
+.bt-fold-header{display:inline-flex;align-items:center;gap:8px;margin:2px 0 4px;padding:2px 8px;border:0;border-radius:999px;background:none;color:var(--bt-ink-2);font:inherit;font-size:12.5px;line-height:18px;cursor:pointer;transition:background-color .12s ease}
+.bt-fold-header:hover{background:var(--bt-hover)}
+.bt-fold-header-mark{flex:none;width:0;height:0;border-left:5px solid var(--bt-ink-3,currentColor);border-top:4px solid transparent;border-bottom:4px solid transparent;opacity:.6}
 .bt-agent-activity{display:flex;flex-direction:column;gap:2px;margin:4px 0 6px;max-width:100%}
 .bt-agent-act{display:flex;align-items:center;gap:8px;min-height:22px;font-size:12.5px;line-height:18px;color:var(--bt-ink-2);min-width:0}
 .bt-agent-act-mark{flex:0 0 6px;width:6px;height:6px;border-radius:50%;background:var(--bt-ink-3,currentColor);opacity:.55}
@@ -13451,7 +13455,7 @@ function useFileMentions({ node, openFile, fileMentions, useTurnData }) {
     return tail?.closing?.finalNode.seq === seq ? fileMentions({ turn, seq, openFile }) : void 0;
   }, [fileMentions, openFile, seq, tail, turn]);
 }
-function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useWorkDetails, actions }) {
+function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useWorkDetails, turnProcess, actions }) {
   const roster = useRoster((value) => value);
   const data = node.data;
   const steps = useTurnSteps(String(data.turn));
@@ -13462,6 +13466,8 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
   const running = data.status === "running";
   const members = steps.length ? steps : [data];
   const shown = reasoningShown(useWorkDetails?.((value) => value));
+  const [, redraw] = (0, import_react31.useState)(0);
+  const folded = turnProcess !== void 0 && turnProcess.foldable && !turnProcess.open;
   const reasoning = groupPart === "response" || !shown ? "" : turnReasoning(steps, data);
   const thinking = groupPart === "response" || !shown ? void 0 : thinkingStep(members);
   const ms = useThinkingMs({ sessionId, turn: data.turn, settledSteps: members.filter((step) => step.status !== "running").length, skip: hidden || reasoning === "" });
@@ -13476,6 +13482,15 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
   return (0, import_react31.createElement)(
     import_react31.Fragment,
     null,
+    folded ? (0, import_react31.createElement)("button", {
+      type: "button",
+      className: "bt-fold-header",
+      "aria-expanded": false,
+      onClick: () => {
+        turnProcess?.setOpen?.(true);
+        redraw((n) => n + 1);
+      }
+    }, (0, import_react31.createElement)("span", { className: "bt-fold-header-mark", "aria-hidden": true }), (0, import_react31.createElement)("span", { className: "bt-fold-header-text" }, t("Show the work of this turn"))) : null,
     relays.map((relay) => {
       const source = relay.source;
       const sender = roster.byId[source.senderSessionId] ?? { id: source.senderSessionId, name: source.senderName ?? t("a Bot"), color: "gray" };
@@ -13490,8 +13505,8 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
       });
     }),
     head ? (0, import_react31.createElement)(SpeakerHead, { bot: speaker, time: data.time }) : null,
-    activity.length ? (0, import_react31.createElement)("div", { className: "bt-agent-activity" }, activity.map((line, index) => (0, import_react31.createElement)("div", { key: index, className: "bt-agent-act", title: line }, (0, import_react31.createElement)("span", { className: "bt-agent-act-mark", "aria-hidden": true }), (0, import_react31.createElement)("span", { className: "bt-agent-act-text" }, activityParts(line))))) : null,
-    reasoning ? (0, import_react31.createElement)(ThinkingRow, {
+    !folded && activity.length ? (0, import_react31.createElement)("div", { className: "bt-agent-activity" }, activity.map((line, index) => (0, import_react31.createElement)("div", { key: index, className: "bt-agent-act", title: line }, (0, import_react31.createElement)("span", { className: "bt-agent-act-mark", "aria-hidden": true }), (0, import_react31.createElement)("span", { className: "bt-agent-act-text" }, activityParts(line))))) : null,
+    !folded && reasoning ? (0, import_react31.createElement)(ThinkingRow, {
       text: reasoning,
       live: thinking !== void 0,
       viewKey: `${sessionId}:${data.turn}`,
@@ -13936,10 +13951,8 @@ function NewDivider() {
   return (0, import_react31.createElement)("div", { className: "bt-new-sep", role: "separator", "aria-label": t("New messages") }, (0, import_react31.createElement)("span", null, t("New")));
 }
 function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTurnClock, actions }) {
-  const open = turnProcess === void 0 || !turnProcess.foldable || turnProcess.open;
-  (0, import_react31.useEffect)(() => {
-    if (!open) turnProcess.setOpen(true);
-  }, [open, turnProcess]);
+  const foldable = turnProcess !== void 0 && turnProcess.foldable;
+  const open = turnProcess === void 0 || !foldable || turnProcess.open;
   const turn = node?.location?.turn?.turn ?? node?.data?.turn;
   const start = node?.location?.turn?.start?.time;
   const hidden = useRoster((roster) => isHiddenTurn(roster, sessionId, turn));
@@ -13951,7 +13964,16 @@ function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTu
     const own = state[sessionId]?.[turn];
     return !hidden && typeof visit?.seen === "number" && own?.first !== void 0 && own.first <= visit.seen && own.end !== void 0 && own.end > visit.seen && own.end <= visit.entered;
   });
-  return fresh ? (0, import_react31.createElement)(NewDivider) : (0, import_react31.createElement)(CellEmpty);
+  const header = foldable && !open ? (0, import_react31.createElement)("button", {
+    type: "button",
+    className: "bt-fold-header",
+    "aria-expanded": false,
+    onClick: () => {
+      turnProcess.setOpen(true);
+      actions.noteTurnProcess?.(sessionId, turn);
+    }
+  }, (0, import_react31.createElement)("span", { className: "bt-fold-header-mark", "aria-hidden": true }), (0, import_react31.createElement)("span", { className: "bt-fold-header-text" }, t("Show the work of this turn"))) : null;
+  return (0, import_react31.createElement)(import_react31.Fragment, null, header, fresh ? (0, import_react31.createElement)(NewDivider) : (0, import_react31.createElement)(CellEmpty));
 }
 function Nothing() {
   return null;
@@ -22894,14 +22916,14 @@ function WorkDetailsRow({ label, mode, setMode }) {
     (0, import_react53.createElement)(
       "div",
       null,
-      (0, import_react53.createElement)(Choice, {
-        label,
+      (0, import_react53.createElement)("select", {
+        className: "bt-select",
+        "aria-label": label,
         value: mode,
-        options: WORK_DETAILS,
-        pick: (id) => {
-          setMode(id);
+        onChange: (event) => {
+          if (event.target.value !== mode) setMode(event.target.value);
         }
-      }),
+      }, WORK_DETAILS.map(([id, text]) => (0, import_react53.createElement)("option", { key: id, value: id }, t(text)))),
       // Only the fully expanded mode keeps the process rows of a turn that has
       // settled: the others fold them away as soon as the reply is done.
       (0, import_react53.createElement)("div", { className: "bt-set-hint" }, t("Only “Full details” keeps the process rows of a finished turn."))

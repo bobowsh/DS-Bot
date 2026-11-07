@@ -253,7 +253,7 @@ function useFileMentions({ node, openFile, fileMentions, useTurnData }) {
   }, [fileMentions, openFile, seq, tail, turn])
 }
 
-export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useWorkDetails, actions }) {
+export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useWorkDetails, turnProcess, actions }) {
   const roster = useRoster(value => value)
   const data = node.data
   const steps = useTurnSteps(String(data.turn))
@@ -267,6 +267,16 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   // compact folds it away, the rest show its first line. The team follows it, so
   // the chat and the host's settings never disagree.
   const shown = reasoningShown(useWorkDetails?.(value => value))
+  // The host folds a finished turn's process rows behind the turn's own control, except in
+  // the fully expanded mode. The team draws the rows itself, so it makes the same decision
+  // here: a turn that is still running keeps its rows, a finished one folds them and leaves
+  // a header the reader can open.
+  const [, redraw] = useState(0)
+  // The host works out whether this turn's process rows fold, following the
+  // work-details mode the reader chose, and hands the answer over with the node. The team
+  // draws the rows itself, so it folds them when the host says so and leaves a header the
+  // reader can open again.
+  const folded = turnProcess !== undefined && turnProcess.foldable && !turnProcess.open
   const reasoning = groupPart === 'response' || !shown ? '' : turnReasoning(steps, data)
   // A live step of the same Turn keeps the row ticking even when it sits on an
   // earlier step's cell.
@@ -288,6 +298,12 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   const head = speaker !== undefined && opensReply(steps, data, shown)
     && (reasoning !== '' || (texts.length > 0 && !(groupPart === 'response' && shown && turnReasoning(steps, data) !== '')))
   return h(Fragment, null,
+    folded ? h('button', {
+      type: 'button',
+      className: 'bt-fold-header',
+      'aria-expanded': false,
+      onClick: () => { turnProcess?.setOpen?.(true); redraw(n => n + 1) },
+    }, h('span', { className: 'bt-fold-header-mark', 'aria-hidden': true }), h('span', { className: 'bt-fold-header-text' }, t('Show the work of this turn'))) : null,
     relays.map(relay => {
       const source = relay.source
       const sender = roster.byId[source.senderSessionId] ?? { id: source.senderSessionId, name: source.senderName ?? t('a Bot'), color: 'gray' }
@@ -300,8 +316,8 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
       })
     }),
     head ? h(SpeakerHead, { bot: speaker, time: data.time }) : null,
-    activity.length ? h('div', { className: 'bt-agent-activity' }, activity.map((line, index) => h('div', { key: index, className: 'bt-agent-act', title: line }, h('span', { className: 'bt-agent-act-mark', 'aria-hidden': true }), h('span', { className: 'bt-agent-act-text' }, activityParts(line))))) : null,
-    reasoning ? h(ThinkingRow, {
+    !folded && activity.length ? h('div', { className: 'bt-agent-activity' }, activity.map((line, index) => h('div', { key: index, className: 'bt-agent-act', title: line }, h('span', { className: 'bt-agent-act-mark', 'aria-hidden': true }), h('span', { className: 'bt-agent-act-text' }, activityParts(line))))) : null,
+    !folded && reasoning ? h(ThinkingRow, {
       text: reasoning, live: thinking !== undefined, viewKey: `${sessionId}:${data.turn}`,
       // The live clock counts the settled steps too: backing `at` by the settled
       // time makes one Elapsed show settled + running.
@@ -748,10 +764,11 @@ function NewDivider() {
 }
 
 export function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTurnClock, actions }) {
-  const open = turnProcess === undefined || !turnProcess.foldable || turnProcess.open
-  useEffect(() => {
-    if (!open) turnProcess.setOpen(true)
-  }, [open, turnProcess])
+  // The turn's own row: the header the reader opens the process rows with. The host works
+  // out whether the rows fold (it follows the work-details mode) and hands the answer over
+  // with the node, so the team only draws the header.
+  const foldable = turnProcess !== undefined && turnProcess.foldable
+  const open = turnProcess === undefined || !foldable || turnProcess.open
   const turn = node?.location?.turn?.turn ?? node?.data?.turn
   const start = node?.location?.turn?.start?.time
   const hidden = useRoster(roster => isHiddenTurn(roster, sessionId, turn))
@@ -767,7 +784,13 @@ export function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi
     return !hidden && typeof visit?.seen === 'number' && own?.first !== undefined && own.first <= visit.seen
       && own.end !== undefined && own.end > visit.seen && own.end <= visit.entered
   })
-  return fresh ? h(NewDivider) : h(CellEmpty)
+  const header = foldable && !open ? h('button', {
+    type: 'button',
+    className: 'bt-fold-header',
+    'aria-expanded': false,
+    onClick: () => { turnProcess.setOpen(true); actions.noteTurnProcess?.(sessionId, turn) },
+  }, h('span', { className: 'bt-fold-header-mark', 'aria-hidden': true }), h('span', { className: 'bt-fold-header-text' }, t('Show the work of this turn'))) : null
+  return h(Fragment, null, header, fresh ? h(NewDivider) : h(CellEmpty))
 }
 
 export function Nothing() { return null }

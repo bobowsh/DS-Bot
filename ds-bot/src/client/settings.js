@@ -86,12 +86,13 @@ function WidthSlider({ label, value, save }) {
 // host's own field and the chat reads it back.
 function WorkDetailsRow({ label, mode, setMode }) {
   if (mode === undefined) return null
+  // A drop-down: four modes on one row, and the choice takes effect at once.
   return h(SetRow, { label },
     h('div', null,
-      h(Choice, {
-        label, value: mode, options: WORK_DETAILS,
-        pick: id => { setMode(id) },
-      }),
+      h('select', {
+        className: 'bt-select', 'aria-label': label, value: mode,
+        onChange: event => { if (event.target.value !== mode) setMode(event.target.value) },
+      }, WORK_DETAILS.map(([id, text]) => h('option', { key: id, value: id }, t(text)))),
       // Only the fully expanded mode keeps the process rows of a turn that has
       // settled: the others fold them away as soon as the reply is done.
       h('div', { className: 'bt-set-hint' }, t('Only “Full details” keeps the process rows of a finished turn.'))))

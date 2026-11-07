@@ -2,8 +2,7 @@
 // The figures come from the host's projections (sessionStats, tokenUsage) and the rate
 // follows the host's own count (output tokens over the writing time), so the two
 // interfaces never disagree about the same session.
-import { useMemo } from 'react'
-import { t } from './i18n.js'
+import { createElement as h, useMemo } from 'react'
 
 /** The host's rate: output tokens over the time the model wrote them. */
 const decodeSpeed = (stats, lang) => {
