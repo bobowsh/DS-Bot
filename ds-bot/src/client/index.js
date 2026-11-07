@@ -843,10 +843,14 @@ export function apply(ctx) {
       if (snapshot === undefined) throw new Error('ds-bot: Chat target is unavailable')
       return snapshot.nodes.turnDataSource(Number(turn), kind)
     }
-    return { ...face(), keyedHooks: {
+    // The face's own hooks come first: the cell reads the roster from them, and a
+    // face that carries only the work-details mode leaves it without one.
+    const own = face()
+    return { ...own, keyedHooks: {
       turnSteps: ofTurn('assistant-step'),
       turnContext: ofTurn('context'),
     }, hooks: {
+      ...own.hooks,
       // The host's own work-details mode: how much of a turn's thought shows.
       workDetails,
     } }

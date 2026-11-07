@@ -132,7 +132,7 @@ function GeneralPage({ roster, actions, run }) {
       // field and the chat reads it back.
       h(WorkDetailsRow, {
         label: t('Work details'),
-        mode: actions.workDetails?.().mode,
+        mode: actions.workDetails?.(),
         setMode: mode => run(actions.setWorkDetails(mode)),
       })),
     h(SetSection, { key: 'new', title: t('New Bots') },

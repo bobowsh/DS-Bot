@@ -22966,7 +22966,7 @@ function GeneralPage({ roster, actions, run: run2 }) {
       // field and the chat reads it back.
       (0, import_react53.createElement)(WorkDetailsRow, {
         label: t("Work details"),
-        mode: actions.workDetails?.().mode,
+        mode: actions.workDetails?.(),
         setMode: (mode) => run2(actions.setWorkDetails(mode))
       })
     ),
@@ -27822,10 +27822,12 @@ function apply(ctx) {
       if (snapshot === void 0) throw new Error("ds-bot: Chat target is unavailable");
       return snapshot.nodes.turnDataSource(Number(turn), kind);
     };
-    return { ...face(), keyedHooks: {
+    const own = face();
+    return { ...own, keyedHooks: {
       turnSteps: ofTurn("assistant-step"),
       turnContext: ofTurn("context")
     }, hooks: {
+      ...own.hooks,
       // The host's own work-details mode: how much of a turn's thought shows.
       workDetails
     } };
