@@ -8,7 +8,7 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, screen, session, shell as electronShell, systemPreferences, Tray, WebContentsView } from 'electron'
 import { createComputerIndicator, indicatorHtml } from './computer-indicator.mjs'
 import { createComputerCursor } from './computer-cursor.mjs'
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { homedir, release } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
@@ -91,6 +91,11 @@ let archivePackageName, installImportPlugin
  * @param {string} resourcesDir - the app's resources directory
  * @returns {{ name: string, path: string, version: string }[]}
  */
+// The plugins the build once carried and no longer does. They leave the profile on the
+// next start: a plugin that is not shipped any more keeps failing the turn, and a plugin the
+// user installed themselves is never on this list.
+export const DROPPED_PLUGINS = ['dsh-tool-activator']
+
 export function bundledPlugins(resourcesDir) {
   const dir = join(resourcesDir, 'bundled-plugins')
   let entries
@@ -501,6 +506,18 @@ async function boot(mine) {
       name,
       version: entry.version,
     }).catch(error => { console.error(`LinkBot: the plugin ${name} was not put in place:`, error) })
+  }
+  // A plugin the build no longer carries leaves the profile: it stays in the profile's own
+  // node_modules and keeps failing the turn.
+  for (const name of DROPPED_PLUGINS) {
+    const folder = join(profileDir(), 'node_modules', ...name.split('/'))
+    if (!existsSync(folder)) continue
+    try {
+      rmSync(folder, { recursive: true, force: true })
+      console.log(`LinkBot: the plugin ${name} left the profile: the build does not carry it any more.`)
+    } catch (error) {
+      console.error(`LinkBot: the plugin ${name} was not taken out of the profile:`, error)
+    }
   }
   // The factory seed and the bundled skills repo land before the Host starts: ds-bot builds
   // the seeded team at its startup, and reads the seed file from the data location. It runs

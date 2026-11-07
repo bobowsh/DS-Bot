@@ -51,7 +51,8 @@ export const BUNDLED_PLUGINS = [
   'dsh-chat-import',
   'dsh-rule-manager',
   'dsh-session-manager',
-  'dsh-tool-activator',
+  // dsh-tool-activator is left out: it breaks the turn with an unreadable error, and the
+  // team works without it.
   '@copylee/dsh-computer-use',
   '@jayyuen66/dsh-ocr-review',
   '@j62268781-alt/dsh-skills-mcp-manager',
