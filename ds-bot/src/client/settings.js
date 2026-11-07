@@ -1,7 +1,8 @@
 import { createElement as h, useCallback, useEffect, useRef, useState } from 'react'
 import { ACCENT_INKS, INKS } from './inks.js'
 import { isMainOf } from './sources.js'
-import { MESSAGE_WIDTH, allThemes, flatWidthOf, layoutOf, thinkingShown, widthOf } from './themes.js'
+import { MESSAGE_WIDTH, allThemes, flatWidthOf, layoutOf, widthOf } from './themes.js'
+import { WORK_DETAILS } from './work-details.js'
 import { CloseIcon, ChevronLeftIcon, ChevronRightIcon, ChatsIcon, ClockIcon, ConnectorIcon, GlobeIcon, InfoIcon, MonitorIcon, PlugIcon, PlusIcon, SlidersIcon, TerminalIcon, SETTINGS_ICONS } from './icons.js'
 import { AdminStar, BotAvatar, RoomAvatar } from './mark.js'
 import { useEscape } from './overlay-hooks.js'
@@ -80,6 +81,18 @@ function WidthSlider({ label, value, save }) {
     h('output', null, `${width}%`))
 }
 
+// The work details of the host's own chat: how much of a turn's process shows.
+// The host owns the setting (the `ui-chat` namespace), so this row writes the
+// host's own field and the chat reads it back.
+function WorkDetailsRow({ label, mode, setMode }) {
+  if (mode === undefined) return null
+  return h(SetRow, { label },
+    h(Choice, {
+      label, value: mode, options: WORK_DETAILS,
+      pick: id => { setMode(id) },
+    }))
+}
+
 function GeneralPage({ roster, actions, run }) {
   const prefs = roster.prefs ?? {}
   const themes = allThemes()
@@ -110,7 +123,14 @@ function GeneralPage({ roster, actions, run }) {
       // The flat layout's text has a width of its own; the bubble width stays for the user's messages.
       layoutOf(prefs) === 'flat' ? h(SetRow, { label: t('Text width') }, h(WidthSlider, { label: t('Text width'), value: flatWidthOf(prefs), save: flatWidth => run(actions.setPrefs({ flatWidth })) })) : null,
       h(SetRow, { label: t('Bubble width') }, h(WidthSlider, { label: t('Bubble width'), value: widthOf(prefs), save: width => run(actions.setPrefs({ width })) })),
-      h(SetRow, { label: t('Show thinking') }, h(Switch, { label: t('Show thinking'), on: thinkingShown(prefs), onChange: thinking => run(actions.setPrefs({ thinking })) }))),
+      // The work details of the host's own chat: how much of a turn's thinking and
+      // tool calls shows. The host owns the setting, so this row writes the host's
+      // field and the chat reads it back.
+      h(WorkDetailsRow, {
+        label: t('Work details'),
+        mode: actions.workDetails?.().mode,
+        setMode: mode => run(actions.setWorkDetails(mode)),
+      })),
     h(SetSection, { key: 'new', title: t('New Bots') },
       h(SetRow, { label: t('Default model'), className: 'bt-set-model' },
         h(ModelMenu, {
