@@ -584,10 +584,18 @@ export function TeamSidebar(props) {
         h('span', { className: 'bt-rail-sep', 'aria-hidden': true }))
   // The foot stands in for the shell's hidden footer: the account avatar, and on
   // the rail the new-chat button above it.
+  // The way out of the Bot team: the classic Agent page, one icon in the foot of our own
+  // column, beside the account button. It lives here rather than in a host slot because this
+  // column is ours - the host's own footer belongs to the Agent page.
+  const toAgent = h('button', {
+    type: 'button', className: 'bt-round', 'aria-label': t('Switch to classic Agent mode'), title: t('Switch to classic Agent mode'),
+    onClick: () => actions.setSurface('agent'),
+  }, h(SwitchIcon))
   const foot = wideContent
-    ? h('div', { className: 'bt-leftcol-foot' }, h(AccountLauncher, { seat: false, actions }))
+    ? h('div', { className: 'bt-leftcol-foot' }, toAgent, h(AccountLauncher, { seat: false, actions }))
     : h('div', { className: 'bt-leftcol-foot bt-leftcol-foot-rail' },
         h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: () => actions.openNewChat('new') }, h(PlusIcon)),
+        toAgent,
         h(AccountLauncher, { seat: false, actions }))
   const content = h('div', { className: wideContent ? 'bt-side' : 'bt-side bt-rail', onKeyDown: typeToSearch },
     top,
@@ -1069,17 +1077,6 @@ export function BotReturn({ wide, useSurface, useRoster, actions }) {
 
 // The one switch between the two surfaces: the Bot team and the classic Agent page.
 // Bot mode offers the way in, Agent mode the way back — the same click, either way.
-export function SurfaceSwitch({ useSurface, actions }) {
-  const mode = useSurface(value => value.mode)
-  // Agent mode keeps the return chip for the way back; this one only leads out.
-  if (mode === 'agent') return null
-  const label = t('Switch to classic Agent mode')
-  return h('button', {
-    type: 'button', className: 'bt-return', 'aria-label': label, title: label,
-    onClick: () => actions.setSurface('agent'),
-  }, h(SwitchIcon))
-}
-
 // Agent mode has none of the shell-group styles, so the return button carries its own.
 export const RETURN_CSS = `
 .bt-return{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:0;border-radius:999px;background:none;color:inherit;font:inherit;font-size:14px;line-height:20px;cursor:pointer;transition:background-color .12s ease}
