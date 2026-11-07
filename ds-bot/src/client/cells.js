@@ -253,7 +253,7 @@ function useFileMentions({ node, openFile, fileMentions, useTurnData }) {
   }, [fileMentions, openFile, seq, tail, turn])
 }
 
-export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useWorkDetails, actions }) {
+export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useWorkDetails, turnProcess, actions }) {
   const roster = useRoster(value => value)
   const data = node.data
   const steps = useTurnSteps(String(data.turn))
@@ -267,6 +267,11 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   // compact folds it away, the rest show its first line. The team follows it, so
   // the chat and the host's settings never disagree.
   const shown = reasoningShown(useWorkDetails?.(value => value))
+  // The host draws the header of a folded turn and keeps the state of the fold: its own
+  // toggle turns it, and the answer comes back here. The team draws the rows themselves,
+  // so they follow the same state: while the host says the turn is folded, they are not
+  // drawn, and the reader opens them with the host's own header.
+  const folded = turnProcess !== undefined && turnProcess.foldable && !turnProcess.open
   // The host folds a finished turn's process rows behind the turn's own control, except in
   // the fully expanded mode. The team draws the rows itself, so it makes the same decision
   // here: a turn that is still running keeps its rows, a finished one folds them and leaves
@@ -304,8 +309,8 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
       })
     }),
     head ? h(SpeakerHead, { bot: speaker, time: data.time }) : null,
-    activity.length ? h('div', { className: 'bt-agent-activity' }, activity.map((line, index) => h('div', { key: index, className: 'bt-agent-act', title: line }, h('span', { className: 'bt-agent-act-mark', 'aria-hidden': true }), h('span', { className: 'bt-agent-act-text' }, activityParts(line))))) : null,
-    reasoning ? h(ThinkingRow, {
+    !folded && activity.length ? h('div', { className: 'bt-agent-activity' }, activity.map((line, index) => h('div', { key: index, className: 'bt-agent-act', title: line }, h('span', { className: 'bt-agent-act-mark', 'aria-hidden': true }), h('span', { className: 'bt-agent-act-text' }, activityParts(line))))) : null,
+    !folded && reasoning ? h(ThinkingRow, {
       text: reasoning, live: thinking !== undefined, viewKey: `${sessionId}:${data.turn}`,
       // The live clock counts the settled steps too: backing `at` by the settled
       // time makes one Elapsed show settled + running.

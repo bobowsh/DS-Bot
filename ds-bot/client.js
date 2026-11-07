@@ -4029,13 +4029,9 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 [class*="_scroll"]>[class*="_column"]::before{content:var(--bt-first-sep,none);display:block;flex:none;height:28px;margin:17px 0 12px;font-size:12px;line-height:28px;text-align:center;color:var(--bt-ink-2);white-space:nowrap}
 .bt-activity{display:flex;align-items:center;gap:10px;margin:8px 0 4px 2px;font-size:14px;color:var(--bt-ink-2)}
 .bt-group-replies{display:contents}
-/* A Bot chat is flat in every work-details mode, without changing the user's mode
-   (it is a DSH-wide setting): step groups lose their header and stay open, and what a
-   mode folds away in a finished turn stays shown. TurnProcessCell also opens that
-   fold; these rules cover the first frame before it does. */
-[data-step-process]>div:first-child{display:none!important}
-[data-step-process]>[data-step-process-body]{display:block!important;content-visibility:visible!important;max-height:none!important;overflow:visible!important;mask-image:none!important;scrollbar-gutter:auto!important}
-:is([data-step-process],[data-turn-process-hidden])[hidden]{content-visibility:visible!important}
+/* The work-details mode is the Host's own setting, and it decides what a finished
+   turn folds away. The team follows it: the Host draws the header and the fold, and the
+   rules below only take the empty seats away. */
 [class*="_flowItem"]:has(> [data-slot="conversation.chat.node"]:empty, > [data-slot="conversation.chat.node"][data-bt-emptied]){display:none!important}
 /* A turn's process seat is a flow child of its own, not a flowItem: a seat whose
    member cells all emptied themselves (a hidden exchange turn, a turn whose
@@ -13456,7 +13452,7 @@ function useFileMentions({ node, openFile, fileMentions, useTurnData }) {
     return tail?.closing?.finalNode.seq === seq ? fileMentions({ turn, seq, openFile }) : void 0;
   }, [fileMentions, openFile, seq, tail, turn]);
 }
-function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useWorkDetails, actions }) {
+function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useWorkDetails, turnProcess, actions }) {
   const roster = useRoster((value) => value);
   const data = node.data;
   const steps = useTurnSteps(String(data.turn));
@@ -13467,6 +13463,7 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
   const running = data.status === "running";
   const members = steps.length ? steps : [data];
   const shown = reasoningShown(useWorkDetails?.((value) => value));
+  const folded = turnProcess !== void 0 && turnProcess.foldable && !turnProcess.open;
   const reasoning = groupPart === "response" || !shown ? "" : turnReasoning(steps, data);
   const thinking = groupPart === "response" || !shown ? void 0 : thinkingStep(members);
   const ms = useThinkingMs({ sessionId, turn: data.turn, settledSteps: members.filter((step) => step.status !== "running").length, skip: hidden || reasoning === "" });
@@ -13495,8 +13492,8 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
       });
     }),
     head ? (0, import_react31.createElement)(SpeakerHead, { bot: speaker, time: data.time }) : null,
-    activity.length ? (0, import_react31.createElement)("div", { className: "bt-agent-activity" }, activity.map((line, index) => (0, import_react31.createElement)("div", { key: index, className: "bt-agent-act", title: line }, (0, import_react31.createElement)("span", { className: "bt-agent-act-mark", "aria-hidden": true }), (0, import_react31.createElement)("span", { className: "bt-agent-act-text" }, activityParts(line))))) : null,
-    reasoning ? (0, import_react31.createElement)(ThinkingRow, {
+    !folded && activity.length ? (0, import_react31.createElement)("div", { className: "bt-agent-activity" }, activity.map((line, index) => (0, import_react31.createElement)("div", { key: index, className: "bt-agent-act", title: line }, (0, import_react31.createElement)("span", { className: "bt-agent-act-mark", "aria-hidden": true }), (0, import_react31.createElement)("span", { className: "bt-agent-act-text" }, activityParts(line))))) : null,
+    !folded && reasoning ? (0, import_react31.createElement)(ThinkingRow, {
       text: reasoning,
       live: thinking !== void 0,
       viewKey: `${sessionId}:${data.turn}`,
