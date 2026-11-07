@@ -1,53 +1,43 @@
-// The bundled plugin, packed as one archive for the installer to carry.
+// The bundled plugin, shipped as a plain folder of files.
 //
-// The import plugin travels with the app as a plain archive rather than as a folder of files:
-// the installer then holds one file instead of a few hundred. The first start unpacks it into
+// The plugin travels with the app as a folder, not as an archive: the installer then holds a
+// few hundred plain files instead of one compressed file, and the first start copies them into
 // the profile (src/import-plugin.mjs), where DSH loads it like a plugin the user installed.
-//
-// The archive is a gzipped tar, the shape npm itself publishes, so the same file could be handed
-// to `npm install` unchanged.
-import { createWriteStream } from 'node:fs'
+// The folder sits in the data directory beside the program, so the install never reaches the
+// network and an updated app brings an updated plugin.
 import { cp, mkdir, readFile, rm } from 'node:fs/promises'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { Readable } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
-import { createGzip } from 'node:zlib'
-import { c as tarCreate } from 'tar'
 
 /**
- * Where the archive is written, and where the installer expects it. The version is in the name.
- * A scoped name is flattened (`@scope/name` -> `scope-name`): the installer reads one flat
- * directory, and a slash in the name would turn into a subdirectory it never looks in.
+ * Where a plugin's folder is written, and where the installer expects it. A scoped name is
+ * flattened (`@scope/name` -> `scope-name`): the installer reads one flat directory, and a
+ * slash in the name would turn into a subdirectory it never looks in.
  */
-export const bundledPluginArchive = (appDir, name, version) => join(appDir, 'build', 'bundled-plugins', `${name.replace(/^@/u, '').replace(/\//gu, '-')}-${version}.tgz`)
+export const bundledPluginDir = (appDir, name) => join(appDir, 'build', 'data', 'plugins', name.replace(/^@/u, '').replace(/\//gu, '-'))
 
 /**
- * Pack a package directory into a gzipped tar under the folder name npm uses.
+ * Copy a package directory into the place the installer ships it from.
  * @param {string} from - the package directory
- * @param {string} to - the archive to write
- * @param {string} [name] - the folder name inside the archive
+ * @param {string} to - the folder to write
  */
-export async function packPlugin(from, to, name = 'package') {
+export async function copyPlugin(from, to) {
   await mkdir(dirname(to), { recursive: true })
-  await rm(to, { force: true })
-  // The archive holds the package under one folder, the way npm publishes it: `package/...`.
-  // The folder given here is that folder, so its own name is dropped from the paths.
-  const entries = await tarCreate({ cwd: from, prefix: name, portable: true }, ['.'])
-  await pipeline(entries, createGzip(), createWriteStream(to))
+  await rm(to, { recursive: true, force: true })
+  await cp(from, to, { recursive: true })
   return to
 }
 
 /**
- * Pack the plugins the app carries into archives the installer ships.
+ * Put the plugins the app carries into folders the installer ships.
  *
  * The package content comes from the plugin development folder (`DS_BOT_PLUGINS_DEV`, by default
  * `<repo>/../dsh-plugins-dev`), where each plugin has a `pack/` holding the npm-published version
  * that ships. A package missing there is taken from the app's own node_modules, which is how the
  * import plugin has always been packed.
  *
- * The archive holds the plugin and the packages it depends on: the plugin runs from the profile,
+ * The folder holds the plugin and the packages it depends on: the plugin runs from the profile,
  * where Node resolves its imports from the profile's own node_modules, so a dependency that
  * stayed in the app's node_modules would not be found.
  * @param {string} appDir - the app directory
@@ -62,7 +52,7 @@ export async function prepareBundledPlugins(appDir, names, pluginsDev = defaultP
     const { from, manifest } = staged
     // The plugin's own dependencies travel with it, and their dependencies too.
     const stage = await stagePlugin(appDir, from, manifest)
-    made.push(await packPlugin(stage, bundledPluginArchive(appDir, name, manifest.version), 'package'))
+    made.push(await copyPlugin(stage, bundledPluginDir(appDir, name)))
     await rm(dirname(stage), { recursive: true, force: true })
   }
   return made
@@ -119,6 +109,6 @@ async function stagePlugin(appDir, from, manifest) {
     await cp(dir, join(packages, 'node_modules', dependency), { recursive: true })
     queue.push(...Object.keys(own.dependencies ?? {}))
   }
-  // The package folder itself is what gets packed: its parent is the staging area.
+  // The package folder itself is what gets copied: its parent is the staging area.
   return packages
 }
