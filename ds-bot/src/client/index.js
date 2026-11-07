@@ -22,7 +22,7 @@ import { AnsweredReply, WidgetDock, WIDGET_CSS } from './widget-cell.js'
 import { HandoffDock, HANDOFF_CSS } from './handoff-card.js'
 import { AppAccessDock, ComputerHandoffDock, ComputerIndicator, COMPUTER_CSS } from './computer.js'
 import { installHeaderNavigation } from './header-navigation.js'
-import { AssistantCell, TriggerCell, TurnProcessCell, Nothing, CellEmpty, TurnTailCell, ToolCell } from './cells.js'
+import { AssistantCell, TriggerCell, TurnProcessCell, Nothing, CellEmpty, TurnTailCell, TEAM_TOOLS, TeamToolView } from './cells.js'
 import { Overlays } from './overlays.js'
 import { createBotBrowsers, serveBrowserReads } from './bot-browsers.js'
 import { BROWSER_CSS } from './browser-pane.js'
@@ -54,7 +54,7 @@ import { QueueDock, QUEUE_CSS } from './queue-dock.js'
 import { noticeApprovals } from './approval-notices.js'
 import { listedOpener } from './open-listed.js'
 
-export const inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout']
+export const inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout', 'configForms']
 
 export function apply(ctx) {
   ctx.effect(() => installLocale(ctx.get('locale')), 'ds-bot: interface copy')
@@ -355,7 +355,7 @@ export function apply(ctx) {
       releaseTokens = ctx.theme.overrideTokens('ds-bot', shellTokens(themes[id]))
       if (typeof release === 'function') release()
       if (snapshot.ready) {
-        try { localStorage.setItem(PREFS_KEY, JSON.stringify({ theme: prefs.theme, accent: prefs.accent, motion: prefs.motion, layout: prefs.layout, width: prefs.width, flatWidth: prefs.flatWidth, thinking: prefs.thinking })) } catch { /* storage unavailable */ }
+        try { localStorage.setItem(PREFS_KEY, JSON.stringify({ theme: prefs.theme, accent: prefs.accent, motion: prefs.motion, layout: prefs.layout, width: prefs.width, flatWidth: prefs.flatWidth })) } catch { /* storage unavailable */ }
       }
     }
     render()
@@ -417,6 +417,27 @@ export function apply(ctx) {
     return frameLayout({ viewport: f.viewport, sidebarWidth: f.sidebarWidth, pref: sidebarPref.getSnapshot(), drawer: state.leftDrawer, panel: { view: view ?? state.view, yielded: state.panelYield === true } }).panel === 'folded'
   }
   const yieldBrowser = state => state.panelYield === true || panelFolded('browser')
+  // The host owns the work-details setting: how much of a turn's thinking and
+  // tool calls shows. DS Bot reads it for its settings row and writes it there,
+  // so the chat and the row never disagree.
+  const workDetails = createSource(undefined)
+  // The host's own settings namespace for the chat. It is served only when the
+  // host exposes it, so the row waits for it.
+  const chatSettings = ctx.get('configForms')?.get('ui-chat')
+  if (chatSettings !== undefined) {
+    const adopt = () => {
+      const value = chatSettings.getSnapshot().value
+      workDetails.set(value?.transcriptView)
+    }
+    ctx.effect(() => {
+      adopt()
+      return chatSettings.subscribe(adopt)
+    }, 'ds-bot: the host work details')
+  }
+  const setWorkDetails = mode => {
+    workDetails.set(mode)
+    void chatSettings?.set('transcriptView', mode).catch(() => {})
+  }
   // Bot mode's view must hold a team conversation; an outside Session wears the
   // Bot skin without one. Runs whenever the surface is (or stays) Bot mode —
   // including a cold start, where no setSurface call ever fires.
@@ -440,7 +461,10 @@ export function apply(ctx) {
   }
   const actions = {
     ...teamActions({ call, after, partFor, roster, ui, live, cards, heldCards, turnClock, panelFolded }),
-    learningAnswer: (id, approve) => after(call('learning-answer', { id, approve })),
+    // The work details of the host's own chat live in the host's settings, so
+    // the row in DS Bot's own settings writes the host's field.
+    workDetails: () => workDetails.getSnapshot(),
+    setWorkDetails: mode => setWorkDetails(mode),    learningAnswer: (id, approve) => after(call('learning-answer', { id, approve })),
     // The full-pane overlays sit above the conversation, so opening one must dismiss them
     // or the click appears to do nothing.
     isAgentSession: id => isAgentSessionId(id),
@@ -773,6 +797,21 @@ export function apply(ctx) {
     })
   }
   const face = () => ({ actions, hooks: { roster, ui, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, frame, sidebarPref } })
+  // The face a team tool view gets: the team's own state, plus the browser and
+  // computer hooks the handover cards read.
+  const teamToolFace = sessionId => ({
+    actions,
+    sessionId,
+    hooks: {
+      roster,
+      ui,
+      work,
+      heldCards,
+      browserPages,
+      browserTabs,
+      browserHolds,
+    },
+  })
   // The queue dock's per-session verbs, supplied the way the shell's own dock
   // injects them (the session facade and the conversation service).
   const queueFace = (sessionId) => ({
@@ -798,10 +837,9 @@ export function apply(ctx) {
     return { ...face(), keyedHooks: {
       turnSteps: ofTurn('assistant-step'),
       turnContext: ofTurn('context'),
-      // The tools of a turn, and its own token accounting, so the chat can show
-      // what the Bot ran and how fast it wrote.
-      turnTools: ofTurn('tool-call'),
-      turnTail: ofTurn('turn-tail'),
+    }, hooks: {
+      // The host's own work-details mode: how much of a turn's thought shows.
+      workDetails,
     } }
   }
 
@@ -960,6 +998,16 @@ export function apply(ctx) {
     return () => { for (const off of offs) off() }
   }
 
+  // The team's own tools ride the host's tool view slot: the host draws every
+  // call as a folded row and dispatches it by wire name, so the team keeps its
+  // own rows while every other tool falls through to the host's.
+  const installTeamTools = () => {
+    const disposers = TEAM_TOOLS.map(key => ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
+      name: 'tool.call.toolview', key, locale: 'conversation', inject: sessionId => teamToolFace(sessionId),
+    }, TeamToolView)))
+    return () => { for (const dispose of disposers) dispose() }
+  }
+
   // The shell group paints the team surface around the session; the conversation
   // group re-skins the session itself. Each step returns a disposer from slots.inject,
   // so a surface change withdraws the whole group and the outlets re-render.
@@ -973,6 +1021,7 @@ export function apply(ctx) {
     () => installCompiledStyles(SCHEDULE_CSS, 'schedules'),
     () => installCompiledStyles(FEEDBACK_CSS, 'feedback'),
     () => installCompiledStyles(ABOUT_CSS, 'about'),
+    installTeamTools,
     () => installCompiledStyles(MEMBER_CSS, 'members'),
     () => installCompiledStyles(IM_CSS, 'im'),
     () => installCompiledStyles(GOAL_CSS, 'goal'),
@@ -1008,7 +1057,9 @@ export function apply(ctx) {
     installHeader,
     () => shadow('conversation.chat.node', { key: 'assistant-step', priority: BOT_PRIORITY, locale: 'chat', inject: assistantFace }, AssistantCell),
     () => shadow('conversation.chat.node', { key: 'turn-trigger', priority: BOT_PRIORITY, locale: 'chat', inject: face }, TriggerCell),
-    () => shadow('conversation.chat.node', { key: 'tool-call', priority: BOT_PRIORITY, locale: 'chat', inject: face }, ToolCell),
+    // The tool rows are the host's own: DSH's tool tree draws every call as a
+    // folded row with its arguments, its result and how long it took. The team's
+    // own tools keep their rows through the host's keyed tool view slot.
     () => shadow('conversation.chat.node', { key: 'turn-process', priority: BOT_PRIORITY, locale: 'chat', inject: face }, TurnProcessCell),
     // DSH's own turn tail stays, so what other plugins add there shows, such as the
     // cards of the files a turn delivered; its copy and branch row is hidden.
@@ -1030,8 +1081,8 @@ export function apply(ctx) {
     // The composer carries no model picker or run statistics; a Bot's model lives
     // in its details panel.
     () => shadow('conversation.input.model', { priority: BOT_PRIORITY }, Nothing),
-    () => shadow('conversation.composer.dock', { id: 'activity', order: 0, priority: BOT_PRIORITY }, Nothing),
-    () => shadow('conversation.composer.dock', { id: 'usage', order: 1, priority: BOT_PRIORITY }, Nothing),
+    // The host's own statistics and rate pills stay: the chat shows how fast the
+    // model wrote, and the host already counts it.
     () => shadow('conversation.composer.dock', { id: 'btw', order: 2, priority: BOT_PRIORITY, inject: face }, BtwDock),
     () => shadow('conversation.input.left', { id: 'bot-plus', order: -100, inject: face }, ComposerPlus),
     () => shadow('conversation.input.right', { id: 'bot-voice', order: 100, inject: face }, ComposerVoice),
