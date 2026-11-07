@@ -483,6 +483,19 @@ async function boot(mine) {
   }
   // Also the check that the data folder can be written.
   mkdirSync(profileDir(), { recursive: true })
+  // The Host's workspace storage races its own first session on a brand-new data directory:
+  // the first session attaches while `workspace.json` is still going through its temporary
+  // file, reads ENOENT, and every factory Bot fails to attach. A storage file that is already
+  // initialized before the Host starts takes that first write out of the race.
+  const workspaceStorage = join(places.dataDir, 'storages', 'workspace.json')
+  if (!existsSync(workspaceStorage)) {
+    mkdirSync(dirname(workspaceStorage), { recursive: true })
+    writeFileSync(workspaceStorage, `${JSON.stringify({
+      unit: { name: 'workspace', version: 2 },
+      global: { initialized: true, workspaceIds: [], archivedSessionIds: [], pinnedSessionIds: [] },
+      tables: { workspaces: {} },
+    }, undefined, 2)}\n`, 'utf8')
+  }
   // The bundled plugins belong to the profile, not to the app: the user may turn each one off in
   // the plugin manager. They travel with the installer and are unpacked into the profile here,
   // before the Host starts, so the profile already holds them when DSH composes the bundle list.
