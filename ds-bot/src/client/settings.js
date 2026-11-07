@@ -2,7 +2,6 @@ import { createElement as h, useCallback, useEffect, useRef, useState } from 're
 import { ACCENT_INKS, INKS } from './inks.js'
 import { isMainOf } from './sources.js'
 import { MESSAGE_WIDTH, allThemes, flatWidthOf, layoutOf, widthOf } from './themes.js'
-import { WORK_DETAILS } from './work-details.js'
 import { CloseIcon, ChevronLeftIcon, ChevronRightIcon, ChatsIcon, ClockIcon, ConnectorIcon, GlobeIcon, InfoIcon, MonitorIcon, PlugIcon, PlusIcon, SlidersIcon, TerminalIcon, SETTINGS_ICONS } from './icons.js'
 import { AdminStar, BotAvatar, RoomAvatar } from './mark.js'
 import { useEscape } from './overlay-hooks.js'
@@ -84,19 +83,6 @@ function WidthSlider({ label, value, save }) {
 // The work details of the host's own chat: how much of a turn's process shows.
 // The host owns the setting (the `ui-chat` namespace), so this row writes the
 // host's own field and the chat reads it back.
-function WorkDetailsRow({ label, mode, setMode }) {
-  if (mode === undefined) return null
-  // A drop-down: four modes on one row, and the choice takes effect at once.
-  return h(SetRow, { label },
-    h('div', null,
-      h('select', {
-        className: 'bt-select', 'aria-label': label, value: mode,
-        onChange: event => { if (event.target.value !== mode) setMode(event.target.value) },
-      }, WORK_DETAILS.map(([id, text]) => h('option', { key: id, value: id }, t(text)))),
-      // Only the fully expanded mode keeps the process rows of a turn that has
-      // settled: the others fold them away as soon as the reply is done.
-      h('div', { className: 'bt-set-hint' }, t('Only “Full details” keeps the process rows of a finished turn.'))))
-}
 
 function GeneralPage({ roster, actions, run }) {
   const prefs = roster.prefs ?? {}
@@ -127,15 +113,7 @@ function GeneralPage({ roster, actions, run }) {
       h(SetRow, { label: t('Message layout') }, h(Choice, { label: t('Message layout'), value: layoutOf(prefs), options: LAYOUTS, pick: id => run(actions.setPrefs({ layout: id })) })),
       // The flat layout's text has a width of its own; the bubble width stays for the user's messages.
       layoutOf(prefs) === 'flat' ? h(SetRow, { label: t('Text width') }, h(WidthSlider, { label: t('Text width'), value: flatWidthOf(prefs), save: flatWidth => run(actions.setPrefs({ flatWidth })) })) : null,
-      h(SetRow, { label: t('Bubble width') }, h(WidthSlider, { label: t('Bubble width'), value: widthOf(prefs), save: width => run(actions.setPrefs({ width })) })),
-      // The work details of the host's own chat: how much of a turn's thinking and
-      // tool calls shows. The host owns the setting, so this row writes the host's
-      // field and the chat reads it back.
-      h(WorkDetailsRow, {
-        label: t('Work details'),
-        mode: actions.workDetails?.(),
-        setMode: mode => run(actions.setWorkDetails(mode)),
-      })),
+      h(SetRow, { label: t('Bubble width') }, h(WidthSlider, { label: t('Bubble width'), value: widthOf(prefs), save: width => run(actions.setPrefs({ width })) }))),
     h(SetSection, { key: 'new', title: t('New Bots') },
       h(SetRow, { label: t('Default model'), className: 'bt-set-model' },
         h(ModelMenu, {

@@ -210,6 +210,7 @@ var ZH = {
   "No such connector": "没有这个连接器",
   "Classic Agent mode": "经典 Agent 模式",
   "Show the work of this turn": "展开这一轮做过的事",
+  "Hide the work of this turn": "收起这一轮做过的事",
   "Switch to classic Agent mode": "切换经典 Agent 模式",
   "Back to the Bot team": "回到 Bot 团队界面",
   "Only “Full details” keeps the process rows of a finished turn.": "只有「完全展开」会保留已完成轮次的过程行。",
@@ -13466,7 +13467,6 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
   const running = data.status === "running";
   const members = steps.length ? steps : [data];
   const shown = reasoningShown(useWorkDetails?.((value) => value));
-  const [, redraw] = (0, import_react31.useState)(0);
   const folded = turnProcess !== void 0 && turnProcess.foldable && !turnProcess.open;
   const reasoning = groupPart === "response" || !shown ? "" : turnReasoning(steps, data);
   const thinking = groupPart === "response" || !shown ? void 0 : thinkingStep(members);
@@ -13482,15 +13482,6 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
   return (0, import_react31.createElement)(
     import_react31.Fragment,
     null,
-    folded ? (0, import_react31.createElement)("button", {
-      type: "button",
-      className: "bt-fold-header",
-      "aria-expanded": false,
-      onClick: () => {
-        turnProcess?.setOpen?.(true);
-        redraw((n) => n + 1);
-      }
-    }, (0, import_react31.createElement)("span", { className: "bt-fold-header-mark", "aria-hidden": true }), (0, import_react31.createElement)("span", { className: "bt-fold-header-text" }, t("Show the work of this turn"))) : null,
     relays.map((relay) => {
       const source = relay.source;
       const sender = roster.byId[source.senderSessionId] ?? { id: source.senderSessionId, name: source.senderName ?? t("a Bot"), color: "gray" };
@@ -13951,8 +13942,6 @@ function NewDivider() {
   return (0, import_react31.createElement)("div", { className: "bt-new-sep", role: "separator", "aria-label": t("New messages") }, (0, import_react31.createElement)("span", null, t("New")));
 }
 function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTurnClock, actions }) {
-  const foldable = turnProcess !== void 0 && turnProcess.foldable;
-  const open = turnProcess === void 0 || !foldable || turnProcess.open;
   const turn = node?.location?.turn?.turn ?? node?.data?.turn;
   const start = node?.location?.turn?.start?.time;
   const hidden = useRoster((roster) => isHiddenTurn(roster, sessionId, turn));
@@ -13964,15 +13953,21 @@ function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTu
     const own = state[sessionId]?.[turn];
     return !hidden && typeof visit?.seen === "number" && own?.first !== void 0 && own.first <= visit.seen && own.end !== void 0 && own.end > visit.seen && own.end <= visit.entered;
   });
-  const header = foldable && !open ? (0, import_react31.createElement)("button", {
-    type: "button",
-    className: "bt-fold-header",
-    "aria-expanded": false,
-    onClick: () => {
-      turnProcess.setOpen(true);
-      actions.noteTurnProcess?.(sessionId, turn);
-    }
-  }, (0, import_react31.createElement)("span", { className: "bt-fold-header-mark", "aria-hidden": true }), (0, import_react31.createElement)("span", { className: "bt-fold-header-text" }, t("Show the work of this turn"))) : null;
+  const foldable = turnProcess !== void 0 && turnProcess.foldable;
+  const open = turnProcess === void 0 || !foldable || turnProcess.open;
+  const header = foldable ? (0, import_react31.createElement)(
+    "button",
+    {
+      type: "button",
+      className: "bt-fold-header",
+      "aria-expanded": open,
+      onClick: () => {
+        turnProcess.setOpen(!open);
+      }
+    },
+    (0, import_react31.createElement)("span", { className: "bt-fold-header-mark", "aria-hidden": true }),
+    (0, import_react31.createElement)("span", { className: "bt-fold-header-text" }, t(open ? "Hide the work of this turn" : "Show the work of this turn"))
+  ) : null;
   return (0, import_react31.createElement)(import_react31.Fragment, null, header, fresh ? (0, import_react31.createElement)(NewDivider) : (0, import_react31.createElement)(CellEmpty));
 }
 function Nothing() {
@@ -22908,28 +22903,6 @@ function WidthSlider({ label, value, save }) {
     (0, import_react53.createElement)("output", null, `${width}%`)
   );
 }
-function WorkDetailsRow({ label, mode, setMode }) {
-  if (mode === void 0) return null;
-  return (0, import_react53.createElement)(
-    SetRow,
-    { label },
-    (0, import_react53.createElement)(
-      "div",
-      null,
-      (0, import_react53.createElement)("select", {
-        className: "bt-select",
-        "aria-label": label,
-        value: mode,
-        onChange: (event) => {
-          if (event.target.value !== mode) setMode(event.target.value);
-        }
-      }, WORK_DETAILS.map(([id, text]) => (0, import_react53.createElement)("option", { key: id, value: id }, t(text)))),
-      // Only the fully expanded mode keeps the process rows of a turn that has
-      // settled: the others fold them away as soon as the reply is done.
-      (0, import_react53.createElement)("div", { className: "bt-set-hint" }, t("Only “Full details” keeps the process rows of a finished turn."))
-    )
-  );
-}
 function GeneralPage({ roster, actions, run: run2 }) {
   const prefs = roster.prefs ?? {};
   const themes = allThemes();
@@ -22982,15 +22955,7 @@ function GeneralPage({ roster, actions, run: run2 }) {
       (0, import_react53.createElement)(SetRow, { label: t("Message layout") }, (0, import_react53.createElement)(Choice, { label: t("Message layout"), value: layoutOf(prefs), options: LAYOUTS, pick: (id) => run2(actions.setPrefs({ layout: id })) })),
       // The flat layout's text has a width of its own; the bubble width stays for the user's messages.
       layoutOf(prefs) === "flat" ? (0, import_react53.createElement)(SetRow, { label: t("Text width") }, (0, import_react53.createElement)(WidthSlider, { label: t("Text width"), value: flatWidthOf(prefs), save: (flatWidth) => run2(actions.setPrefs({ flatWidth })) })) : null,
-      (0, import_react53.createElement)(SetRow, { label: t("Bubble width") }, (0, import_react53.createElement)(WidthSlider, { label: t("Bubble width"), value: widthOf(prefs), save: (width) => run2(actions.setPrefs({ width })) })),
-      // The work details of the host's own chat: how much of a turn's thinking and
-      // tool calls shows. The host owns the setting, so this row writes the host's
-      // field and the chat reads it back.
-      (0, import_react53.createElement)(WorkDetailsRow, {
-        label: t("Work details"),
-        mode: actions.workDetails?.(),
-        setMode: (mode) => run2(actions.setWorkDetails(mode))
-      })
+      (0, import_react53.createElement)(SetRow, { label: t("Bubble width") }, (0, import_react53.createElement)(WidthSlider, { label: t("Bubble width"), value: widthOf(prefs), save: (width) => run2(actions.setPrefs({ width })) }))
     ),
     (0, import_react53.createElement)(
       SetSection,
