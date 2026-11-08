@@ -25,6 +25,7 @@ import { bundledPlugins, findBundledPlugin } from './bundled-plugins.mjs'
 import { createShell, SHELL_TEXT } from './shell.mjs'
 import { readStartFrame, writeStartFrame } from './start-frame.mjs'
 import { explainOf, StartWindow } from './start-window.mjs'
+import { watchFactorySkills } from './factory-skills-update.mjs'
 import { langOf } from './start/text.mjs'
 import { createDeferredPrompt } from './update-prompt.mjs'
 import { CAPTION_HEIGHT, cssColor, micaAvailable, nativeThemeSource } from './window-frame.mjs'
@@ -487,6 +488,12 @@ async function boot(mine) {
       .catch(error => { console.error('LinkBot: the factory resources were not put in place:', error) })
   })
   setImmediate(() => { void pullSkillsRepo({ dataDir: places.dataDir, resourcesDir: resourcesDir() }) })
+  // The factory skills update themselves from the intranet SkillHub: a skill whose published
+  // version moved ahead of the last sync is downloaded over the local copy. It runs off the
+  // ready path so a slow SkillHub can never hold the window back.
+  setImmediate(() => {
+    watchFactorySkills({ dataDir: places.dataDir, repoDirOf: () => join(places.dataDir, 'skills-repo') })
+  })
   startWindow.done('data')
   const engine = await startEngine(mine)
   if (engine === undefined || mine !== attempt) return
