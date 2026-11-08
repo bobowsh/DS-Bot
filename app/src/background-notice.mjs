@@ -58,7 +58,7 @@ export class BackgroundNotice {
   async #ask(hide) {
     try {
       const { response, unasked = false } = await this.#show({
-        type: 'info', title: 'DS Bot', message: this.#message,
+        type: 'info', title: 'LinkBot', message: this.#message,
         buttons: [this.#confirm], defaultId: 0, cancelId: -1, noLink: true,
       })
       // A cancelled box leaves the window where it is.
