@@ -8,6 +8,7 @@
 import { cp, mkdir, rm } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { publishedSkills, writeSkillhubMetadata } from './factory-skillhub-metadata.mjs'
 
 /** The folder inside the shipped data directory the factory skills are written to. */
 export const bundledSkillsDir = appDir => join(appDir, 'build', 'data', 'skills')
@@ -25,7 +26,7 @@ export function defaultSkillsSrc(appDir) {
  * @param {{ slug: string }[]} entries - the manifest's skill entries
  * @param {string} [skillsSrc] - the local skills source folder
  */
-export async function prepareFactorySkills(appDir, entries, skillsSrc = defaultSkillsSrc(appDir)) {
+export async function prepareFactorySkills(appDir, entries, skillsSrc = defaultSkillsSrc(appDir), { registry, fetchImpl } = {}) {
   // Build from nothing: the skills-repo layout of the old mechanism must not survive into a
   // package built after it was retired, and neither must a stale skills folder.
   await rm(join(appDir, 'build', 'data', 'skills-repo'), { recursive: true, force: true })
@@ -41,5 +42,11 @@ export async function prepareFactorySkills(appDir, entries, skillsSrc = defaultS
     await cp(from, to, { recursive: true })
     made.push(to)
   }
-  return made
+  // The skills the SkillHub holds get the metadata it reads to judge them installed. The version
+  // comes from the registry, so a skill that was never published (or a registry that cannot be
+  // reached) simply gets none: the plugin then shows the truth.
+  const published = await publishedSkills(registry, fetchImpl)
+  const marked = await writeSkillhubMetadata(bundledSkillsDir(appDir), published)
+  if (marked.length === 0) console.log('LinkBot: no factory skill is published on the SkillHub, so none carries its installation record')
+  return { folders: made, marked }
 }

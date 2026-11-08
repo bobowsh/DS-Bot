@@ -54,6 +54,7 @@ import { QueueDock, QUEUE_CSS } from './queue-dock.js'
 import { UsageLine, USAGE_LINE_CSS } from './usage-line.js'
 import { noticeApprovals } from './approval-notices.js'
 import { listedOpener } from './open-listed.js'
+import { DEFAULT_WORK_DETAILS } from './work-details.js'
 
 export const inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout', 'configForms']
 
@@ -427,13 +428,13 @@ export function apply(ctx) {
   // host exposes it, so the row waits for it.
   const chatSettings = ctx.get('configForms')?.get('ui-chat')
   if (chatSettings !== undefined) {
-    // A profile that never chose a work-details mode opens on the host's default, which
-    // folds a settled turn's process rows away. The team's point is showing what the Bots
-    // ran, so an unchosen mode is put on the one that keeps those rows; a mode the user
-    // picked is never overwritten.
+    // A profile that never chose a work-details mode opens on the host's default.
+    // The team wants the standard amount of a turn's process: enough to see what the
+    // Bots ran, without the fully expanded rows. A mode the user picked is never
+    // overwritten.
     const ensureMode = () => {
       const value = chatSettings.getSnapshot().value
-      if (value?.transcriptView === undefined) void chatSettings.set('transcriptView', 'verbose').catch(() => {})
+      if (value?.transcriptView === undefined) void chatSettings.set('transcriptView', DEFAULT_WORK_DETAILS).catch(() => {})
     }
     const adopt = () => {
       const value = chatSettings.getSnapshot().value

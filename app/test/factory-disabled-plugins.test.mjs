@@ -66,14 +66,17 @@ describe('the list of the plugins that ship turned off', () => {
   before(() => {
     root = mkdtempSync(join(tmpdir(), 'ds-bot-disabled-list-'))
     dataDir = join(root, 'data')
-    write(join(dataDir, 'factory', 'disabled.json'), `${JSON.stringify({
-      plugins: [{ name: 'ds-harness-remote', reason: 'it needs a server account' }],
+    write(join(dataDir, 'factory', 'plugins.json'), `${JSON.stringify({
+      plugins: [
+        { name: 'ds-harness-remote', version: '0.6.3', path: 'profiles/ds-bot/node_modules/ds-harness-remote', disabled: true },
+        { name: 'dsh-aide', version: '0.12.0', path: 'profiles/ds-bot/node_modules/dsh-aide' },
+      ],
     }, undefined, 2)}\n`)
   })
   after(() => { rmSync(root, { recursive: true, force: true }) })
 
-  test('the build\'s decision is read from the data tree', () => {
-    assert.deepEqual(factoryDisabledPlugins(dataDir), [{ name: 'ds-harness-remote', reason: 'it needs a server account' }])
+  test('the build\'s decision is read from the factory list', () => {
+    assert.deepEqual(factoryDisabledPlugins(dataDir), ['ds-harness-remote'])
   })
 
   test('a data tree without the list has none', () => {

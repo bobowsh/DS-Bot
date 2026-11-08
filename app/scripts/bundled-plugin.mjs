@@ -80,20 +80,19 @@ export async function prepareBundledPlugins(appDir, entries, pluginsDev = defaul
   // The list of the plugins the build carries. The installer and the first start read it to tell
   // the factory plugins from the ones the user installed, so an upgrade only replaces these names.
   // Plain-text form is for the NSIS installer, which cannot read JSON.
+  // A plugin that ships turned off carries `disabled: true` on its entry: the first start keeps
+  // it out of the bundle list, and the overlay turns it off on a machine that installed it.
   const factory = join(bundledDataDir(appDir), 'factory')
   await mkdir(factory, { recursive: true })
+  const off = new Set(disabled.map(entry => entry.name))
   writeFileSync(join(factory, 'plugins.json'), `${JSON.stringify({
     plugins: made.map(({ name, version }) => ({
       name, version, path: `profiles/${PROFILE}/node_modules/${name}`,
+      ...(off.has(name) ? { disabled: true } : {}),
     })),
   }, undefined, 2)}\n`, 'utf8')
   writeFileSync(join(factory, 'plugins.txt'),
     `${made.map(({ name }) => name.replace(/\//gu, '\\')).join('\n')}\n`, 'utf8')
-  // The plugins that ship turned off: the first start puts them in place but keeps them out of
-  // the bundle list, so the Host does not load them until the user turns them on.
-  writeFileSync(join(factory, 'disabled.json'), `${JSON.stringify({
-    plugins: disabled.map(({ name, reason }) => ({ name, reason })),
-  }, undefined, 2)}\n`, 'utf8')
   return made.map(({ folder }) => folder)
 }
 

@@ -129,8 +129,11 @@ describe('the skills the build carries', () => {
   after(() => { rmSync(root, { recursive: true, force: true }) })
 
   test('every slug the manifest names is copied with its files', async () => {
-    const made = await prepareFactorySkills(appDir, [{ slug: 'grilling' }, { slug: 'cua-driver' }], skillsSrc)
-    assert.equal(made.length, 2)
+    // The registry is pointed at a port that refuses, so no skill carries an installation
+    // record: the build does not wait for the intranet.
+    const made = await prepareFactorySkills(appDir, [{ slug: 'grilling' }, { slug: 'cua-driver' }], skillsSrc, { registry: 'http://127.0.0.1:1/' })
+    assert.equal(made.folders.length, 2)
+    assert.deepEqual(made.marked, [])
     assert.ok(existsSync(join(bundledSkillsDir(appDir), 'grilling', 'SKILL.md')), 'the skill file is there')
     assert.ok(existsSync(join(bundledSkillsDir(appDir), 'cua-driver', 'bin', 'tool.exe')), 'a skill carries its own files, bin/ included')
   })

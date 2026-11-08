@@ -1,13 +1,13 @@
 // The own-ui alignment overlay: the desktop app turns off DSH's welcome / sign-in / API-key
 // row on every start, keeps the runtime rows, and stops writing when a DSH update drops the row.
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, test } from 'node:test'
 import { composeEntries } from '@deepseek-ai/dsh-app-boot'
 import { parse } from 'yaml'
-import { ownUiPatch, reconcileOwnUi, OWN_UI_PATCH_NAME } from '../src/own-ui-patch.mjs'
+import { ownUiPatch, reconcileOwnUi, factoryOffNames, factoryOffRows, OWN_UI_PATCH_NAME } from '../src/own-ui-patch.mjs'
 
 const UI_ROW = '@deepseek-ai/dsh-client-ui-settings-account'
 
@@ -77,4 +77,37 @@ test('a stale overlay goes away when a DSH update drops the row', () => {
   p.layers = p.layers.filter(({ packageName }) => packageName !== '@deepseek-ai/dsh-web-app')
   assert.deepEqual(reconcileOwnUi(p), [])
   assert.equal(existsSync(file), false)
+})
+
+// The factory plugins that ship turned off: they are turned off on every start, so a plugin
+// whose service the user has not authorized does not sit there reconnecting.
+test('the factory plugin that ships off is turned off on every start', () => {
+  const p = track()
+  p.layers.push({ packageName: 'ds-harness-remote', packageDir: '', patchPaths: [], patches: [
+    { insert: [{ id: 'ds-harness-remote', name: 'ds-harness-remote' }] },
+  ] })
+  // The factory list is what says a plugin ships off: the build marks it there.
+  const home = mkdtempSync(join(tmpdir(), 'ds-bot-factory-off-'))
+  made.push(home)
+  mkdirSync(join(home, 'factory'), { recursive: true })
+  writeFileSync(join(home, 'factory', 'plugins.json'), `${JSON.stringify({
+    plugins: [{ name: 'ds-harness-remote', version: '0.6.3', disabled: true }],
+  })}\n`, 'utf8')
+  const [file] = reconcileOwnUi(p, factoryOffNames(home))
+  const rows = parse(readFileSync(file, 'utf8'))
+  assert.deepEqual(rows.find(row => row.id === 'ds-harness-remote'), { id: 'ds-harness-remote', name: 'ds-harness-remote', disabled: true })
+  // The composed profile honours it: the plugin is off, the account UI row still off.
+  const entries = composeEntries([...p.layers.map(layer => layer.patches), ...rows])
+  assert.equal(entries.find(entry => entry.id === 'ds-harness-remote')?.disabled, true)
+  assert.equal(entries.find(entry => entry.id === 'ui-settings-account')?.disabled, true)
+})
+
+test('a factory plugin that is not in the profile gets no row', () => {
+  const p = track()
+  assert.deepEqual(factoryOffRows(p, ['ds-harness-remote']), [])
+  assert.deepEqual(factoryOffRows(p, []), [])
+})
+
+test('a factory list that is not there names no plugin that ships off', () => {
+  assert.deepEqual(factoryOffNames(join(tmpdir(), 'ds-bot-no-factory-list')), [])
 })

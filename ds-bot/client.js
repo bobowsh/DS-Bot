@@ -13228,6 +13228,7 @@ var WORK_DETAILS = [
   ["detailed", "Detailed"],
   ["verbose", "Verbose"]
 ];
+var DEFAULT_WORK_DETAILS = "standard";
 var reasoningShown = (mode) => mode === "standard" || mode === "detailed" || mode === "verbose";
 
 // src/client/cells.js
@@ -27841,7 +27842,7 @@ function apply(ctx) {
   if (chatSettings !== void 0) {
     const ensureMode = () => {
       const value = chatSettings.getSnapshot().value;
-      if (value?.transcriptView === void 0) void chatSettings.set("transcriptView", "verbose").catch(() => {
+      if (value?.transcriptView === void 0) void chatSettings.set("transcriptView", DEFAULT_WORK_DETAILS).catch(() => {
       });
     };
     const adopt = () => {

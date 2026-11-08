@@ -10,6 +10,13 @@ export const WORK_DETAILS = [
   ['verbose', 'Verbose'],
 ]
 
+// The mode a profile that never chose one opens on.
+//
+// The team wants the standard amount of a turn's process: enough to see what the
+// Bots ran, without the fully expanded rows. A mode the user picked is never
+// overwritten — this only fills in a profile that has none.
+export const DEFAULT_WORK_DETAILS = 'standard'
+
 // Whether the mode shows a settled thought's first line beside its title. The
 // host's own policy decides this (`settledReasoningPreview`): compact folds the
 // thought away, the other three show it.
