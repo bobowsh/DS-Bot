@@ -97,20 +97,24 @@ describe('the import plugin in the profile', () => {
     writeFileSync(join(withDep, 'package.json'), `${JSON.stringify({ name: PLUGIN_NAME, version: '0.28.0', dependencies: { 'a-helper': '^1.0.0' } }, undefined, 2)}\n`)
     writeFileSync(join(withDep, 'cordis.patch.yml'), '- insert:\n    - id: import-claude\n      name: dsh-chat-import\n', 'utf8')
     writeFileSync(join(withDep, 'lib', 'index.mjs'), "import 'a-helper'\n", 'utf8')
-    // 依赖在 app 的 node_modules 里
-    const helper = join(root, 'app-node_modules', 'a-helper')
-    mkdirSync(helper, { recursive: true })
-    writeFileSync(join(helper, 'package.json'), `${JSON.stringify({ name: 'a-helper', version: '1.2.0' }, undefined, 2)}\n`)
-    writeFileSync(join(helper, 'index.js'), 'export default 1\n', 'utf8')
-    // 打包时把依赖一起带上
+    // The plugin development folder is the offline source the build packs from; the dependency
+    // the plugin does not carry itself is taken from the app's node_modules.
+    const pluginsDev = join(root, 'dsh-plugins-dev')
+    await cp(withDep, join(pluginsDev, PLUGIN_NAME), { recursive: true })
     const { prepareBundledPlugins } = await import('../scripts/bundled-plugin.mjs')
     const appDir = join(root, 'fake-app')
-    mkdirSync(join(appDir, 'node_modules'), { recursive: true })
-    await cp(join(root, 'source-with-dep'), join(appDir, 'node_modules', PLUGIN_NAME), { recursive: true })
     mkdirSync(join(appDir, 'node_modules', 'a-helper'), { recursive: true })
     writeFileSync(join(appDir, 'node_modules', 'a-helper', 'package.json'), `${JSON.stringify({ name: 'a-helper', version: '1.2.0' }, undefined, 2)}\n`)
     writeFileSync(join(appDir, 'node_modules', 'a-helper', 'index.js'), 'export default 1\n', 'utf8')
-    const made = await prepareBundledPlugins(appDir, [PLUGIN_NAME])
+    const registrySaved = process.env.DS_BOT_FACTORY_REGISTRY
+    process.env.DS_BOT_FACTORY_REGISTRY = 'http://127.0.0.1:1/'
+    let made
+    try {
+      made = await prepareBundledPlugins(appDir, [{ name: PLUGIN_NAME, version: '0.28.0' }], pluginsDev)
+    } finally {
+      if (registrySaved === undefined) delete process.env.DS_BOT_FACTORY_REGISTRY
+      else process.env.DS_BOT_FACTORY_REGISTRY = registrySaved
+    }
     assert.equal(made.length, 1)
     // 复制后依赖在 profile 的 node_modules 根，插件自己也在那
     const profile = join(root, 'profile-with-dep')
