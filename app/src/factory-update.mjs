@@ -15,10 +15,11 @@
 // The state of the daily check lives in <dataDir>/factory-update.json, so a restart does not
 // check again on the same day and the failure count survives it.
 import { cp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { gunzipSync } from 'node:zlib'
 import { dirname, join } from 'node:path'
 import { newerVersion } from './import-plugin.mjs'
+import { PROFILE } from './bundled-plugins.mjs'
 
 /**
  * The files of a gzipped tar, read with the zlib that Node carries: the archive is the shape npm
@@ -204,21 +205,42 @@ export async function archiveUrl(name, version, registry = NPM_REGISTRY, fetchIm
 }
 
 /**
- * The plugins the catalog offers that the profile holds an older version of.
+ * The plugins the catalog offers that the profile does not have, or has an older version of.
+ * A catalog entry the profile never installed is a new factory plugin: it is installed, not
+ * skipped. An entry the profile holds at the same or a newer version is not.
  * @param {Record<string, string>} installed - the profile's plugins and their versions
  * @param {{ name: string, version: string, registry?: string }[]} catalog
- * @returns {{ name: string, version: string, registry?: string, current: string }[]}
+ * @returns {{ name: string, version: string, registry?: string, current?: string }[]}
  */
 export function outdated(installed, catalog) {
   const updates = []
   for (const entry of catalog) {
     const current = installed[entry.name]
-    if (current === undefined) continue
-    if (!newerVersion(entry.version, current)) continue
+    if (current !== undefined && !newerVersion(entry.version, current)) continue
     updates.push({ ...entry, current })
   }
   return updates
 }
+
+/**
+ * The package names on the factory list the build shipped: the plugins whose install scripts
+ * were already reviewed when the installer was built. Only these may bring install scripts in
+ * through an update.
+ * @param {string} dataDir - the data location
+ * @returns {string[]}
+ */
+function factoryApprovedNames(dataDir) {
+  try {
+    const list = JSON.parse(readFileSync(join(dataDir, 'factory', 'plugins.json'), 'utf8'))
+    if (!Array.isArray(list.plugins)) return []
+    return list.plugins.map(entry => (typeof entry === 'string' ? entry : entry?.name)).filter(name => typeof name === 'string')
+  } catch {
+    return []
+  }
+}
+
+/** The npm lifecycle hooks that run code when a package is installed. */
+const INSTALL_SCRIPT_KEYS = ['preinstall', 'install', 'postinstall']
 
 /**
  * Put a newer copy of a plugin in place.
@@ -261,6 +283,28 @@ export async function installUpdate({ dataDir, profileDir, name, version, archiv
     await rm(staging, { recursive: true, force: true })
     return { updated: false, reason: `the archive carries ${String(stagedVersion)}, not ${version}` }
   }
+  // Gate: the archive has to declare itself a DSH plugin. An archive without the manifest
+  // cannot be checked against anything the Host understands, and the factory distributes
+  // DSH plugins only.
+  let stagedManifest
+  try {
+    stagedManifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  } catch {
+    stagedManifest = undefined
+  }
+  if (stagedManifest?.dsh === undefined) {
+    await rm(staging, { recursive: true, force: true })
+    return { updated: false, reason: 'the archive does not declare itself a DSH plugin (no dsh manifest)' }
+  }
+  // Gate: install scripts never run here — the unpacker only writes files — but a new copy
+  // that starts carrying them is a change the factory has not reviewed. Only plugins on the
+  // shipped factory list may bring install scripts through an update.
+  const scripts = stagedManifest?.scripts ?? {}
+  const installScripts = INSTALL_SCRIPT_KEYS.filter(key => typeof scripts[key] === 'string' && scripts[key] !== '')
+  if (installScripts.length > 0 && !factoryApprovedNames(dataDir).includes(name)) {
+    await rm(staging, { recursive: true, force: true })
+    return { updated: false, reason: `${name} carries install scripts (${installScripts.join(', ')}) and is not on the factory list` }
+  }
   await rm(backup, { recursive: true, force: true })
   await mkdir(backupDir(dataDir), { recursive: true })
   const had = existsSync(target)
@@ -279,6 +323,31 @@ export async function installUpdate({ dataDir, profileDir, name, version, archiv
 }
 
 /**
+ * Record a newly installed plugin in the profile's manifest: the dependency the profile owns and
+ * the bundle list entry that makes DSH load it.
+ * @param {object} options
+ * @param {string} options.profileDir - the profile directory
+ * @param {string} options.name - the package name
+ * @param {string} options.version - the version installed
+ * @returns {Promise<void>}
+ */
+async function recordInstalledPlugin({ profileDir, name, version }) {
+  const manifestPath = join(profileDir, 'package.json')
+  let manifest
+  try {
+    manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  } catch {
+    manifest = { name: `dsh-profile-${PROFILE}`, private: true, dependencies: {} }
+  }
+  const bundles = manifest.dsh?.profile?.bundles ?? []
+  manifest.dependencies = { ...manifest.dependencies ?? {}, [name]: version }
+  if (!bundles.includes(name)) {
+    manifest.dsh = { ...manifest.dsh, profile: { ...manifest.dsh?.profile, bundles: [...bundles, name] } }
+  }
+  await writeFile(manifestPath, `${JSON.stringify(manifest, undefined, 2)}\n`, 'utf8')
+}
+
+/**
  * Update the profile's plugins from the catalog.
  *
  * @param {object} options
@@ -287,10 +356,10 @@ export async function installUpdate({ dataDir, profileDir, name, version, archiv
  * @param {string} [options.catalogUrl] - the catalog url
  * @param {typeof fetch} [options.fetch] - the fetch to use
  * @param {Console} [options.log] - where the outcome is written
- * @returns {Promise<{ checked: boolean, updated: string[], failed: string[], skipped: string[], reason?: string }>}
+ * @returns {Promise<{ checked: boolean, updated: string[], installed: string[], failed: string[], skipped: string[], leftAlone: string[], reason?: string }>}
  */
 export async function updateFactoryPlugins({ dataDir, profileDir, catalogUrl = CATALOG_URL, fetch: fetchImpl = globalThis.fetch, log = console }) {
-  const result = { checked: false, updated: [], failed: [], skipped: [] }
+  const result = { checked: false, updated: [], installed: [], failed: [], skipped: [], leftAlone: [] }
   const state = await readState(dataDir)
   const today = dayOf()
   if (state.day === today) {
@@ -308,6 +377,9 @@ export async function updateFactoryPlugins({ dataDir, profileDir, catalogUrl = C
   result.checked = true
   const installed = await installedPlugins(profileDir)
   const updates = outdated(installed, catalog)
+  // A plugin the profile holds that the catalog no longer names is left alone: the factory
+  // stopped distributing it, but removing it would take away something the reader may use.
+  result.leftAlone = Object.keys(installed).filter(name => !catalog.some(entry => entry.name === name))
   const failures = { ...state.failures }
   for (const update of updates) {
     const count = failures[update.name] ?? 0
@@ -315,6 +387,7 @@ export async function updateFactoryPlugins({ dataDir, profileDir, catalogUrl = C
       result.skipped.push(update.name)
       continue
     }
+    const isNew = update.current === undefined
     try {
       const url = await archiveUrl(update.name, update.version, update.registry ?? NPM_REGISTRY, fetchImpl)
       const response = await fetchImpl(url)
@@ -323,8 +396,12 @@ export async function updateFactoryPlugins({ dataDir, profileDir, catalogUrl = C
       const outcome = await installUpdate({ dataDir, profileDir, name: update.name, version: update.version, archive })
       if (outcome.updated) {
         delete failures[update.name]
-        result.updated.push(update.name)
-        log.info(`LinkBot: plugin ${update.name} updated to ${update.version}`)
+        // A new factory plugin has to be recorded, or DSH never loads it: the manifest gains
+        // the dependency and the bundle list gains the name. An update of an installed plugin
+        // never touches the manifest, so a plugin the reader turned off stays off.
+        if (isNew) await recordInstalledPlugin({ profileDir, name: update.name, version: update.version })
+        result[isNew ? 'installed' : 'updated'].push(update.name)
+        log.info(`LinkBot: plugin ${update.name} ${isNew ? 'installed' : 'updated to'} ${update.version}`)
       } else {
         failures[update.name] = count + 1
         result.failed.push(update.name)
