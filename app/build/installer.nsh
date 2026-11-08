@@ -288,6 +288,18 @@
     CreateDirectory "$R1\factory"
     CopyFiles /SILENT "$INSTDIR\data\factory\*.*" "$R1\factory"
   ${EndIf}
+  ; The language servers travel as plain files: they are native programs the Host finds on its
+  ; PATH, so the whole folder is moved beside the data.
+  ${If} ${FileExists} "$INSTDIR\data\lsp\*.*"
+    ClearErrors
+    RMDir /r "$R1\lsp"
+    CreateDirectory "$R1\lsp"
+    CopyFiles /SILENT "$INSTDIR\data\lsp\*.*" "$R1\lsp"
+    ${If} ${Errors}
+      DetailPrint "LinkBot: the language servers could not be moved to the data folder."
+      StrCpy $R7 1
+    ${EndIf}
+  ${EndIf}
   ; The factory skills: replace the installed copies, keeping one .bak of each replaced skill,
   ; and leave the skills the package does not carry alone. The sync state file is dropped when
   ; the package carries skills, so the next start re-records versions instead of downloading

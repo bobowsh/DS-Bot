@@ -651,6 +651,31 @@ async function removeMade() {
 const profileDir = () => join(places.dataDir, 'profiles', PROFILE)
 const pnpmEntry = () => join(app.getAppPath(), 'node_modules', 'pnpm', 'bin', 'pnpm.mjs')
 const runtimeDir = () => app.isPackaged ? process.resourcesPath : join(here, '..', 'build', 'runtime')
+
+// The language servers the app ships: the folders their executables live in. They are put on the
+// Host's PATH, so an editor plugin that looks for a server on the PATH finds the one that
+// travels with the app (a language server is a native program, so it cannot be imported).
+const languageServerDirs = () => {
+  const root = join(places.dataDir, 'lsp')
+  const dirs = []
+  for (const entry of existsSync(root) ? readdirSync(root, { withFileTypes: true }) : []) {
+    if (!entry.isDirectory()) continue
+    const bin = join(root, entry.name, 'bin')
+    if (existsSync(bin)) dirs.push(bin)
+  }
+  return dirs
+}
+
+// The PATH the Host runs with: the language servers the app ships come first, then the node
+// they may need (a server written in JavaScript is a script and needs a node to run it), then
+// the PATH the app itself was started with.
+function hostPath() {
+  const extra = [...languageServerDirs()]
+  const nodeBin = join(runtimeDir(), 'dependencies', 'node', 'bin')
+  if (existsSync(nodeBin)) extra.push(nodeBin)
+  return [...extra, process.env.PATH ?? ''].filter(part => part !== '').join(';')
+}
+
 const hostOutput = (stream, chunk) => {
   logs.write('engine', chunk)
   rawOutput[stream](chunk)
@@ -662,7 +687,7 @@ function newHost() {
   return new HostProcess({
     entry: join(here, 'host.mjs'),
     cwd: profileDir(),
-    env: { ...process.env, DSH_HOME: places.dataDir, DS_BOT_PORT: String(port), DS_BOT_APP: '1', DS_BOT_USER_DSH_HOME: userDshHome(), DS_BOT_FACTORY_RESOURCES: resourcesDir(), DS_BOT_RUNTIME_DIR: runtimeDir(), DSHM_REGISTRY_URL, ...(places.workspace ? { DS_BOT_WORKSPACE: places.workspace } : {}) },
+    env: { ...process.env, PATH: hostPath(), DSH_HOME: places.dataDir, DS_BOT_PORT: String(port), DS_BOT_APP: '1', DS_BOT_USER_DSH_HOME: userDshHome(), DS_BOT_FACTORY_RESOURCES: resourcesDir(), DS_BOT_RUNTIME_DIR: runtimeDir(), DSHM_REGISTRY_URL, ...(places.workspace ? { DS_BOT_WORKSPACE: places.workspace } : {}) },
     pnpm: pnpmEntry(),
     onFailure: (error) => { if (mine === attempt) void fail(error) },
     output: hostOutput,

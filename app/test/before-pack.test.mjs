@@ -13,6 +13,7 @@ test('a build for the architecture of this Node goes on', async () => {
   const asked = []
   const skills = []
   const plugins = []
+  const servers = []
   // A real app directory carrying the real manifest: the hook reads it from the app dir.
   const root = mkdtempSync(join(tmpdir(), 'ds-bot-before-pack-'))
   const appDir = join(root, 'app')
@@ -25,16 +26,18 @@ test('a build for the architecture of this Node goes on', async () => {
     async (request) => { asked.push(request) },
     async (dir, skillsEntries) => { skills.push({ dir, skillsEntries }) },
     async (dir, pluginEntries) => { plugins.push({ dir, pluginEntries }) },
+    async (dir, serverEntries) => { servers.push({ dir, serverEntries }) },
   )
   assert.equal(asked.length, 1)
   assert.equal(asked[0].target, runtimeTarget(process.platform, process.arch))
   assert.equal(asked[0].output, join(appDir, 'build', 'runtime'))
-  // The manifest drives the rest of the hook: the skills and the plugins it names are what the
-  // two prepare steps are called with.
+  // The manifest drives the rest of the hook: the skills, the plugins and the language
+  // servers it names are what the three prepare steps are called with.
   assert.equal(skills.length, 1)
   assert.equal(plugins.length, 1)
   assert.deepEqual(plugins[0].pluginEntries, manifest.plugins)
   assert.deepEqual(skills[0].skillsEntries, manifest.skills)
+  assert.deepEqual(servers[0].serverEntries, manifest.languageServers)
   rmSync(root, { recursive: true, force: true })
 })
 

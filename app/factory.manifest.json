@@ -1,5 +1,5 @@
 {
-  "comment": "出厂插件与技能清单（用户 2026-11-08 拍板）。plugins 打进 data/profiles/ds-bot/node_modules/（scoped 包按 name 建 scoped 目录），skills 打进 data/skills/<slug>/。运行时清单 data/factory/plugins.json 由打包脚本按本清单生成，格式不变。",
+  "comment": "出厂插件与技能清单（用户 2026-11-08 拍板）。plugins 打进 data/profiles/ds-bot/node_modules/（scoped 包按 name 建 scoped 目录），skills 打进 data/skills/<slug>/，languageServers 打进 data/lsp/<name>/（原生程序，由宿主 PATH 找到）。运行时清单 data/factory/plugins.json 由打包脚本按本清单生成，格式不变。",
   "plugins": [
     { "name": "dsh-chat-import", "version": "0.26.4" },
     { "name": "dsh-xdpool", "version": "2.6.1" },
@@ -19,5 +19,9 @@
     { "slug": "ub-mode" },
     { "slug": "cua-driver" },
     { "slug": "skillhub-cli" }
+  ],
+  "languageServers": [
+    { "name": "clangd" },
+    { "name": "pyright" }
   ]
 }

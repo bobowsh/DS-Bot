@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { preparePrimaryRuntime, runtimeTarget } from './prepare-runtime.mjs'
 import { prepareFactorySkills } from './factory-skills-pack.mjs'
 import { prepareBundledPlugins } from './bundled-plugin.mjs'
+import { prepareLanguageServers } from './factory-lsp-pack.mjs'
 
 const WHERE = {
   darwin: { x64: 'on an Intel Mac, or under Rosetta with an x64 Node', arm64: 'on a Mac with Apple silicon' },
@@ -52,7 +53,7 @@ export function factoryManifest(appDir) {
   return JSON.parse(readFileSync(join(appDir, 'factory.manifest.json'), 'utf8'))
 }
 
-export async function beforePack(context, prepare = preparePrimaryRuntime, prepareSkills = prepareFactorySkills, preparePlugins = prepareBundledPlugins) {
+export async function beforePack(context, prepare = preparePrimaryRuntime, prepareSkills = prepareFactorySkills, preparePlugins = prepareBundledPlugins, prepareServers = prepareLanguageServers) {
   const targets = []
   for (const archToNames of context.packager?.packagerOptions?.targets?.values() ?? [])
     for (const arch of archToNames.keys()) targets.push(Arch[arch])
@@ -67,4 +68,7 @@ export async function beforePack(context, prepare = preparePrimaryRuntime, prepa
   // The plugins the app carries are resolved from the factory manifest: the intranet registry
   // first, the local development folder when it cannot be reached, the build stops on neither.
   await preparePlugins(appDir, manifest.plugins)
+  // The language servers travel as plain files too: they are native programs, so they go on
+  // the Host's PATH rather than into a plugin.
+  await prepareServers(appDir, manifest.languageServers ?? [])
 }
