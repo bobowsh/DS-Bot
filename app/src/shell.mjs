@@ -4,6 +4,7 @@
 // operating system's session all close the window for good.
 import { BackgroundNotice } from './background-notice.mjs'
 import { createTray } from './tray.mjs'
+import { DISPLAY_NAME } from './legacy.mjs'
 
 export const SHELL_TEXT = {
   en: {
@@ -153,7 +154,7 @@ export function createShell(options) {
     const t = text()
     try {
       const { response } = await options.fallback.show({
-        type: 'question', title: 'LinkBot', message: t.fallback,
+        type: 'question', title: DISPLAY_NAME, message: t.fallback,
         buttons: [t.quit, t.cancel], defaultId: 1, cancelId: 1, noLink: true,
       })
       if (response === 0) { quit(); return }

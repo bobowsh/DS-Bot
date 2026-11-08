@@ -1,6 +1,8 @@
 // Every string of the app shell that the user sees, in one table: the start page and the system
 // dialogs of the main process (choosing a folder, moving the data, the import, updates). Product
-// names in dialog titles (LinkBot, DSH Desktop, DSH Web) are constants, not copy.
+// names in dialog titles (LinkBot, DSH Desktop, DSH Web) are constants, not copy. The product's
+// own display name is spelled out here on purpose: it is copy, and the constant that code uses
+// is legacy.mjs's DISPLAY_NAME.
 // docs/plans/2026-10-29-start-copy.md decides the keys and the layers; zh is the source, en
 // mirrors it key by key with the same placeholders.
 //

@@ -16,7 +16,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { canonicalExecPath } from './canonical-path.mjs'
 import { disk } from './copy-tree.mjs'
-import { configureIdentity } from './legacy.mjs'
+import { configureIdentity, DISPLAY_NAME } from './legacy.mjs'
 import { hostPort } from './host-port.mjs'
 import { captureStdio, LogFile } from './logs.mjs'
 import { Pickers } from './picker-host.mjs'
@@ -1385,7 +1385,7 @@ function createWindow() {
     // The window never squeezes the chat: RAIL_WIDTH + MIN_CHAT from ds-bot's
     // src/client/frame-layout.js is the avatar rail plus the smallest chat column.
     ...startWindow.mainBounds(), minWidth: 508, minHeight: 480,
-    title: 'LinkBot', show: false, icon: iconFile,
+    title: DISPLAY_NAME, show: false, icon: iconFile,
     backgroundColor: mica ? '#00000000' : dark ? '#1b1b1c' : '#ffffff',
     // Frameless as in DSH Desktop: the caption buttons overlay the page's band. They keep the
     // sidebar's colors until the page sends the colors of the surface under them.

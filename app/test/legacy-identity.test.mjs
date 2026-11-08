@@ -7,14 +7,13 @@ import { spawnSync } from 'node:child_process'
 import { test } from 'node:test'
 import { parse } from 'yaml'
 import { UUID } from 'builder-util-runtime'
-import { APP_ID, configureIdentity, LEGACY_ARTIFACT_PREFIX, PRODUCT_NAME } from '../src/legacy.mjs'
+import { APP_ID, configureIdentity, LEGACY_ARTIFACT_PREFIX, LEGACY_PRODUCT_NAME } from '../src/legacy.mjs'
 
 function fixture({ saved = [], packaged = true } = {}) {
   const app = new EventEmitter()
   const appData = join(tmpdir(), 'dsbot-identity-fixture')
-  const current = join(appData, PRODUCT_NAME)
-  const past = join(appData, 'DS Bot')
-  const older = join(appData, 'DeepSeek Bot')
+  const current = join(appData, 'DS Bot')
+  const legacy = join(appData, LEGACY_PRODUCT_NAME)
   const paths = { appData, userData: current }
   const names = []
   Object.assign(app, {
@@ -25,32 +24,25 @@ function fixture({ saved = [], packaged = true } = {}) {
     setAppUserModelId: id => { app.id = id },
   })
   const exists = path => saved.includes(path)
-  return { app, paths, names, current, past, older, exists }
+  return { app, paths, names, current, legacy, exists }
 }
 
 for (const platform of ['win32', 'darwin', 'linux']) {
   test(`${platform}: an existing installation keeps its shell data and encryption identity`, () => {
     const f = fixture()
     let created
-    const options = { env: {}, platform, mkdir: path => { created = path }, exists: path => path === f.past }
-    assert.deepEqual(configureIdentity(f.app, options), { userData: f.past, legacy: true })
-    assert.equal(f.paths.sessionData, f.past)
-    assert.equal(created, f.past)
+    const options = { env: {}, platform, mkdir: path => { created = path }, exists: path => path === f.legacy }
+    assert.deepEqual(configureIdentity(f.app, options), { userData: f.legacy, legacy: true })
+    assert.equal(f.paths.sessionData, f.legacy)
+    assert.equal(created, f.legacy)
     if (platform === 'win32') {
       assert.equal(f.app.id, APP_ID)
       assert.deepEqual(f.names, [])
     } else {
-      assert.deepEqual(f.names, ['DS Bot'])
+      assert.deepEqual(f.names, [LEGACY_PRODUCT_NAME])
       f.app.emit('ready')
-      assert.deepEqual(f.names, ['DS Bot', PRODUCT_NAME])
+      assert.deepEqual(f.names, [LEGACY_PRODUCT_NAME, 'DS Bot'])
     }
-  })
-
-  test(`${platform}: an install that never ran under the last name still finds its data`, () => {
-    // An upgrade that skipped the DS Bot generation: only the oldest folder is there, and it wins.
-    const f = fixture()
-    const options = { env: {}, platform, mkdir: () => {}, exists: path => path === f.older }
-    assert.deepEqual(configureIdentity(f.app, options), { userData: f.older, legacy: true })
   })
 }
 
@@ -62,7 +54,7 @@ test('a fresh installation uses the new shell directory', () => {
 
 test('an already configured new installation wins when both directories exist', () => {
   const f = fixture()
-  const existing = [f.past, join(f.current, 'locations.json')]
+  const existing = [f.legacy, join(f.current, 'locations.json')]
   assert.equal(configureIdentity(f.app, { env: {}, mkdir: () => {}, exists: path => existing.includes(path) }).userData, f.current)
 })
 
@@ -80,7 +72,7 @@ test('an isolated data run never probes an installed application', () => {
 
 test('a source installation also keeps its existing shell data', () => {
   const f = fixture({ packaged: false })
-  assert.equal(configureIdentity(f.app, { env: {}, mkdir: () => {}, exists: path => path === f.past }).userData, f.past)
+  assert.equal(configureIdentity(f.app, { env: {}, mkdir: () => {}, exists: path => path === f.legacy }).userData, f.legacy)
 })
 
 for (const suffix of ['mac-arm64.zip', 'mac-x64.zip', 'linux-amd64.deb']) {

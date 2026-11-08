@@ -3,6 +3,7 @@
 // window go; the answer is remembered under the app's own data.
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { DISPLAY_NAME } from './legacy.mjs'
 
 export class BackgroundNotice {
   #marker
@@ -58,7 +59,7 @@ export class BackgroundNotice {
   async #ask(hide) {
     try {
       const { response, unasked = false } = await this.#show({
-        type: 'info', title: 'LinkBot', message: this.#message,
+        type: 'info', title: DISPLAY_NAME, message: this.#message,
         buttons: [this.#confirm], defaultId: 0, cancelId: -1, noLink: true,
       })
       // A cancelled box leaves the window where it is.

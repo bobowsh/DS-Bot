@@ -6,6 +6,7 @@
 import { pathToFileURL } from 'node:url'
 import { writeFile } from 'node:fs/promises'
 import { within } from './copy-tree.mjs'
+import { DISPLAY_NAME } from './legacy.mjs'
 
 export const START_STATE = 'ds-bot:start-state'
 export const START_ACT = 'ds-bot:start-act'
@@ -360,7 +361,7 @@ export class StartWindow {
     const win = new BrowserWindow({
       ...rect,
       useContentSize: true, resizable: false, maximizable: false, fullscreenable: false, minimizable: true,
-      show: false, title: 'LinkBot', icon: this.#o.icon,
+      show: false, title: DISPLAY_NAME, icon: this.#o.icon,
       backgroundColor: mica ? '#00000000' : colors.main,
       // Frameless with the system minimize and close buttons over the page's empty 40 px band.
       ...(win32 ? {
