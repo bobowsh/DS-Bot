@@ -58,7 +58,10 @@ function hostVersionWired() {
   if (fn < 0) return false
   const body = code.slice(fn, code.indexOf('\n}', fn) + 2)
   const call = body.match(/installUpdate\s*\(\s*\{([^}]*)\}\s*\)/u)
-  return !!call && /hostVersion/u.test(call[1])
+  if (!call || !/hostVersion/u.test(call[1])) return false
+  // 队长要求版本号从 app 取、不许写死：调用点的值不能是字符串/数字字面量。
+  const literal = /hostVersion\s*:\s*(['"`]|\d)/u.test(call[1])
+  return !literal
 }
 
 describe('E 场景5 兼容熔断 / 版本门（Q6）', () => {
@@ -95,6 +98,21 @@ describe('E 场景5 兼容熔断 / 版本门（Q6）', () => {
     const intranetCatalogFields = ['added', 'category', 'description', 'installedVersion', 'name', 'npm', 'owner', 'page', 'registry', 'source', 'status', 'tag', 'upstream', 'url']
     assert.ok(!intranetCatalogFields.some(f => /engine|host|compat|dshversion/iu.test(f)))
     assert.ok(intranetCatalogFields.includes('installedVersion'))
+  })
+
+  test('V6 watcher 一路透传 hostVersion，不许在启动处写死', (t) => {
+    const code = moduleSource().replace(/^\s*\/\/.*$/gmu, '')
+    const fn = code.indexOf('export function watchFactoryPlugins')
+    if (fn < 0) { t.skip('watchFactoryPlugins 未导出'); return }
+    const body = code.slice(fn, code.indexOf('\n}', fn) + 2)
+    const wired = /hostVersion/u.test(body)
+    const literal = /hostVersion\s*:\s*(['"`]|\d)/u.test(body)
+    if (!wired || literal) {
+      t.diagnostic('BLOCKED: watchFactoryPlugins 未透传 hostVersion，或在启动处写死了版本号')
+      t.skip('watcher 未透传 hostVersion，不算通过')
+      return
+    }
+    assert.ok(wired && !literal)
   })
 
   test('V5 主链路：不兼容条目被跳过、次日再看、不计连败', async (t) => {

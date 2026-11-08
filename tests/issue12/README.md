@@ -5,9 +5,9 @@
 2. **catalog 新增条目自动装 + 自动写 bundles 启用**（Q2）
 3. **失败回滚**：换到一半失败要退回旧版
 
-状态：**五个场景脚本已写成并实跑**（22 tests / 19 pass / 0 fail / 3 skip）；插件通道三场景全绿。
+状态：**五个场景脚本已写成并实跑**（23 tests / 20 pass / 0 fail / 3 skip）；插件通道三场景全绿。
 Q6 版本门的「门本身」V1-V3 已随实现转为真实通过；技能通道 S2/S3 阻塞于 C5、
-主链路 V5 阻塞于 `hostVersion` 未透传，都明确 `BLOCKED` + `skip`，**不算通过**。
+主链路 V5 阻塞于 `hostVersion` 未透传、V6 阻塞于 watcher 未透传，都明确 `BLOCKED` + `skip`，**不算通过**。
 脚本落 `tests/issue12/`，临时数据落系统 temp，不碰 `D:\LinkBot\data` 与用户真实 DSH_HOME。
 
 运行（PR #20 未合进 dev-me 时，用 `FACTORY_UPDATE_MODULE` 指向 C 组 worktree）：
@@ -120,7 +120,8 @@ tests/issue12/
 - V3 未声明 `engines.dsh` 的包不受影响 ✅
 - V5 主链路：不兼容归入 `skipped`（次日再看）、不计连败 —— **BLOCKED**：
   `updateFactoryPlugins` 调用 `installUpdate` 时**未透传 `hostVersion`**，且 `incompatible` 目前被当普通失败累计 `failures`。
-  解除条件：小柚子补上透传并把不兼容归入 `skipped`。
+  检测还要求透传值不能是字面量（版本号要从 app 取，不许写死）。解除条件：补上透传并把不兼容归入 `skipped`。
+- V6 `watchFactoryPlugins` 一路透传 `hostVersion`、启动处不写死 —— **BLOCKED**（同样未落地）
 - 实现采用候选 (c) 同源思路：解包后、替换前判归档 manifest 的 `engines.dsh`，与 dsh 清单门共用拒绝路径。
 
 ## 实跑结果（2026-11-08，真实输出）
@@ -128,12 +129,12 @@ tests/issue12/
 ```
 $ FACTORY_UPDATE_MODULE=E:/dsbot-work/DS-Bot-issue12/app/src/factory-update.mjs \
     node --test --test-timeout=20000 tests/issue12/*.test.mjs
-tests 22 | suites 5 | pass 19 | fail 0 | cancelled 0 | skipped 3 | duration 387ms
+tests 23 | suites 5 | pass 20 | fail 0 | cancelled 0 | skipped 3 | duration 336ms
 ```
 
 - 插件通道三场景 **14/14 全绿**（A1-A4、B1-B3、C1-C6）
 - 技能通道 S1/S4 通过；**S2/S3 `BLOCKED` skip**（C5 未落地，不算通过）
-- Q6 门本身 V1-V3 真实通过、V4 现场证据通过；**V5 `BLOCKED` skip**（`hostVersion` 未透传，不算通过）
+- Q6 门本身 V1-V3 真实通过、V4 现场证据通过；**V5/V6 `BLOCKED` skip**（`hostVersion` 未沿主链路与 watcher 透传，不算通过）
 - 关键回归：`app/test/import-skills.test.mjs` + `factory-registry.test.mjs` + `data-packaging.test.mjs` = **31/31**
 - helpers 自检 `node tests/issue12/helpers/selfcheck.mjs` → `OK`
 
