@@ -42,6 +42,19 @@ dev/bench.sh smoke 3096 8796 stop
 
 A change is done when `npm test`, the `--check` and `npm run lint` pass; CI runs them on every pull request. Run the smoke test as well for changes to `index.js` or `src/host/`. Use a free port for each bench, and stop every bench and process that you started.
 
+### Packaging the desktop app
+
+`app/` takes `ds-bot` as a `file:` dependency, which npm **copies** into `app/node_modules/ds-bot` at install time: editing `ds-bot/` never updates that copy. A package built without re-installing ships the old plugin, and the symptom is a packaged app that starts normally but lacks the change.
+
+Before every `npm run pack` / `npm run dist` in `app/`:
+
+```sh
+npm ci                                                                          # re-copy ds-bot/ into node_modules
+node -e "console.log(require('./node_modules/ds-bot/package.json').version)"     # must equal ds-bot/package.json's version
+```
+
+Never resolve this with `npm install --legacy-peer-deps`: it re-resolves the whole tree and drops `@electron/windows-sign` and `electron-winstaller`, which breaks packaging. The full release flow is in [docs/dev/release-checklist.md](docs/dev/release-checklist.md).
+
 ## Branches, pull requests and issues
 
 The full workflow is in [CONTRIBUTING.md](CONTRIBUTING.md#how-we-work). The parts that an agent must follow:
