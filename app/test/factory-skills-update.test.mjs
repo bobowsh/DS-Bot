@@ -212,6 +212,41 @@ describe('the sync', () => {
     assert.deepEqual(outcome.updated, [])
     assert.equal(existsSyncLike(join(repoDir, 'grilling', 'SKILL.md')), true, 'the skill stays')
   })
+
+  test('a broken archive leaves the local skill untouched', async () => {
+    await writeSyncState(dataDir, { versions: { grilling: '20261108.022746' } })
+    const outcome = await syncFactorySkills({
+      dataDir,
+      repoDir,
+      registry: 'http://hub/',
+      fetch: fakeFetch([
+        { prefix: 'http://hub/', body: { data: { items: [{ slug: 'grilling', latestVersion: { version: '20261109.110000' } }] } } },
+        { prefix: 'http://hub/api/v1/skills/', body: Buffer.from('definitely not a zip') },
+      ]),
+    })
+    assert.deepEqual(outcome.updated, [])
+    assert.deepEqual(outcome.failed, ['grilling'])
+    assert.equal(readFileSync(join(repoDir, 'grilling', 'SKILL.md'), 'utf8').includes('old'), true, 'the old copy stays')
+    assert.equal(existsSyncLike(join(dataDir, 'skills-update-staging')), false, 'no staging leftover')
+    const state = await readSyncState(dataDir)
+    assert.equal(state.versions.grilling, '20261108.022746', 'the old version record is kept so the retry re-checks')
+  })
+
+  test('an archive without a SKILL.md is refused and the local skill stays', async () => {
+    await writeSyncState(dataDir, { versions: { grilling: '20261108.022746' } })
+    const outcome = await syncFactorySkills({
+      dataDir,
+      repoDir,
+      registry: 'http://hub/',
+      fetch: fakeFetch([
+        { prefix: 'http://hub/', body: { data: { items: [{ slug: 'grilling', latestVersion: { version: '20261109.110000' } }] } } },
+        { prefix: 'http://hub/api/v1/skills/', body: makeZip([{ path: 'lib/index.mjs', body: Buffer.from('x', 'utf8') }]) },
+      ]),
+    })
+    assert.deepEqual(outcome.updated, [])
+    assert.deepEqual(outcome.failed, ['grilling'])
+    assert.equal(readFileSync(join(repoDir, 'grilling', 'SKILL.md'), 'utf8').includes('old'), true, 'the old copy stays')
+  })
 })
 
 function existsSyncLike(path) {

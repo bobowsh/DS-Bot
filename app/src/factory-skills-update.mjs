@@ -12,7 +12,7 @@
 // The download is a zip, read with the zlib that Node carries; no dependency is added for it.
 // The state of the last sync lives in <dataDir>/skills-sync.json.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { inflateRawSync } from 'node:zlib'
 import { join } from 'node:path'
 import { SKILLHUB_REGISTRY } from './profile.mjs'
@@ -196,12 +196,15 @@ export async function syncFactorySkills({ dataDir, repoDir, registry = SKILLHUB_
       const response = await fetchImpl(downloadUrl(registry, SKILLHUB_NAMESPACE, slug))
       if (!response.ok) throw new Error(`HTTP ${String(response.status)}`)
       const archive = Buffer.from(await response.arrayBuffer())
-      const skillDir = join(repoDir, slug)
-      await rm(skillDir, { recursive: true, force: true })
-      await unpackSkillZip(archive, skillDir)
-      versions[slug] = remote
-      result.updated.push(slug)
-      log.info(`LinkBot: skill ${slug} updated to ${remote}`)
+      const outcome = await installSkillUpdate({ dataDir, repoDir, slug, remote, archive })
+      if (outcome.updated) {
+        versions[slug] = remote
+        result.updated.push(slug)
+        log.info(`LinkBot: skill ${slug} updated to ${remote}`)
+      } else {
+        result.failed.push(slug)
+        log.error(`LinkBot: skill ${slug} was not updated: ${outcome.reason ?? 'unknown reason'}`)
+      }
     } catch (error) {
       result.failed.push(slug)
       log.error(`LinkBot: skill ${slug} was not updated: ${error instanceof Error ? error.message : String(error)}`)
@@ -210,6 +213,60 @@ export async function syncFactorySkills({ dataDir, repoDir, registry = SKILLHUB_
   await writeSyncState(dataDir, { versions })
   return result
 }
+
+/**
+ * Put a newer copy of one skill in place.
+ *
+ * The zip is unpacked into a staging folder and only then swapped in: the local folder is
+ * renamed to a backup, the staged one takes its place, and any failure moves the backup back —
+ * the same shape the plugin channel uses (factory-update.mjs), so a half-written skill never
+ * replaces the one the reader has.
+ * @param {object} options
+ * @param {string} options.dataDir - the data location
+ * @param {string} options.repoDir - the skills-repo directory
+ * @param {string} options.slug - the skill's slug
+ * @param {string} options.remote - the version SkillHub publishes
+ * @param {Buffer} options.archive - the skill zip
+ * @returns {Promise<{ updated: boolean, reason?: string }>}
+ */
+async function installSkillUpdate({ dataDir, repoDir, slug, remote, archive }) {
+  const staging = join(stagingDir(dataDir), slug.replace(/[\\/]/gu, '__'))
+  const backup = join(backupDir(dataDir), slug.replace(/[\\/]/gu, '__'))
+  const target = join(repoDir, slug)
+  await rm(staging, { recursive: true, force: true })
+  await mkdir(staging, { recursive: true })
+  try {
+    await unpackSkillZip(archive, staging)
+  } catch (error) {
+    await rm(staging, { recursive: true, force: true })
+    return { updated: false, reason: `unpack failed: ${error instanceof Error ? error.message : String(error)}` }
+  }
+  // The unpacked skill has to carry its SKILL.md: an archive without one would leave the
+  // reader with a folder DSH does not treat as a skill.
+  if (!existsSync(join(staging, 'SKILL.md'))) {
+    await rm(staging, { recursive: true, force: true })
+    return { updated: false, reason: 'the archive does not carry a SKILL.md' }
+  }
+  await rm(backup, { recursive: true, force: true })
+  await mkdir(backupDir(dataDir), { recursive: true })
+  const had = existsSync(target)
+  if (had) await rename(target, backup)
+  try {
+    await rename(staging, target)
+  } catch (error) {
+    // The swap failed: the old copy goes back, so the repo keeps what it had.
+    if (had) await rename(backup, target).catch(() => {})
+    await rm(staging, { recursive: true, force: true })
+    return { updated: false, reason: `the swap failed: ${error instanceof Error ? error.message : String(error)}` }
+  }
+  await rm(backup, { recursive: true, force: true })
+  return { updated: true }
+}
+
+/** Where the new skill copies are unpacked before they are swapped in. */
+const stagingDir = dataDir => join(dataDir, 'skills-update-staging')
+/** Where the replaced skill folders are kept until the swap is known to have worked. */
+const backupDir = dataDir => join(dataDir, 'skills-update-backup')
 
 /**
  * Run the skills sync on the same hourly rhythm as the plugin check; the state file keeps a
