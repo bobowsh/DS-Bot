@@ -494,6 +494,7 @@ async function boot(mine) {
   watchFactoryPlugins({
     dataDir: places.dataDir,
     profileDirOf: () => profileDir(),
+    hostVersionOf: () => getDshRuntimeVersion(),
     onUpdated: names => { void tellPluginsUpdated(names) },
   })
   startWindow.done('data')

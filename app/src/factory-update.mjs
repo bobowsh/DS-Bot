@@ -242,6 +242,57 @@ function factoryApprovedNames(dataDir) {
 /** The npm lifecycle hooks that run code when a package is installed. */
 const INSTALL_SCRIPT_KEYS = ['preinstall', 'install', 'postinstall']
 
+/** Parse a version into comparable parts; null when it is not three dot-separated numbers. */
+function parseVersionParts(version) {
+  const core = String(version ?? '').replace(/^v/u, '').split(/-(.*)/su)[0]
+  const parts = core.split('.')
+  if (parts.length !== 3 || parts.some(part => !/^\d+$/u.test(part))) return null
+  return parts.map(part => Number(part))
+}
+
+/**
+ * Whether one comparison like `>=0.2.2`, `^0.2.0`, `~0.2.0` or `0.2.2` holds for the version.
+ * @param {number[]} parts - the host version's three numbers
+ * @param {string} operator @param {string} target
+ */
+function holdsComparison(parts, operator, target) {
+  const targetParts = parseVersionParts(target)
+  if (targetParts === null) return false
+  for (let index = 0; index < 3; index += 1) {
+    if (parts[index] !== targetParts[index]) break
+  }
+  const compare = (left, right) => left[0] !== right[0] ? left[0] - right[0] : left[1] !== right[1] ? left[1] - right[1] : left[2] - right[2]
+  const order = compare(parts, targetParts)
+  if (operator === '^') return order >= 0 && parts[0] === targetParts[0]
+  if (operator === '~') return order >= 0 && parts[0] === targetParts[0] && parts[1] === targetParts[1]
+  if (operator === '>=') return order >= 0
+  if (operator === '>') return order > 0
+  if (operator === '<=') return order <= 0
+  if (operator === '<') return order < 0
+  return order === 0
+}
+
+/**
+ * Whether the host version satisfies a semver range like `^0.2.0 || >=0.3.0`. The subset npm
+ * plugins actually declare: `^`, `~`, `>=`, `>`, `<=`, `<`, exact, joined by spaces (and) or
+ * `||` (or). An unparseable range refuses the update, since it says nothing we can check.
+ * @param {string} hostVersion - the DSH version this app runs
+ * @param {string} range - the range the plugin declares
+ */
+export function satisfiesDshRange(hostVersion, range) {
+  const parts = parseVersionParts(hostVersion)
+  if (parts === null) return false
+  for (const alternative of String(range).split('||')) {
+    const comparisons = alternative.trim().split(/\s+/u).filter(part => part !== '')
+    if (comparisons.length === 0) continue
+    if (comparisons.every(comparison => {
+      const match = /^(\^|~|>=|>|<=|<)?\s*(.+)$/u.exec(comparison)
+      return match !== null && holdsComparison(parts, match[1] ?? '=', match[2])
+    })) return true
+  }
+  return false
+}
+
 /**
  * Put a newer copy of a plugin in place.
  *
@@ -256,9 +307,10 @@ const INSTALL_SCRIPT_KEYS = ['preinstall', 'install', 'postinstall']
  * @param {string} options.name - the package name
  * @param {string} options.version - the version the catalog named
  * @param {Buffer} options.archive - the archive
- * @returns {Promise<{ updated: boolean, reason?: string }>}
+ * @param {string} [options.hostVersion] - the DSH version this app runs, for `engines.dsh`
+ * @returns {Promise<{ updated: boolean, incompatible?: boolean, reason?: string }>}
  */
-export async function installUpdate({ dataDir, profileDir, name, version, archive }) {
+export async function installUpdate({ dataDir, profileDir, name, version, archive, hostVersion }) {
   const staging = join(stagingDir(dataDir), name.replace(/[\\/]/gu, '__'))
   const backup = join(backupDir(dataDir), name.replace(/[\\/]/gu, '__'))
   const target = join(profileDir, 'node_modules', ...name.split('/'))
@@ -304,6 +356,14 @@ export async function installUpdate({ dataDir, profileDir, name, version, archiv
   if (installScripts.length > 0 && !factoryApprovedNames(dataDir).includes(name)) {
     await rm(staging, { recursive: true, force: true })
     return { updated: false, reason: `${name} carries install scripts (${installScripts.join(', ')}) and is not on the factory list` }
+  }
+  // Gate: the compatibility the plugin declares in `engines.dsh`. #12 calls this the one risky
+  // step of the whole case: an update that the running DSH does not satisfy is skipped, not
+  // counted as a failure, so it is looked at again the next day.
+  const dshRange = stagedManifest?.engines?.dsh
+  if (typeof dshRange === 'string' && dshRange !== '' && hostVersion !== undefined && !satisfiesDshRange(hostVersion, dshRange)) {
+    await rm(staging, { recursive: true, force: true })
+    return { updated: false, incompatible: true, reason: `${name} declares engines.dsh ${dshRange}, but this app runs DSH ${hostVersion}` }
   }
   await rm(backup, { recursive: true, force: true })
   await mkdir(backupDir(dataDir), { recursive: true })
@@ -354,11 +414,12 @@ async function recordInstalledPlugin({ profileDir, name, version }) {
  * @param {string} options.dataDir - the data location
  * @param {string} options.profileDir - the profile directory
  * @param {string} [options.catalogUrl] - the catalog url
+ * @param {string} [options.hostVersion] - the DSH version this app runs, for `engines.dsh`
  * @param {typeof fetch} [options.fetch] - the fetch to use
  * @param {Console} [options.log] - where the outcome is written
  * @returns {Promise<{ checked: boolean, updated: string[], installed: string[], failed: string[], skipped: string[], leftAlone: string[], reason?: string }>}
  */
-export async function updateFactoryPlugins({ dataDir, profileDir, catalogUrl = CATALOG_URL, fetch: fetchImpl = globalThis.fetch, log = console }) {
+export async function updateFactoryPlugins({ dataDir, profileDir, catalogUrl = CATALOG_URL, hostVersion, fetch: fetchImpl = globalThis.fetch, log = console }) {
   const result = { checked: false, updated: [], installed: [], failed: [], skipped: [], leftAlone: [] }
   const state = await readState(dataDir)
   const today = dayOf()
@@ -393,7 +454,7 @@ export async function updateFactoryPlugins({ dataDir, profileDir, catalogUrl = C
       const response = await fetchImpl(url)
       if (!response.ok) throw new Error(`HTTP ${String(response.status)}`)
       const archive = Buffer.from(await response.arrayBuffer())
-      const outcome = await installUpdate({ dataDir, profileDir, name: update.name, version: update.version, archive })
+      const outcome = await installUpdate({ dataDir, profileDir, name: update.name, version: update.version, archive, hostVersion })
       if (outcome.updated) {
         delete failures[update.name]
         // A new factory plugin has to be recorded, or DSH never loads it: the manifest gains
@@ -402,6 +463,11 @@ export async function updateFactoryPlugins({ dataDir, profileDir, catalogUrl = C
         if (isNew) await recordInstalledPlugin({ profileDir, name: update.name, version: update.version })
         result[isNew ? 'installed' : 'updated'].push(update.name)
         log.info(`LinkBot: plugin ${update.name} ${isNew ? 'installed' : 'updated to'} ${update.version}`)
+      } else if (outcome.incompatible) {
+        // A plugin the running DSH cannot satisfy is skipped, not counted as a failure: #12
+        // wants it looked at again the next day, when the app itself may have moved ahead.
+        result.skipped.push(update.name)
+        log.info(`LinkBot: plugin ${update.name} was skipped: ${outcome.reason}`)
       } else {
         failures[update.name] = count + 1
         result.failed.push(update.name)
@@ -427,12 +493,13 @@ export async function updateFactoryPlugins({ dataDir, profileDir, catalogUrl = C
  * @param {string} options.profileDir - the profile directory
  * @param {() => string} options.profileDirOf - where the profile lives, read when the check runs
  * @param {string} [options.catalogUrl] - the catalog url
+ * @param {() => string} [options.hostVersionOf] - the DSH version this app runs, read when the check runs
  * @param {typeof fetch} [options.fetch] - the fetch to use
  * @param {Console} [options.log] - where the outcome is written
  * @param {(updated: string[]) => void} [options.onUpdated] - told when plugins were replaced
  * @returns {{ stop: () => void, check: () => Promise<void> }}
  */
-export function watchFactoryPlugins({ dataDir, profileDirOf, catalogUrl, fetch: fetchImpl, log = console, onUpdated }) {
+export function watchFactoryPlugins({ dataDir, profileDirOf, catalogUrl, hostVersionOf, fetch: fetchImpl, log = console, onUpdated }) {
   const HOUR_MS = 60 * 60_000
   let busy = false
   const check = async () => {
@@ -444,6 +511,7 @@ export function watchFactoryPlugins({ dataDir, profileDirOf, catalogUrl, fetch: 
         dataDir,
         profileDir: profileDirOf(),
         catalogUrl,
+        hostVersion: hostVersionOf?.(),
         fetch: fetchImpl,
         log,
       })
