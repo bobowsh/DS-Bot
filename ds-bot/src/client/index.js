@@ -52,10 +52,8 @@ import { MEMBER_CSS, MemberDock } from './member-status.js'
 import { IM_CSS } from './im-page.js'
 import { USER_MESSAGE_CSS, UserMessageCell, canDrawUserMessages } from './user-message.js'
 import { QueueDock, QUEUE_CSS } from './queue-dock.js'
-import { UsageLine, USAGE_LINE_CSS } from './usage-line.js'
 import { noticeApprovals } from './approval-notices.js'
 import { listedOpener } from './open-listed.js'
-import { DEFAULT_WORK_DETAILS } from './work-details.js'
 
 export const inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout', 'configForms']
 
@@ -429,20 +427,15 @@ export function apply(ctx) {
   // host exposes it, so the row waits for it.
   const chatSettings = ctx.get('configForms')?.get('ui-chat')
   if (chatSettings !== undefined) {
-    // A profile that never chose a work-details mode opens on the host's default.
-    // The team wants the standard amount of a turn's process: enough to see what the
-    // Bots ran, without the fully expanded rows. A mode the user picked is never
-    // overwritten.
-    const ensureMode = () => {
-      const value = chatSettings.getSnapshot().value
-      if (value?.transcriptView === undefined) void chatSettings.set('transcriptView', DEFAULT_WORK_DETAILS).catch(() => {})
-    }
+    // Nothing is written here. The host owns the mode and its own default (the
+    // desktop app opens on 'standard'); writing one on startup would land in the
+    // profile's patch row, where it outranks the user's own choice — the choice
+    // in the settings page would then not survive a restart.
     const adopt = () => {
       const value = chatSettings.getSnapshot().value
       workDetails.set(value?.transcriptView)
     }
     ctx.effect(() => {
-      ensureMode()
       adopt()
       return chatSettings.subscribe(adopt)
     }, 'ds-bot: the host work details')
@@ -813,17 +806,6 @@ export function apply(ctx) {
   // the rate it measured) and its token usage. They come from the session list's own snapshot,
   // which is the public way to read them.
 
-// The usage line under the input: the host's own readings of the session.
-const UsageDock = ({ sessionId }) => {
-  const values = ctx.sessions.list.getSnapshot().projectionsBySession?.[sessionId]?.values ?? {}
-  return h(UsageLine, {
-    stats: values.sessionStats,
-    usage: values.tokenUsage,
-    pressure: values.contextPressure,
-    breakdown: values.contextBreakdown,
-  })
-}
-
   const face = () => ({ actions, hooks: { roster, ui, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, frame, sidebarPref } })
   // The face a team tool view gets: the team's own state, plus the browser and
   // computer hooks the handover cards read.
@@ -1054,7 +1036,6 @@ const UsageDock = ({ sessionId }) => {
     () => installCompiledStyles(SECRET_CSS + CONNECTOR_CSS + CONNECTORS_PAGE_CSS, 'secrets'),
     () => installCompiledStyles(LEARNING_CSS, 'learning'),
     () => installCompiledStyles(MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + GROUP_SETTINGS_CSS + AVATAR_LIBRARY_CSS, 'models'),
-    () => installCompiledStyles(USAGE_LINE_CSS, 'usage'),
     () => installCompiledStyles(SCHEDULE_CSS, 'schedules'),
     () => installCompiledStyles(FEEDBACK_CSS, 'feedback'),
     () => installCompiledStyles(ABOUT_CSS, 'about'),
@@ -1130,7 +1111,6 @@ const UsageDock = ({ sessionId }) => {
       priority: BOT_PRIORITY,
       select: owner => (owner.pendingInteraction?.kind === 'question' ? owner.pendingInteraction : null),
     }, QuestionCard),
-    () => shadow('conversation.input.dock', { id: 'bot-usage', order: -125, inject: face }, UsageDock),
     () => shadow('conversation.input.dock', { id: 'bot-members', order: -120, inject: face }, MemberDock),
     () => shadow('conversation.input.dock', { id: 'bot-model', order: -110, inject: face }, ModelChoiceDock),
     () => shadow('conversation.input.dock', { id: 'bot-question', order: -100, inject: face }, QuestionDock),
