@@ -28,6 +28,8 @@
 `dsh-chat-import`、`dsh-xdpool`、`dshmarket`、`@linxin666/dsh-client-ui-git-graph`、`dsh-rule-manager`、`dsh-tool-activator`、`skillhub-dsh`、`dsh-aide`、`dsh-better-sidebar`、`dsh-screenshot-native`、`ds-harness-remote`、`dsh-plugin-guide`
 
 > **变更**：`dsh-computer-use-win` 用户 2026-11-08 明确**不要了**，清单从 13 个减为 12 个。
+>
+> **变更（2026-11-08 晚）**：`dsh-tool-activator` **移出出厂清单，现为 11 个**。原因：它要修的报错需要升到 0.5.0，而 0.5.0 只在外网 npm 上、**内网 Gitea registry 最高只有 0.4.3**，而**内网当前不通**（192.168.1.10 的 3000/8081/22/80/443 端口全部不可达，ping 通但无服务），推不上去。用户 2026-11-08 指示「内网现在不通，先把这个插件不放进出厂插件」。等内网恢复并把 0.5.0 推上内网 registry 后，再加回清单。
 
 ### 出厂技能清单（3 个，用户定）
 

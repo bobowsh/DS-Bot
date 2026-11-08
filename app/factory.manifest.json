@@ -6,7 +6,6 @@
     { "name": "dshmarket", "version": "1.70.2" },
     { "name": "@linxin666/dsh-client-ui-git-graph", "version": "0.4.12" },
     { "name": "dsh-rule-manager", "version": "0.1.0" },
-    { "name": "dsh-tool-activator", "version": "0.4.3" },
     { "name": "@astron-team/skillhub-dsh", "version": "0.6.2" },
     { "name": "dsh-aide", "version": "0.12.0" },
     { "name": "dsh-better-sidebar", "version": "0.28.2" },
