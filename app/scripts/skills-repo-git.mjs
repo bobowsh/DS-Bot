@@ -1,5 +1,5 @@
 // The bundled skills repo ships as a repository, but .git can never be committed (git does not
-// track a git dir), so this script makes one inside resources/skills-repo before the pack: the
+// track a git dir), so this script makes one inside build/data/skills-repo before the pack: the
 // installed app copies that repository to <dataDir>/skills-repo and updates it with `git pull`.
 // scripts/before-pack.mjs runs it for every build; run it by hand after the skills change.
 //
@@ -12,7 +12,10 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const SKILLS_REPO = fileURLToPath(new URL('../resources/skills-repo', import.meta.url))
+export const SKILLS_REPO = fileURLToPath(new URL('../build/data/skills-repo', import.meta.url))
+// The skills themselves live in the repository; the folder the installer ships them from is
+// built from it.
+export const SKILLS_SOURCE = fileURLToPath(new URL('../resources/skills-repo', import.meta.url))
 
 function git(args, cwd) {
   const run = spawnSync('git', args, { cwd, encoding: 'utf8' })
@@ -50,11 +53,21 @@ function cloneMirror(dir, url, warn) {
 }
 
 /**
- * Make resources/skills-repo a repository holding its current contents, pulling from `url`.
- * A repository that is already there keeps its history and only records the remote.
+ * Make build/data/skills-repo a repository holding the skills of resources/skills-repo, pulling
+ * from `url`. A repository that is already there keeps its history and only records the remote.
  * @returns whether the directory carries git information afterwards.
  */
-export function ensureSkillsRepoGit({ dir = SKILLS_REPO, env = process.env, warn = console.warn } = {}) {
+export function ensureSkillsRepoGit({ dir = SKILLS_REPO, source = SKILLS_SOURCE, env = process.env, warn = console.warn } = {}) {
+  // The skills live in the repository; the folder the installer ships them from is a copy of it.
+  // The copy is made first, so the git information is made in the folder that ships.
+  if (source !== dir) {
+    if (!existsSync(source)) {
+      warn('LinkBot: no bundled skills repo to prepare')
+      return false
+    }
+    rmSync(dir, { recursive: true, force: true })
+    cpSync(source, dir, { recursive: true })
+  }
   if (!existsSync(dir)) {
     warn('LinkBot: no bundled skills repo to prepare')
     return false

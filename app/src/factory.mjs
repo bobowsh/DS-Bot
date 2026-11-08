@@ -1,8 +1,9 @@
 // The factory seed: the resources the installer ships with are put under the data location
 // on first launch, so a fresh install opens on a ready-made Bot team. ds-bot reads the team
 // from <dataDir>/factory/factory-team.json (src/host/factory-seed.js); the skills live in the
-// git repository at <dataDir>/skills-repo/, which travels with the installer as a repository
-// of its own and is only copied here — the first run never reaches the network. Later starts
+// git repository at <dataDir>/skills-repo/, which the installer puts in the data directory
+// beside the program and the first run only copies when the installer could not move it there.
+// The first run never reaches the network. Later starts
 // update it with `git pull` against the remote the repository carries (or DS_BOT_SKILLS_REPO).
 // isomorphic-git is loaded lazily: an offline machine or a build without the package still
 // works with the copy, and never fails the start.
@@ -51,7 +52,7 @@ async function loadGit() {
   }
 }
 
-export async function installFactoryResources({ dataDir, resourcesDir, signal }) {
+export async function installFactoryResources({ dataDir, resourcesDir, skillsRepoDir, signal }) {
   const result = { seedCopied: false, repo: 'kept' }
   const bundledSeed = join(resourcesDir, 'factory', 'factory-team.json')
   // A seed that ships a newer version replaces the one already installed: an upgrade must be able
@@ -63,14 +64,17 @@ export async function installFactoryResources({ dataDir, resourcesDir, signal })
     await cp(bundledSeed, seedFile(dataDir), signal)
     result.seedCopied = true
   }
-  const bundledRepo = join(resourcesDir, 'skills-repo')
+  const target = repoDir(dataDir)
+  // A repository is already in place: it is the user's, and the pull keeps it current.
+  if (existsSync(join(target, '.git'))) return result
+  // The installer puts the repository in the data directory beside the program. It could not
+  // when the parent folder cannot be written (as under Program Files), and the copy the
+  // installer left is then read from the program folder.
+  const bundledRepo = skillsRepoDir ?? join(resourcesDir, 'skills-repo')
   if (!existsSync(bundledRepo)) {
     result.reason = 'no bundled skills repo'
     return result
   }
-  const target = repoDir(dataDir)
-  // A repository is already in place: it is the user's, and the pull keeps it current.
-  if (existsSync(join(target, '.git'))) return result
   if (!existsSync(target)) {
     // The bundled repository ships whole, its .git included, so the installed copy can pull.
     await copyTree(bundledRepo, target, signal)

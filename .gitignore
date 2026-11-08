@@ -12,6 +12,12 @@ node_modules/
 # (scripts/before-pack.mjs runs it for every build). Its git dir is build output; the skills
 # in it are the repository's own files.
 /app/resources/skills-repo/.git/
+# The data directory the installer ships: the plugins and the skills repository are made for
+# every build (scripts/bundled-plugin.mjs, scripts/skills-repo-git.mjs), and the skills
+# repository carries a git dir of its own.
+/app/build/data/
+# Some tests use a relative appDir ("app-dir"); its build output is test scratch, not source.
+/app/app-dir/
 
 # A DeepSeek Harness checkout for the tests and the test bench.
 /deepseek-harness/

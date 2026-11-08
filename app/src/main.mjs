@@ -21,6 +21,7 @@ import { hostPort } from './host-port.mjs'
 import { captureStdio, LogFile } from './logs.mjs'
 import { Pickers } from './picker-host.mjs'
 import { currentRootOf, driveOf, formatBytes, freeSpace, isEmptyTree, pickFrom, placeOf, rootOf, runningLow } from './place.mjs'
+import { bundledPlugins, findBundledPlugin } from './bundled-plugins.mjs'
 import { createShell, SHELL_TEXT } from './shell.mjs'
 import { readStartFrame, writeStartFrame } from './start-frame.mjs'
 import { explainOf, StartWindow } from './start-window.mjs'
@@ -83,45 +84,21 @@ let downloadSaver, chooseLocations, defaultPlaces, lang, pickerLabels, pickRoot,
 let copySessions, findTeam, importTeam, restoreSessions, teamInUse, teamSizes, userDshHome, copyData, copyReason, moveProblem, CHECK_PROFILE, PROFILE, ImportFlow
 let watchReleases, watchUpdates, RELEASE_PAGE, getDshRuntimeVersion, electronUpdater
 let installFactoryResources, pullSkillsRepo, removeDshHomeVariableWithNotice
-let archivePackageName, installImportPlugin
+let installImportPlugin
 
 /**
- * The plugin archives the installer carries, with the version each file name carries. The name
- * holds the version so a start that finds nothing to do reads a file name, not the archive.
- * @param {string} resourcesDir - the app's resources directory
- * @returns {{ name: string, path: string, version: string }[]}
+ * Where the factory plugins live. The installer moves its data tree beside the program, but a
+ * parent it cannot write to (as under Program Files) leaves the copy in the program folder, and
+ * the first start reads it from there instead.
+ * @param {string} dataDir - the data directory beside the program
+ * @returns {string} the data directory whose profiles/<profile>/node_modules holds the plugins
  */
-export function bundledPlugins(resourcesDir) {
-  const dir = join(resourcesDir, 'bundled-plugins')
-  let entries
-  try {
-    entries = readdirSync(dir)
-  } catch {
-    return []
-  }
-  // A scoped name is packed with the scope flattened to a dash, so the version is the last
-  // dashed segment and everything before it is the name.
-  const found = []
-  for (const file of entries) {
-    const match = /^(.+)-(\d+\.\d+\.\d+(?:-[\w.]+)?)\.tgz$/u.exec(file)
-    if (match === null) continue
-    found.push({ name: match[1], path: join(dir, file), version: match[2] })
-  }
-  return found.sort((a, b) => a.name.localeCompare(b.name, 'en'))
-}
-
-/**
- * The plugin archive the installer carries for one package, by its flattened file name.
- * @param {string} resourcesDir - the app's resources directory
- * @param {string} name - the plugin's package name
- * @returns {{ path: string, version: string } | undefined}
- */
-export function findBundledPlugin(resourcesDir, name) {
-  const flattened = name.replace(/^@/u, '').replace(/\//gu, '-')
-  const found = bundledPlugins(resourcesDir)
-    .filter(entry => entry.name === flattened)
-    .sort((a, b) => b.version.localeCompare(a.version, 'en', { numeric: true }))[0]
-  return found === undefined ? undefined : { path: found.path, version: found.version }
+export function bundledDataHome(dataDir) {
+  const programData = join(dirname(app.getPath('exe')), 'data')
+  const hasPlugins = root => existsSync(join(root, 'factory', 'plugins.json'))
+  if (hasPlugins(dataDir)) return dataDir
+  if (hasPlugins(programData)) return programData
+  return dataDir
 }
 
 let mainWindow
@@ -375,7 +352,7 @@ async function loadModules() {
   ;({ getDshRuntimeVersion } = boot)
   ;({ installFactoryResources, pullSkillsRepo } = factory)
   ;({ removeDshHomeVariableWithNotice } = autoImports)
-  ;({ archivePackageName, installImportPlugin } = importPlugin)
+  ;({ installImportPlugin } = importPlugin)
   electronUpdater = updater.default
   browserGuests = new BotBrowserGuests({ session, origin: () => origin, devTools: !app.isPackaged })
   botViews = new BotViews({
@@ -488,19 +465,18 @@ async function boot(mine) {
   // its temporary file, and every factory Bot fails to attach. That is a Host defect (the
   // storage is not ours to write), so the app does not seed it; the upstream issue tracks it.
   // The bundled plugins belong to the profile, not to the app: the user may turn each one off in
-  // the plugin manager. They travel with the installer and are unpacked into the profile here,
-  // before the Host starts, so the profile already holds them when DSH composes the bundle list.
-  // A plugin turned off stays off: installImportPlugin reads the profile's own manifest and does
-  // not put a bundle back into a list the user removed it from.
-  for (const entry of bundledPlugins(resourcesDir())) {
-    // The file name is flattened, so the package name comes from the archive's own manifest.
-    const name = await archivePackageName(entry.path) ?? entry.name
+  // the plugin manager. They travel with the installer in a DSH home tree and are recorded in the
+  // profile before the Host starts, so the profile already holds them when DSH composes the
+  // bundle list. A plugin turned off stays off: installImportPlugin reads the profile's own
+  // manifest and does not put a bundle back into a list the user removed it from.
+  const factoryHome = bundledDataHome(places.dataDir)
+  for (const entry of bundledPlugins(factoryHome)) {
     await installImportPlugin({
       profileDir: profileDir(),
-      archive: entry.path,
-      name,
+      folder: entry.folder,
+      name: entry.name,
       version: entry.version,
-    }).catch(error => { console.error(`LinkBot: the plugin ${name} was not put in place:`, error) })
+    }).catch(error => { console.error(`LinkBot: the plugin ${entry.name} was not put in place:`, error) })
   }
   // The factory seed and the bundled skills repo land before the Host starts: ds-bot builds
   // the seeded team at its startup, and reads the seed file from the data location. It runs
