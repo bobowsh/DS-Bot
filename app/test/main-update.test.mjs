@@ -22,18 +22,21 @@ test('the update waits for the window and is installed when the window comes bac
   hostState.release()
   // The team view is ready: the start window hands over to the team window.
   await handOff()
-  // The window goes away, and the update is downloaded while it is gone.
+  // The window goes away, and the update is downloaded while it is gone. The close asks what
+  // should happen; the tray answer hides the window.
   win.close()
+  await waitFor(() => windowCards(win).length === 1, 'ask what the close should do')
+  answerCard(0, win)
   await waitFor(() => win.visible === false, 'hide the window')
   updater.emit('update-downloaded', { version: '9.9.9' })
   await new Promise(resolve => { setTimeout(resolve, 50) })
-  assert.equal(windowCards(win).length, 0, 'the card waits for the window')
+  assert.equal(windowCards(win).length, 1, 'the update card waits for the window; only the close question is up')
 
   // The user says yes on the card when the window is back; no message box comes up.
   trayMenu()[0].click()
-  await waitFor(() => windowCards(win).length === 1, 'ask on a card in the team window')
-  assert.match(windowCards(win)[0].message, /9\.9\.9/u)
-  assert.equal(windowCards(win)[0].cancel, 1, 'Escape is 「以后再说」')
+  await waitFor(() => windowCards(win).length === 2, 'ask on a card in the team window')
+  assert.match(windowCards(win).at(-1).message, /9\.9\.9/u)
+  assert.equal(windowCards(win).at(-1).cancel, 1, 'Escape is 「以后再说」')
   answerCard(0, win)
   await waitFor(() => updaterState.quitAndInstall.length === 1, 'install the update')
   assert.equal(hostState.stops, 1, 'the Host stops for the installer')

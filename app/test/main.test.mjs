@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { before, test } from 'node:test'
 import { paths, state } from './helpers/fake-electron.mjs'
 import { state as hostState } from './helpers/fake-host-process.mjs'
-import { handOff, startApp, startWindows, teamWindows, trayMenu, waitFor, window } from './helpers/app-harness.mjs'
+import { answerCard, handOff, startApp, startWindows, teamWindows, trayMenu, waitFor, window, windowCards } from './helpers/app-harness.mjs'
 import { installHooks } from './helpers/register.mjs'
 
 await installHooks()
@@ -49,14 +49,16 @@ test('a window that is gone for good is built anew and talks to the same Host', 
   assert.equal(hostState.starts, 1, 'no second Host was started')
 })
 
-test('closing the window hides it; the app goes on', async () => {
+test('closing the window asks what to do; the tray answer hides it', async () => {
   const win = window()
   win.close()
+  await waitFor(() => windowCards(win).length === 1, 'ask what the close should do')
+  answerCard(0, win)
   await waitFor(() => win.visible === false, 'hide the window')
   assert.equal(win.isDestroyed(), false, 'the window is there')
   assert.equal(state.quits, 0, 'the app goes on')
   assert.equal(hostState.stops, 0, 'the Host goes on')
-  assert.equal(state.dialogs.length, 0, 'the notice was answered already')
+  assert.equal(state.dialogs.length, 0, 'no message box')
 })
 
 test('the tray opens the window again', async () => {

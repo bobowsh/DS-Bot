@@ -189,10 +189,9 @@ const shell = createShell({
   // Before the first run has chosen its places there is no window to show, and before the
   // first load of the Host there is no address to load.
   ready: () => places !== undefined && origin !== undefined && bootstrap !== undefined,
-  // The one-time notice is a card in the team window; a page that cannot show it lets the window
-  // go to the tray, which is what the notice would have said.
-  // A second close while the card is up brings the window, and so the card, to the front.
-  notice: { marker: () => join(app.getPath('userData'), 'tray-close-acknowledged'), show: options => boxInWindow(options, 0), focus: () => { toFront(mainWindow) } },
+  // The close question is a card in the team window; a page that cannot show it lets the window
+  // stay, which is what a cancelled answer means.
+  closeAsk: { show: options => boxInWindow(options, options.cancelId) },
   // Without a tray the close asks whether the app should end; unasked, the window minimizes.
   fallback: { show: options => boxInWindow(options, options.cancelId) },
 })
