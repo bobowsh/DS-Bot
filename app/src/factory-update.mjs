@@ -16,8 +16,69 @@
 // check again on the same day and the failure count survives it.
 import { cp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
-import { unpackTgz, newerVersion } from './import-plugin.mjs'
+import { gunzipSync } from 'node:zlib'
+import { dirname, join } from 'node:path'
+import { newerVersion } from './import-plugin.mjs'
+
+/**
+ * The files of a gzipped tar, read with the zlib that Node carries: the archive is the shape npm
+ * publishes, and unpacking it needs nothing else. The unpacking lives here because only the
+ * runtime update pulls archives at runtime (#10 removed it from import-plugin.mjs, whose install
+ * path works on plain folders now).
+ * @param {Buffer} buffer - the archive
+ * @returns {{ path: string, body: Buffer, directory: boolean }[]}
+ */
+function readTgz(buffer) {
+  const archive = gunzipSync(buffer)
+  const entries = []
+  for (let at = 0; at + 512 <= archive.length; at += 512) {
+    const header = archive.subarray(at, at + 512)
+    // Two empty blocks end the archive.
+    if (header.every(byte => byte === 0)) break
+    const name = header.subarray(0, 100).toString('utf8').replace(/\0.*$/u, '')
+    if (name === '') continue
+    const prefix = header.subarray(345, 500).toString('utf8').replace(/\0.*$/u, '')
+    const path = prefix === '' ? name : `${prefix}/${name}`
+    const size = Number.parseInt(header.subarray(124, 136).toString('ascii').replace(/\0.*$/u, '').trim() || '0', 8)
+    const type = String.fromCharCode(header[156])
+    const body = archive.subarray(at + 512, at + 512 + size)
+    if (type === '0' || type === '\0') entries.push({ path, body, directory: false })
+    else if (type === '5') entries.push({ path: `${path}/`, body: Buffer.alloc(0), directory: true })
+    // The data of a file is padded to a whole block.
+    at += Math.ceil(size / 512) * 512
+  }
+  return entries
+}
+
+/**
+ * Write the files of an archive into a directory.
+ *
+ * The archive holds the package under `package/`, and the packages it depends on under
+ * `package/node_modules/`. The plugin goes into the staging folder under its own name, and its
+ * dependencies go beside it, where Node looks for them.
+ * @param {Buffer} buffer - the archive
+ * @param {string} into - the plugin's directory inside the staging folder
+ * @param {string} [stagingModules] - the staging folder's node_modules, where the dependencies go
+ */
+async function unpackTgz(buffer, into, stagingModules) {
+  for (const entry of readTgz(buffer)) {
+    // The archive's own top folder is the package: its contents go straight into the target.
+    const relative = entry.path.replace(/^[^/]+\//u, '').replace(/\/+$/u, '')
+    if (relative === '') continue
+    const parts = relative.split('/')
+    // The plugin's dependencies are packed beside it, but belong beside the plugin: Node
+    // resolves a package's imports from the node_modules above it.
+    const target = parts[0] === 'node_modules' && stagingModules !== undefined
+      ? join(stagingModules, ...parts.slice(1))
+      : join(into, ...parts)
+    if (entry.directory) {
+      await mkdir(target, { recursive: true })
+      continue
+    }
+    await mkdir(dirname(target), { recursive: true })
+    await writeFile(target, entry.body)
+  }
+}
 
 /** The catalog the intranet publishes; it is readable without a token. */
 export const CATALOG_URL = 'http://192.168.1.10:3000/dshplugin/dsh-catalog/raw/branch/main/plugins.json'

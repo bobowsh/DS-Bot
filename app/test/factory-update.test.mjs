@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { gzipSync } from 'node:zlib'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, beforeEach, describe, test } from 'node:test'
@@ -16,7 +17,33 @@ import {
   watchFactoryPlugins,
   writeState,
 } from '../src/factory-update.mjs'
-import { packPlugin } from '../scripts/bundled-plugin.mjs'
+
+/**
+ * A minimal ustar writer, so the tests can shape the archives the update unpacks without
+ * depending on how the installer builds its bundle.
+ * @param {{ path: string, body: Buffer }[]} files - the archive's files, under `package/`
+ * @returns {Buffer} the gzipped tar
+ */
+function makeArchive(files) {
+  const blocks = []
+  for (const file of files) {
+    const header = Buffer.alloc(512)
+    header.write(file.path.slice(0, 99), 0, 'utf8')
+    header.write('0000644\0', 100, 'utf8')
+    header.write(String(file.body.length.toString(8)).padStart(11, '0') + '\0', 124, 'utf8')
+    header.write('0', 156, 'utf8')
+    header.write('ustar\0', 257, 'utf8')
+    header.write('00', 263, 'utf8')
+    // The checksum is the sum of the header bytes with its own field blanked.
+    header.fill(' ', 148, 156)
+    let checksum = 0
+    for (const byte of header) checksum += byte
+    header.write(checksum.toString(8).padStart(6, '0') + '\0 ', 148, 'utf8')
+    blocks.push(header, file.body, Buffer.alloc(512 - (file.body.length % 512 || 512)))
+  }
+  blocks.push(Buffer.alloc(1024))
+  return gzipSync(Buffer.concat(blocks))
+}
 
 /** A fetch that answers from a table, so the check can run without the intranet. */
 function fakeFetch(routes) {
@@ -120,19 +147,17 @@ describe('the update itself', () => {
   let dataDir
   let profileDir
   let archive
-  before(async () => {
+  before(() => {
     root = mkdtempSync(join(tmpdir(), 'ds-bot-update-'))
     dataDir = join(root, 'data')
     profileDir = join(root, 'profile')
     mkdirSync(join(profileDir, 'node_modules', 'dsh-rule-manager'), { recursive: true })
     writeFileSync(join(profileDir, 'node_modules', 'dsh-rule-manager', 'package.json'), JSON.stringify({ name: 'dsh-rule-manager', version: '0.1.0' }), 'utf8')
     writeFileSync(join(profileDir, 'node_modules', 'dsh-rule-manager', 'old.mjs'), 'old\n', 'utf8')
-    const source = join(root, 'source')
-    mkdirSync(source, { recursive: true })
-    writeFileSync(join(source, 'package.json'), JSON.stringify({ name: 'dsh-rule-manager', version: '0.2.0' }), 'utf8')
-    writeFileSync(join(source, 'new.mjs'), 'new\n', 'utf8')
-    archive = join(root, 'plugin.tgz')
-    await packPlugin(source, archive, 'package')
+    archive = makeArchive([
+      { path: 'package/package.json', body: Buffer.from(JSON.stringify({ name: 'dsh-rule-manager', version: '0.2.0' }), 'utf8') },
+      { path: 'package/new.mjs', body: Buffer.from('new\n', 'utf8') },
+    ])
   })
   after(() => { rmSync(root, { recursive: true, force: true }) })
   beforeEach(() => {
@@ -146,7 +171,7 @@ describe('the update itself', () => {
     const fetchImpl = fakeFetch([
       { prefix: 'http://catalog/', body: { plugins: [{ name: 'dsh-rule-manager', version: '0.2.0', registry: 'http://registry/' }] } },
       { prefix: 'http://registry/dsh-rule-manager', body: { versions: { '0.2.0': { dist: { tarball: 'http://registry/pkg/-/pkg-0.2.0.tgz' } } } } },
-      { prefix: 'http://registry/pkg/-/', body: readFileSync(archive) },
+      { prefix: 'http://registry/pkg/-/', body: archive },
     ])
     writeFileSync(join(profileDir, 'package.json'), JSON.stringify({ dependencies: { 'dsh-rule-manager': '0.1.0' } }), 'utf8')
     const outcome = await updateFactoryPlugins({ dataDir, profileDir, catalogUrl: 'http://catalog/', fetch: fetchImpl })
@@ -165,7 +190,7 @@ describe('the update itself', () => {
       profileDir,
       name: 'dsh-rule-manager',
       version: '0.3.0',
-      archive: readFileSync(archive),
+      archive: archive,
     })
     assert.equal(outcome.updated, false)
     assert.match(outcome.reason, /0\.2\.0/)
