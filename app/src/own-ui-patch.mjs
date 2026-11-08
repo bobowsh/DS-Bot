@@ -86,3 +86,54 @@ export function reconcileOwnUi(profile, factoryOff = []) {
   writeFileSync(file, stringify([...(rows ?? []), ...off]), 'utf8')
   return [file]
 }
+
+// The work-details mode of the host's own chat: how much of a turn's tool calls
+// shows. It is a field of the `ui-chat` settings namespace, and the host's settings
+// document is the profile's own patch file — so a `transcriptView` there is the
+// user's own choice, and the host's own settings page reads it back.
+//
+// Earlier builds of DS Bot wrote *their* default mode into that file on startup, so
+// profiles that ran them carry a mode the user never chose — and because a patch
+// row's config outranks the settings document, every later choice in the settings
+// page is overwritten again on the next start. That is why the choice did not stick.
+//
+// This removes the mode from the profile's patch file once, so the host's settings
+// page owns it from then on. A profile whose patch file already has no mode is left
+// alone, and the removal is idempotent.
+const WORK_DETAILS_FIELD = 'transcriptView'
+const CHAT_ROW_ID = 'ui-chat'
+
+/**
+ * Remove the work-details mode from the profile's `ui-chat` patch row, and the row
+ * itself when nothing else is left in it. `undefined` when there was no such file.
+ * @param {string} file - the profile's `cordis.patch.yml`
+ * @param {{ read?: typeof readFileSync, write?: typeof writeFileSync }} [io] - injectable for tests
+ * @returns {boolean | undefined} whether the file was rewritten, or `undefined` when absent
+ */
+export function dropWorkDetailsPatch(file, { read = readFileSync, write = writeFileSync } = {}) {
+  let content
+  try {
+    content = read(file, 'utf8')
+  } catch {
+    return undefined
+  }
+  const lines = content.split('\n')
+  const start = lines.findIndex(line => line === `- id: ${CHAT_ROW_ID}`)
+  if (start === -1) return false
+  let end = start + 1
+  while (end < lines.length && !lines[end].startsWith('- ')) end += 1
+  const block = lines.slice(start, end)
+  if (!block.some(line => line.trim().startsWith(`${WORK_DETAILS_FIELD}:`))) return false
+  const kept = block.filter(line => !line.trim().startsWith(`${WORK_DETAILS_FIELD}:`))
+  // The row's config is a nested mapping; with the mode gone it may hold nothing.
+  const config = kept.findIndex(line => line === '  config:')
+  const hasConfig = config !== -1 && kept.slice(config + 1).some(line => /^ {4}\S/u.test(line))
+  const withoutConfig = config === -1 ? kept : kept.filter((line, index) => index !== config || hasConfig)
+  // Nothing but the id and the name is left: the row has no purpose of its own.
+  const onlyIdentity = withoutConfig.every(line => /^(- id: |  name: )/u.test(line))
+  const next = onlyIdentity
+    ? [...lines.slice(0, start), ...lines.slice(end)]
+    : [...lines.slice(0, start), ...withoutConfig, ...lines.slice(end)]
+  write(file, next.join('\n'), 'utf8')
+  return true
+}

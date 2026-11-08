@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { after, test } from 'node:test'
 import { composeEntries } from '@deepseek-ai/dsh-app-boot'
 import { parse } from 'yaml'
-import { ownUiPatch, reconcileOwnUi, factoryOffNames, factoryOffRows, OWN_UI_PATCH_NAME } from '../src/own-ui-patch.mjs'
+import { ownUiPatch, reconcileOwnUi, factoryOffNames, factoryOffRows, dropWorkDetailsPatch, OWN_UI_PATCH_NAME } from '../src/own-ui-patch.mjs'
 
 const UI_ROW = '@deepseek-ai/dsh-client-ui-settings-account'
 
@@ -110,4 +110,68 @@ test('a factory plugin that is not in the profile gets no row', () => {
 
 test('a factory list that is not there names no plugin that ships off', () => {
   assert.deepEqual(factoryOffNames(join(tmpdir(), 'ds-bot-no-factory-list')), [])
+})
+
+// The work-details mode in the profile's patch file: it outranks the user's own choice in
+// the settings page, so a profile that carries one cannot keep a choice at all.
+const patchWithWorkDetails = [
+  '# Your patch layer for this dsh profile, applied after every bundle layer:',
+  '- id: ui-chat',
+  '  name: "@deepseek-ai/dsh-client-ui-chat"',
+  '  config:',
+  '    transcriptView: verbose',
+  '- id: ui-settings-general',
+  '  name: "@deepseek-ai/dsh-client-ui-settings-general"',
+  '  config:',
+  '    welcomeNoticeVersion: 2026-09-28.1',
+  '',
+].join('\n')
+
+const patchFile = (content) => {
+  const dir = mkdtempSync(join(tmpdir(), 'ds-bot-work-details-'))
+  made.push(dir)
+  const file = join(dir, 'cordis.patch.yml')
+  writeFileSync(file, content, 'utf8')
+  return file
+}
+
+test('the work-details mode is removed from the profile patch', () => {
+  const file = patchFile(patchWithWorkDetails)
+  assert.equal(dropWorkDetailsPatch(file), true)
+  const next = readFileSync(file, 'utf8')
+  assert.ok(!next.includes('transcriptView'), 'the mode is gone')
+  // The row itself held nothing else, so it goes with it.
+  assert.ok(!next.includes('- id: ui-chat'), 'the empty row is gone')
+  // The other rows are untouched.
+  assert.ok(next.includes('- id: ui-settings-general'))
+  assert.ok(next.includes('welcomeNoticeVersion: 2026-09-28.1'))
+})
+
+test('a row that holds something else keeps it', () => {
+  const file = patchFile([
+    '- id: ui-chat',
+    '  name: "@deepseek-ai/dsh-client-ui-chat"',
+    '  config:',
+    '    transcriptView: standard',
+    '    collapseTiming: completion',
+    '- id: other',
+    '  name: other-package',
+    '',
+  ].join('\n'))
+  assert.equal(dropWorkDetailsPatch(file), true)
+  const next = readFileSync(file, 'utf8')
+  assert.ok(!next.includes('transcriptView'))
+  assert.ok(next.includes('collapseTiming: completion'), 'the other field stays')
+  assert.ok(next.includes('- id: ui-chat'), 'the row stays')
+})
+
+test('a profile without the mode is left alone', () => {
+  const file = patchFile(patchWithWorkDetails.replace('    transcriptView: verbose\n', ''))
+  const before = readFileSync(file, 'utf8')
+  assert.equal(dropWorkDetailsPatch(file), false)
+  assert.equal(readFileSync(file, 'utf8'), before)
+})
+
+test('a profile without a patch file is not an error', () => {
+  assert.equal(dropWorkDetailsPatch(join(tmpdir(), 'ds-bot-no-patch-file', 'cordis.patch.yml')), undefined)
 })

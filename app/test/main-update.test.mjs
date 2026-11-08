@@ -26,7 +26,7 @@ test('the update waits for the window and is installed when the window comes bac
   // should happen; the tray answer hides the window.
   win.close()
   await waitFor(() => windowCards(win).length === 1, 'ask what the close should do')
-  answerCard(0, win)
+  answerCard(1, win)
   await waitFor(() => win.visible === false, 'hide the window')
   updater.emit('update-downloaded', { version: '9.9.9' })
   await new Promise(resolve => { setTimeout(resolve, 50) })

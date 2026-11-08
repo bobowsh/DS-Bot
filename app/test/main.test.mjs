@@ -53,7 +53,7 @@ test('closing the window asks what to do; the tray answer hides it', async () =>
   const win = window()
   win.close()
   await waitFor(() => windowCards(win).length === 1, 'ask what the close should do')
-  answerCard(0, win)
+  answerCard(1, win)
   await waitFor(() => win.visible === false, 'hide the window')
   assert.equal(win.isDestroyed(), false, 'the window is there')
   assert.equal(state.quits, 0, 'the app goes on')

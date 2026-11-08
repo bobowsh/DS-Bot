@@ -31,9 +31,12 @@ test('the close asks on a card in the window and hides it once the tray is chose
   assert.ok(win.focused > focused, 'the window with the card is brought to the front')
   const card = windowCards(win)[0]
   assert.equal(card.buttons.length, 3, 'the card offers three answers')
+  // The quit comes first and is the default answer; the tray answer is the second.
+  assert.match(card.buttons[0], /退出|Quit/u)
+  assert.match(card.buttons[1], /托盘|tray/u)
   assert.match(card.message, /window closes|关闭窗口/u)
   assert.equal(win.visible, true, 'the window stays until the answer')
-  answerCard(0, win)
+  answerCard(1, win)
   await waitFor(() => win.visible === false, 'hide the window')
   assert.deepEqual(messageBoxes(), [], 'no message box')
 })
