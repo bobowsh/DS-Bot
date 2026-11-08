@@ -59,9 +59,9 @@ node -e "console.log(require('./node_modules/ds-bot/package.json').version)"    
 
 完整流程在 [CONTRIBUTING.md](CONTRIBUTING.md#how-we-work)。代理必须遵守的部分：
 
-- 从最新的 `dev-me` 拉分支，分支名用 `fix/<issue>-<名字>`、`feat/<issue>-<名字>`、`docs/<名字>` 或 `chore/<名字>`。分支名绝不以 `dev/` 开头。PR 一律开向 `dev-me`（它是本仓库的默认分支）；只有发版和热修才进 `main`。
-- **任何人都不许直接在 `dev-me` 上提交**，必须走分支 + PR。合并权在项目所有者，代理只开 PR，不合并。
-- 分支落后就先合并 `dev-me` 对齐最新基线，别在旧基线上开 PR。绝不 rebase 已推送的分支，绝不 force-push。
+- 从最新的 `master` 拉分支，分支名用 `fix/<issue>-<名字>`、`feat/<issue>-<名字>`、`docs/<名字>` 或 `chore/<名字>`。分支名绝不以 `dev/` 开头。PR 一律开向 `master`（它是本仓库的默认分支）；只有发版和热修才进 `main`。
+- **任何人都不许直接在 `master` 上提交**，必须走分支 + PR。合并权在项目所有者，代理只开 PR，不合并。
+- 分支落后就先合并 `master` 对齐最新基线，别在旧基线上开 PR。绝不 rebase 已推送的分支，绝不 force-push。
 - 填好 PR 模板。用 `Fixes #<编号>` 关联 issue；修 bug 的要说清修的是哪个 bug。用户能感知的改动写在 Changelog 栏，不要直接改 `CHANGELOG.md`。
 - 一个 PR 只做一件事：只含本通道或本 issue 的改动，不夹带别的活。发现夹带要拆开。
 - PR 正文要写全：改了什么、**验收证据（真实的命令输出与数字）**、Changelog、与 issue 的关联。证据只贴真实输出，不写「应该可以」；测试数字、lint、`--check` 三项都要有。跑不了的要说清为什么、卡在哪一步。
