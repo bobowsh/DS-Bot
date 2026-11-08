@@ -221,9 +221,9 @@
 ; factory list: the data home holds the user's own data (bot/, profiles/, sessions/ ...), and
 ; a plugin the user installed themselves must not be replaced or removed by an upgrade.
 ;
-; The skills repository is a git repository the user may have pulled new skills into. A copy
-; that was changed is kept, and the factory one is dropped: an upgrade must not take the
-; user's work away.
+; The factory skills are the package's own copies: an installed one is replaced, but one backup
+; of the replaced content is kept (<data>\skills\<slug>.bak, the most recent previous content
+; only). A skill the package does not carry is the user's own and is left alone.
 ;
 ; A move that fails (the parent folder cannot be written, as under Program Files) does not stop
 ; the install: the first start reads the tree from <INSTDIR>\data and copies it into the profile
@@ -280,43 +280,39 @@
     CreateDirectory "$R1\factory"
     CopyFiles /SILENT "$INSTDIR\data\factory\*.*" "$R1\factory"
   ${EndIf}
-  ; The skills repository: a copy the user changed is kept.
-  ${If} ${FileExists} "$INSTDIR\data\skills-repo\.git\*.*"
-    ${If} ${FileExists} "$R1\skills-repo\.git\*.*"
-      ; The installed repository is there. Whether the user changed it is asked of git, which
-      ; may not be there; without git the copy is kept, because a user who pulled skills in
-      ; has a repository git can read.
-      nsExec::ExecToLog 'cmd /c cd /d "%R1\skills-repo" && git status --porcelain > "%TEMP%\dsb-skills-dirty.txt" 2>nul'
-      ${If} $0 == 0
-        ClearErrors
-        FileOpen $R2 "$TEMP%\dsb-skills-dirty.txt" r
-        ${If} ${Errors}
-          ; The file could not be read: the copy is kept.
-        ${Else}
-          FileRead $R2 $3
-          FileClose $R2
-          Delete "$TEMP%\dsb-skills-dirty.txt"
-          ${If} $3 != ""
-            ; The user changed the repository: it is kept, and the factory one is dropped.
-            DetailPrint "LinkBot: the skills repository was changed and is kept."
-            RMDir /r "$INSTDIR\data\skills-repo"
-            Goto dsbDataDone
-          ${EndIf}
+  ; The factory skills: replace the installed copies, keeping one .bak of each replaced skill,
+  ; and leave the skills the package does not carry alone. The sync state file is dropped when
+  ; the package carries skills, so the next start re-records versions instead of downloading
+  ; what the package just put in place.
+  ${If} ${FileExists} "$INSTDIR\data\skills\*.*"
+    Delete "$R1\skills-sync.json"
+    FindFirst $R2 $3 "$INSTDIR\data\skills\*.*"
+    dsbSkillsLoop:
+      StrCmp $3 "" dsbSkillsEnd
+      StrCmp $3 "." dsbSkillsNext
+      StrCmp $3 ".." dsbSkillsNext
+      ${If} ${FileExists} "$INSTDIR\data\skills\$3\*.*"
+        StrCpy $5 "$INSTDIR\data\skills\$3"
+        StrCpy $6 "$R1\skills\$3"
+        ${If} ${FileExists} "$6\*.*"
+          RMDir /r "$R1\skills\$3.bak"
+          CreateDirectory "$R1\skills\$3.bak"
+          CopyFiles /SILENT "$6\*.*" "$R1\skills\$3.bak"
         ${EndIf}
-      ${Else}
-        ; No git: the copy is kept.
-        DetailPrint "LinkBot: the skills repository was kept."
-        RMDir /r "$INSTDIR\data\skills-repo"
-        Goto dsbDataDone
+        ClearErrors
+        RMDir /r "$6"
+        CreateDirectory "$6"
+        CopyFiles /SILENT "$5\*.*" "$6"
+        ${If} ${Errors}
+          DetailPrint "LinkBot: the skill $3 could not be moved to the data folder."
+          StrCpy $R7 1
+        ${EndIf}
       ${EndIf}
-    ${EndIf}
-    ClearErrors
-    RMDir /r "$R1\skills-repo"
-    CopyFiles /SILENT "$INSTDIR\data\skills-repo" "$R1\skills-repo"
-    ${If} ${Errors}
-      DetailPrint "LinkBot: the skills repository could not be moved to the data folder."
-      StrCpy $R7 1
-    ${EndIf}
+      dsbSkillsNext:
+      FindNext $R2 $3
+      Goto dsbSkillsLoop
+    dsbSkillsEnd:
+    FindClose $R2
   ${EndIf}
   ; Only when everything was moved is the installer's own data tree removed. A failed move
   ; leaves it in place: the first start reads the factory tree from <INSTDIR>\data instead.

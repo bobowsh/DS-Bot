@@ -85,7 +85,7 @@ let BotBrowserGuests, partitionOf, BotViews, isBotId, importFromBrowser, listSou
 let downloadSaver, chooseLocations, defaultPlaces, lang, pickerLabels, pickRoot, programFolder, saveLocations, teamIn, teamsAt, tx, HostProcess
 let copySessions, findTeam, importTeam, restoreSessions, teamInUse, teamSizes, userDshHome, copyData, copyReason, moveProblem, CHECK_PROFILE, PROFILE, DSHM_REGISTRY_URL, ImportFlow
 let watchReleases, watchUpdates, RELEASE_PAGE, getDshRuntimeVersion, electronUpdater
-let installFactoryResources, pullSkillsRepo, removeDshHomeVariableWithNotice
+let installFactoryResources, removeDshHomeVariableWithNotice
 let installImportPlugin
 
 /**
@@ -352,7 +352,7 @@ async function loadModules() {
   ;({ CHECK_PROFILE, PROFILE, DSHM_REGISTRY_URL } = profile)
   ;({ watchReleases, watchUpdates, RELEASE_PAGE } = updatesModule)
   ;({ getDshRuntimeVersion } = boot)
-  ;({ installFactoryResources, pullSkillsRepo } = factory)
+  ;({ installFactoryResources } = factory)
   ;({ removeDshHomeVariableWithNotice } = autoImports)
   ;({ installImportPlugin } = importPlugin)
   electronUpdater = updater.default
@@ -480,15 +480,15 @@ async function boot(mine) {
       version: entry.version,
     }).catch(error => { console.error(`LinkBot: the plugin ${entry.name} was not put in place:`, error) })
   }
-  // The factory seed and the bundled skills repo land before the Host starts: ds-bot builds
-  // the seeded team at its startup, and reads the seed file from the data location. It runs
-  // off the ready path so a slow disk or a shared folder can never hold the window back;
-  // ds-bot waits for the seed file itself (it retries on the first Bot start).
+  // The factory seed lands before the Host starts: ds-bot builds the seeded team at its
+  // startup, and reads the seed file from the data location. It runs off the ready path so a
+  // slow disk or a shared folder can never hold the window back; ds-bot waits for the seed
+  // file itself (it retries on the first Bot start). The factory skills and plugins need no
+  // first-start step: they travel inside the data tree the installer puts in place.
   setImmediate(() => {
     void installFactoryResources({ dataDir: places.dataDir, resourcesDir: resourcesDir() })
       .catch(error => { console.error('LinkBot: the factory resources were not put in place:', error) })
   })
-  setImmediate(() => { void pullSkillsRepo({ dataDir: places.dataDir, resourcesDir: resourcesDir() }) })
   // The factory plugins update themselves after 22:00: the app asks the intranet catalog what
   // they have become and puts the newer ones in place. The Host runs them, so the new copy
   // takes effect on the next start; the reader is told so.
@@ -502,7 +502,7 @@ async function boot(mine) {
   // version moved ahead of the last sync is downloaded over the local copy. It runs off the
   // ready path so a slow SkillHub can never hold the window back.
   setImmediate(() => {
-    watchFactorySkills({ dataDir: places.dataDir, repoDirOf: () => join(places.dataDir, 'skills-repo') })
+    watchFactorySkills({ dataDir: places.dataDir, repoDirOf: () => join(places.dataDir, 'skills') })
   })
   startWindow.done('data')
   const engine = await startEngine(mine)
