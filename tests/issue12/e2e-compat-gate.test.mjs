@@ -1,13 +1,13 @@
 // #12 E 组 · 场景 5：兼容熔断 / 版本门（Q6 / discovery-compatibility）。
 //
 // issue 原文：「装前过 discovery-compatibility（engines.dsh 匹配检查），不兼容跳过次日再看」。
-// 现状（队长验收 PR #20 时核出）：factory-update.mjs 顶部注释写了这道闸，但全文
-// satisf / engines / hostVer / compat 零命中 —— 只有注释、没有实现；内网 catalog 的
-// 14 个字段（含 installedVersion，那是已装插件版本）也没有宿主版本约束字段。
+// 现状（2026-11-08 复核）：小柚子已在 installUpdate 里实现 satisfiesDshRange + engines.dsh
+// 门（解包后、替换前，与 dsh 清单门同源，即队长倾向的 (c) 方案）；但 updateFactoryPlugins
+// 调用 installUpdate 时还没透传 hostVersion，且不兼容会被当成普通失败累计 failures。
 //
-// 因此本用例写成「契约级」：断言「不兼容条目必须被跳过、次日再看」这个可判真假的
-// 行为；当前实现下明确打印 BLOCKED 并 skip，绝不算通过。版本约束从哪来是待决设计
-// 问题，不在测试里替开发拍板（候选见下方注释）。
+// 因此本用例分两层：
+//   - V1/V2/V3 直接调 installUpdate 验证「门本身」的行为契约（能真跑、要真过）；
+//   - V5 验证主链路透传与「次日再看」语义，透传未落地就 BLOCKED skip，不算通过。
 //
 // 运行：node --test --test-timeout=20000 tests/issue12/e2e-compat-gate.test.mjs
 import assert from 'node:assert/strict'
@@ -21,88 +21,101 @@ import { installedVersion } from './helpers/fingerprint.mjs'
 import { loadFactoryUpdate } from './helpers/load-module.mjs'
 
 let mod
-let root, dataDir, profileDir
+let root, dataDir, profileDir, pluginDir
 const NAME = 'dsh-rule-manager'
 const REG = 'http://registry/'
 const CATALOG = 'http://catalog/'
+const HOST = '0.2.2-rc.1'
 const quiet = { info() {}, error() {} }
-
-// 版本约束来源的候选（待小柚子/队长拍板，测试不预设）：
-//   (a) 插件 package.json 的 engines.dsh —— issue 原文点名的方式，需要解包后才能判；
-//   (b) catalog 新增字段（如 enginesDsh / minHostVersion）—— 要改 gen-catalog.mjs 与人审流程；
-//   (c) 归档内 manifest 的 dsh.engines —— 与现有 dsh 清单门同源，改一处即可。
-// 无论选哪种，行为契约不变：不兼容 → 不装、不写 manifest、次日再看。
 
 before(async () => { mod = await loadFactoryUpdate() })
 before(() => {
   root = mkdtempSync(join(tmpdir(), 'ds-bot-e2e-compat-'))
   dataDir = join(root, 'data')
   profileDir = join(root, 'profile')
-  mkdirSync(join(profileDir, 'node_modules', NAME), { recursive: true })
-  writeFileSync(join(profileDir, 'node_modules', NAME, 'package.json'), JSON.stringify({ name: NAME, version: '0.1.0' }), 'utf8')
-  writeFileSync(join(profileDir, 'package.json'), JSON.stringify({
-    name: 'dsh-profile-ds-bot', private: true, dependencies: { [NAME]: '0.1.0' }, dsh: { profile: { bundles: [NAME] } },
-  }, undefined, 2), 'utf8')
+  pluginDir = join(profileDir, 'node_modules', NAME)
 })
 after(() => { rmSync(root, { recursive: true, force: true }) })
 
+function seed(version = '0.1.0') {
+  rmSync(dataDir, { recursive: true, force: true })
+  mkdirSync(pluginDir, { recursive: true })
+  writeFileSync(join(pluginDir, 'package.json'), JSON.stringify({ name: NAME, version }), 'utf8')
+  mkdirSync(profileDir, { recursive: true })
+  writeFileSync(join(profileDir, 'package.json'), JSON.stringify({
+    name: 'dsh-profile-ds-bot', private: true, dependencies: { [NAME]: version }, dsh: { profile: { bundles: [NAME] } },
+  }, undefined, 2), 'utf8')
+}
+
+function moduleSource() {
+  return readFileSync(process.env.FACTORY_UPDATE_MODULE || join(process.cwd(), 'app/src/factory-update.mjs'), 'utf8')
+}
+// 精确判断：updateFactoryPlugins 里的 installUpdate 调用点是否带 hostVersion。
+// 只看「调用参数对象」这一处，避免被 installUpdate 自己的形参/文档注释里的 hostVersion 误导。
+function hostVersionWired() {
+  const code = moduleSource().replace(/^\s*\/\/.*$/gmu, '')
+  const fn = code.indexOf('export async function updateFactoryPlugins')
+  if (fn < 0) return false
+  const body = code.slice(fn, code.indexOf('\n}', fn) + 2)
+  const call = body.match(/installUpdate\s*\(\s*\{([^}]*)\}\s*\)/u)
+  return !!call && /hostVersion/u.test(call[1])
+}
+
 describe('E 场景5 兼容熔断 / 版本门（Q6）', () => {
-  test('V1 契约：catalog 声明的宿主版本不满足 → 跳过、不装、次日再看', async (t) => {
-    // 检测实现是否落地：模块里是否有版本匹配相关导出或常量。
-    const src = readFileSync(process.env.FACTORY_UPDATE_MODULE || join(process.cwd(), 'app/src/factory-update.mjs'), 'utf8')
-    const implemented = /satisf|engines\.dsh|hostVersion|minHost|compatib|compatible/iu.test(src.replace(/^\s*\/\/.*$/gmu, ''))
-    if (!implemented) {
-      t.diagnostic('BLOCKED: 版本门只有注释无实现（Q6 / discovery-compatibility 未落地），不算通过')
-      t.diagnostic('待决：版本约束从哪来 —— (a) 插件 engines.dsh / (b) catalog 新增字段 / (c) dsh.engines')
-      t.skip('版本门未实现，等小柚子补或明确说明不做并改注释')
+  test('V1 门本身：归档 engines.dsh 与宿主版本不符 → 拒装、旧版原样', async (t) => {
+    if (typeof mod.installUpdate !== 'function') { t.skip('installUpdate 未导出'); return }
+    seed()
+    const before = installedVersion(pluginDir)
+    const archive = pluginArchive(NAME, '0.2.0', { manifest: { engines: { dsh: '>=99.0.0' } } })
+    const outcome = await mod.installUpdate({ dataDir, profileDir, name: NAME, version: '0.2.0', archive, hostVersion: HOST })
+    assert.equal(outcome.updated, false, '不兼容不装')
+    assert.equal(outcome.incompatible, true, '明确标记为不兼容，不是普通失败')
+    assert.match(outcome.reason || '', /engines\.dsh/u)
+    assert.equal(installedVersion(pluginDir), before, '旧版原样')
+  })
+
+  test('V2 门本身：engines.dsh 满足 → 正常替换，不误伤', async (t) => {
+    if (typeof mod.installUpdate !== 'function') { t.skip('installUpdate 未导出'); return }
+    seed()
+    const archive = pluginArchive(NAME, '0.2.0', { manifest: { engines: { dsh: '>=0.2.0' } } })
+    const outcome = await mod.installUpdate({ dataDir, profileDir, name: NAME, version: '0.2.0', archive, hostVersion: HOST })
+    assert.equal(outcome.updated, true, '兼容的照常更新')
+    assert.equal(installedVersion(pluginDir), '0.2.0')
+  })
+
+  test('V3 门本身：未声明 engines.dsh 的包不受影响', async (t) => {
+    if (typeof mod.installUpdate !== 'function') { t.skip('installUpdate 未导出'); return }
+    seed()
+    const archive = pluginArchive(NAME, '0.2.0')
+    const outcome = await mod.installUpdate({ dataDir, profileDir, name: NAME, version: '0.2.0', archive, hostVersion: HOST })
+    assert.equal(outcome.updated, true)
+  })
+
+  test('V4 现场证据：catalog 无宿主版本字段，installedVersion 是插件版本', () => {
+    const intranetCatalogFields = ['added', 'category', 'description', 'installedVersion', 'name', 'npm', 'owner', 'page', 'registry', 'source', 'status', 'tag', 'upstream', 'url']
+    assert.ok(!intranetCatalogFields.some(f => /engine|host|compat|dshversion/iu.test(f)))
+    assert.ok(intranetCatalogFields.includes('installedVersion'))
+  })
+
+  test('V5 主链路：不兼容条目被跳过、次日再看、不计连败', async (t) => {
+    if (!hostVersionWired()) {
+      t.diagnostic('BLOCKED: updateFactoryPlugins 调用 installUpdate 时未透传 hostVersion，版本门在主链路不生效')
+      t.diagnostic('解除条件：补上 hostVersion 透传，并把 incompatible 归入 skipped 而非 failures')
+      t.skip('主链路未透传 hostVersion，不算通过')
       return
     }
-    // 实现落地后要满足的行为契约：
-    const catalog = [{ name: NAME, version: '0.2.0', registry: REG, enginesDsh: '>=99.0.0' }]
+    seed()
     const archive = pluginArchive(NAME, '0.2.0', { manifest: { engines: { dsh: '>=99.0.0' } } })
     const routes = [
-      { prefix: CATALOG, body: { plugins: catalog } },
-      { prefix: REG + NAME, body: { versions: { '0.2.0': { dist: { tarball: REG + 'pkg/-/pkg-0.2.0.tgz' } } } } },
-      { prefix: REG + 'pkg/-/', body: archive },
+      { prefix: CATALOG, body: { plugins: [{ name: NAME, version: '0.2.0', registry: REG }] } },
+      { prefix: REG + NAME, body: { versions: { '0.2.0': { dist: { tarball: `${REG}pkg/-/pkg-0.2.0.tgz` } } } } },
+      { prefix: `${REG}pkg/-/`, body: archive },
     ]
-    const before = installedVersion(join(profileDir, 'node_modules', NAME))
-    const outcome = await mod.updateFactoryPlugins({ dataDir, profileDir, catalogUrl: CATALOG, fetch: fakeFetch(routes), log: quiet })
-    assert.equal(outcome.checked, true)
+    const outcome = await mod.updateFactoryPlugins({ dataDir, profileDir, catalogUrl: CATALOG, fetch: fakeFetch(routes), log: quiet, hostVersion: HOST })
     assert.deepEqual(outcome.updated, [], '不兼容不更新')
-    assert.deepEqual(outcome.installed, [], '不兼容不新装')
-    assert.ok(outcome.skipped.includes(NAME) || (outcome.leftAlone || []).includes(NAME), '被跳过或留待次日')
-    assert.equal(installedVersion(join(profileDir, 'node_modules', NAME)), before, '旧版原样')
-  })
-
-  test('V2 契约：兼容的条目照常更新（版本门不能误伤）', async (t) => {
-    const src = readFileSync(process.env.FACTORY_UPDATE_MODULE || join(process.cwd(), 'app/src/factory-update.mjs'), 'utf8')
-    const implemented = /satisf|engines\.dsh|hostVersion|minHost|compatib|compatible/iu.test(src.replace(/^\s*\/\/.*$/gmu, ''))
-    if (!implemented) { t.skip('版本门未实现'); return }
-    rmSync(dataDir, { recursive: true, force: true })
-    const archive = pluginArchive(NAME, '0.2.0', { manifest: { engines: { dsh: '>=0.1.0' } } })
-    const routes = [
-      { prefix: CATALOG, body: { plugins: [{ name: NAME, version: '0.2.0', registry: REG, enginesDsh: '>=0.1.0' }] } },
-      { prefix: REG + NAME, body: { versions: { '0.2.0': { dist: { tarball: REG + 'pkg/-/pkg-0.2.0.tgz' } } } } },
-      { prefix: REG + 'pkg/-/', body: archive },
-    ]
-    const outcome = await mod.updateFactoryPlugins({ dataDir, profileDir, catalogUrl: CATALOG, fetch: fakeFetch(routes), log: quiet })
-    assert.deepEqual(outcome.updated, [NAME], '兼容的照常更新')
-  })
-
-  test('V3 契约：不兼容不计入连败拉黑（只是「次日再看」）', async (t) => {
-    const src = readFileSync(process.env.FACTORY_UPDATE_MODULE || join(process.cwd(), 'app/src/factory-update.mjs'), 'utf8')
-    const implemented = /satisf|engines\.dsh|hostVersion|minHost|compatib|compatible/iu.test(src.replace(/^\s*\/\/.*$/gmu, ''))
-    if (!implemented) { t.skip('版本门未实现'); return }
-    rmSync(dataDir, { recursive: true, force: true })
-    const state = await mod.readState(dataDir)
-    assert.equal(state.failures[NAME], undefined, '不兼容不是失败，不累计 failures')
-  })
-
-  test('V4 现场证据：catalog 无宿主版本字段，installedVersion 是插件版本不是宿主版本', () => {
+    assert.ok(outcome.skipped.includes(NAME), '归入 skipped（次日再看）')
+    assert.equal((await mod.readState(dataDir)).failures[NAME], undefined, '不兼容不计连败')
+    assert.equal(installedVersion(pluginDir), '0.1.0')
     assert.equal(existsSync(join(profileDir, 'package.json')), true)
-    // 内网 catalog 实测字段并集（2026-11-08）里没有 engines / minHost / compat。
-    const intranetCatalogFields = ['added', 'category', 'description', 'installedVersion', 'name', 'npm', 'owner', 'page', 'registry', 'source', 'status', 'tag', 'upstream', 'url']
-    assert.ok(!intranetCatalogFields.some(f => /engine|host|compat|dshversion/iu.test(f)), 'catalog 确实没有宿主版本字段')
-    assert.ok(intranetCatalogFields.includes('installedVersion'), '只有已装插件版本')
   })
 })

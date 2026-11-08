@@ -1,12 +1,13 @@
-# #12 E 组端到端验收（准备稿，未实跑）
+# #12 E 组端到端验收
 
 口径（队长派单）：
 1. **断网全流程**：catalog 加插件 → 安装 → 替换 → 回滚；用进程级死端口代理断网，**不碰系统网络配置 / hosts**
 2. **catalog 新增条目自动装 + 自动写 bundles 启用**（Q2）
 3. **失败回滚**：换到一半失败要退回旧版
 
-状态：**五个场景脚本已写成并实跑**（21 tests / 16 pass / 0 fail / 5 skip）；插件通道三场景全绿。
-技能通道 S2/S3 因 C5 模块未落地、版本门 V1-V3 因 Q6 未实现，都明确 `BLOCKED` + `skip`，**不算通过**。
+状态：**五个场景脚本已写成并实跑**（22 tests / 19 pass / 0 fail / 3 skip）；插件通道三场景全绿。
+Q6 版本门的「门本身」V1-V3 已随实现转为真实通过；技能通道 S2/S3 阻塞于 C5、
+主链路 V5 阻塞于 `hostVersion` 未透传，都明确 `BLOCKED` + `skip`，**不算通过**。
 脚本落 `tests/issue12/`，临时数据落系统 temp，不碰 `D:\LinkBot\data` 与用户真实 DSH_HOME。
 
 运行（PR #20 未合进 dev-me 时，用 `FACTORY_UPDATE_MODULE` 指向 C 组 worktree）：
@@ -112,39 +113,36 @@ tests/issue12/
 - S3 「已更新 N 项，重启生效」提示 —— **BLOCKED：同上**
 - S4 断网时技能目录原样保留 ✅
 
-### 场景 5 兼容熔断 / 版本门（Q6，队长验收 #20 时核出的缺口）
-- **现场证据**：`factory-update.mjs` 里版本门只有顶部注释，`satisf/engines/hostVer/compat` 零实现；
-  内网 catalog 实测 14 个字段（`added/category/description/installedVersion/name/npm/owner/page/registry/source/status/tag/upstream/url`）
-  **没有宿主版本字段**，`installedVersion` 是已装插件版本、不是宿主约束 ✅ V4
-- V1 不兼容条目 → 跳过、不装、次日再看 —— **BLOCKED：闸未实现，skip 不算通过**
-- V2 兼容条目照常更新（门不能误伤）—— **BLOCKED：同上**
-- V3 不兼容不计入连败拉黑 —— **BLOCKED：同上**
-- **待决设计**（测试不替开发拍板，写在这里供对齐）：版本约束从哪来
-  (a) 插件 `package.json` 的 `engines.dsh`（issue 点名，需解包后判）/
-  (b) catalog 新增字段（要改 `gen-catalog.mjs` 与人审）/
-  (c) 归档 manifest 的 `dsh.engines`（与现有 dsh 清单门同源）。
-  无论选哪种，行为契约不变。
+### 场景 5 兼容熔断 / 版本门（Q6）
+- **现场证据 V4** ✅：内网 catalog 实测 14 个字段无宿主版本字段，`installedVersion` 是已装插件版本
+- V1 归档 `engines.dsh` 与宿主版本不符 → 拒装、旧版原样、`incompatible:true` ✅（门本身已实现）
+- V2 `engines.dsh` 满足 → 正常替换，不误伤 ✅
+- V3 未声明 `engines.dsh` 的包不受影响 ✅
+- V5 主链路：不兼容归入 `skipped`（次日再看）、不计连败 —— **BLOCKED**：
+  `updateFactoryPlugins` 调用 `installUpdate` 时**未透传 `hostVersion`**，且 `incompatible` 目前被当普通失败累计 `failures`。
+  解除条件：小柚子补上透传并把不兼容归入 `skipped`。
+- 实现采用候选 (c) 同源思路：解包后、替换前判归档 manifest 的 `engines.dsh`，与 dsh 清单门共用拒绝路径。
 
 ## 实跑结果（2026-11-08，真实输出）
 
 ```
 $ FACTORY_UPDATE_MODULE=E:/dsbot-work/DS-Bot-issue12/app/src/factory-update.mjs \
     node --test --test-timeout=20000 tests/issue12/*.test.mjs
-tests 21 | suites 5 | pass 16 | fail 0 | cancelled 0 | skipped 5 | duration 307ms
+tests 22 | suites 5 | pass 19 | fail 0 | cancelled 0 | skipped 3 | duration 387ms
 ```
 
 - 插件通道三场景 **14/14 全绿**（A1-A4、B1-B3、C1-C6）
 - 技能通道 S1/S4 通过；**S2/S3 `BLOCKED` skip**（C5 未落地，不算通过）
-- 版本门 V4 现场证据通过；**V1-V3 `BLOCKED` skip**（Q6 未实现，不算通过）
+- Q6 门本身 V1-V3 真实通过、V4 现场证据通过；**V5 `BLOCKED` skip**（`hostVersion` 未透传，不算通过）
 - 关键回归：`app/test/import-skills.test.mjs` + `factory-registry.test.mjs` + `data-packaging.test.mjs` = **31/31**
 - helpers 自检 `node tests/issue12/helpers/selfcheck.mjs` → `OK`
 
 ## 未验证 / 依赖（如实标注）
 
-- **E 组仍不算完整通过**：技能通道 S2/S3 被 C5 阻塞、版本门 V1-V3 被 Q6 阻塞；
+- **E 组仍不算完整通过**：技能通道 S2/S3 被 C5 阻塞、主链路 V5 被 `hostVersion` 透传阻塞；
   两者落地后需重跑把 skip 转成实跑
-- 本次用 `FACTORY_UPDATE_MODULE` 指向 C 组 worktree（PR #20 未合进 dev-me）；
-  **三个 PR 合进 dev-me 后需在最新基线上不带该环境变量再跑一遍**，才算正式验收
+- 本次用 `FACTORY_UPDATE_MODULE` 指向 C 组 worktree（PR #20 未合进 master）；
+  **PR 合进 master 后需在最新基线上不带该环境变量再跑一遍**，才算正式验收
 - 断网是进程级 mock fetch（等价死端口），未对真实打包后的 app 起进程实测；
   不碰系统 hosts / 路由 / 防火墙
 - 真 swap 阶段失败的回滚由 `factory-update.test.mjs` 单测覆盖，本脚手架未重造
