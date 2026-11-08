@@ -15,8 +15,14 @@
 ; that keeps the path as it is. The check for a writable folder runs between the
 ; directory page and the install (#626).
 ;
-; An earlier installation's folder is the default the page starts at, so an
-; upgrade lands where the copy already is.
+; The directory page starts at <drive>\LinkBot\app, which customInit works out and writes
+; back to the registry: NSIS's InstallDir page reads the previous install's registered
+; location as its starting value, so without the write-back it would start at wherever an
+; old copy once lived. The path is used exactly as it is chosen: electron-builder appends a
+; product-name sub-folder to any path that lacks it (assistedInstaller.nsh,
+; instFilesPre), but customPageAfterChangeDir replaces that function with one
+; that keeps the path as it is. The check for a writable folder runs between the
+; directory page and the install (#626).
 !macro customInit
   ; The /D= switch wins over everything else: that is how a silent install in
   ; the acceptance run aims the app at a throwaway folder.
@@ -27,10 +33,11 @@
     ; The folder is fixed: <drive>\LinkBot\app, with the data at
     ; <drive>\LinkBot\data beside it.
     ;
-    ; The registered location of an earlier installation is deliberately NOT read.
-    ; It was the one thing that kept an install from ever reaching this folder: a
-    ; copy that once landed elsewhere (in a drive's root, or under another
-    ; product name) left its path behind, and every later install followed it.
+    ; The registered location of an earlier installation is deliberately NOT read: a copy
+    ; that once landed elsewhere (in a drive's root, or under another product name) left
+    ; its path behind, and every later install followed it. But the InstallDir page does
+    ; read that registry value as its starting point, so the folder worked out here is
+    ; written back over it — the page then starts where this installer means to install.
     ; A drive is detected with a wildcard: "D:\" and "D:\." both fail, because a
     ; backslash at the end of the string is an escape and the path never resolves.
     IfFileExists "D:\*" 0 useE
@@ -45,6 +52,7 @@
     ; Neither drive: the program folder of the current user is the last resort.
     StrCpy $INSTDIR "$LocalAppData\Programs\LinkBot\app"
     done:
+    WriteRegStr HKCU "Software\32c46dfc-ed78-5d41-85a4-a3c7f083f2e0" "InstallLocation" "$INSTDIR"
   ${EndIf}
 
   ; The installer never asks for administrator rights, so a folder the user cannot
