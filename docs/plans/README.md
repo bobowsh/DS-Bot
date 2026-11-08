@@ -65,8 +65,7 @@
 | [Office 文档](2026-10-27-office-documents.md) | Bot 离线处理 .docx/.pptx/.xlsx：应用带的 payload、`office.js` 命令行、office 路由换成带 `office-tools` 的版本 |
 | [固定数据位置与导入提示](2026-11-01-fixed-data-location.md) | 打包 Windows 应用首启把数据固定到安装目录上一级的 `data`（app 自己写 `locations.json`，不硬编码路径、不动安装器）；导入提示与首跑解耦：数据里没团队、用户 DSH 里有团队且没拒绝过就问一次，拒绝过写标记 |
 | [关掉 DSH 自带的欢迎、登录与 API key 界面](2026-11-01-hide-dsh-account-ui.md) | 三个界面同属 `ui-settings-account` 一行；用行级 `disabled` 的第三个 reconcile 补丁（`own-ui-patch.mjs`）禁 UI，服务端行和模型链路不动 |
-| [聊天框里的过程可见与 token 速率](2026-11-06-chat-process-visibility.md) | 普通工具调用在聊天框里画成可展开的行（工具名、参数、输出、耗时）；回合上方一行给出工具数、耗时、本回合 token 与**输出口径**的速率，provider 没报 usage 时显式显示「速率不可用」 |
+| [聊天框里的过程可见与 token 速率](2026-11-06-chat-process-visibility.md) | Bot 的思考与工具调用在聊天框里就地折叠展开（默认折叠、流式实时显示当前步骤），普通工具调用画成可展开的行（工具名、参数、输出、耗时）；token 速率取**输出口径**（输出 token ÷ 解码时长），provider 拿不到 usage 时显式显示「不可用」；群成员过程另列第二阶段 |
 | [按 bot 挂载文件技能](2026-11-01-bot-skill-files.md) | 技能存文件系统单独目录（`SKILL.md` + `scripts/`）；capabilities 条目加 `locator` 指向目录，挂载时从文件读正文并带 `resourceBase`，按 `bot.capabilities` 只挂给指定 Bot |
 | [出厂预制团队、技能仓库与去掉导入团队](2026-11-01-factory-team.md) | 安装包预置 Bot 团队（含私有能力包）：ds-bot 启动时按 `factoryId` 建队/覆盖，用户 Bot 不动；skills-repo 走 git 更新（isomorphic-git，离线回退内置副本）；删掉「从 DSH 复制团队」，需求三只剩自动导入历史会话 |
 | [连接器](2026-11-04-connectors.md) | 通用连接器引擎、OAuth、网关、邮箱 |
-
