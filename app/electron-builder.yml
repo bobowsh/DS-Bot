@@ -46,9 +46,9 @@ extraResources:
   # outside the asar: nothing reads it through the archive.
   - from: resources/factory
     to: factory
-# The factory plugins (a DSH home tree: profiles/ds-bot/node_modules), the skills repository and
+# The factory plugins (a DSH home tree: profiles/ds-bot/node_modules), the factory skills and
 # the factory list travel in the data directory beside the program, as plain folders. The
-# installer moves profiles/ and skills-repo/ to the data home beside the program
+# installer moves profiles/, skills/ and factory/ to the data home beside the program
 # (build/installer.nsh); when that fails the first start reads the tree from here.
 extraFiles:
   - from: build/data
