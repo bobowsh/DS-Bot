@@ -1,10 +1,11 @@
-// Where a first start puts the data: the line on the start page that says so, and the root rule
-// of 「换个位置…」 (windows-onboarding §3, 一个位置; start-window §6). No Electron here, so the
-// tests run without it.
-import { existsSync, mkdirSync, readdirSync, rmdirSync, rmSync, statfsSync, statSync, writeFileSync } from 'node:fs'
+// Where a first start puts the data: the line on the start page that says so (and when a later
+// start shows it again), and the root rule of 「换个位置…」 (windows-onboarding §3, 一个位置;
+// start-window §6). No Electron here, so the tests run without it.
 import { homedir } from 'node:os'
 import { basename, dirname, join, parse, resolve, sep } from 'node:path'
-import { real, within } from './copy-tree.mjs'
+import { disk, real, within } from './copy-tree.mjs'
+
+const { existsSync, mkdirSync, readdirSync, rmdirSync, rmSync, statfsSync, statSync, writeFileSync } = disk
 
 export const DATA_DIR = 'data'
 export const WORKSPACE_DIR = 'workspace'
@@ -29,13 +30,27 @@ export function freeSpace(path) {
   }
 }
 
-/** Bytes as the page shows them, in Explorer's units of 1024: whole GB from 10 up, else one decimal. */
-export function formatBytes(bytes) {
+/**
+ * Bytes as the page shows them, in Explorer's units of 1024: whole GB from 10 up, else one
+ * decimal, whole MB under 1 GB, and 「不到 1 MB」 under that (never 「0 MB」).
+ * @param {string} [lang] 'en' or 'zh'
+ */
+export function formatBytes(bytes, lang = 'zh') {
   if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) return undefined
   const gb = bytes / 2 ** 30
   if (gb >= 10) return `${String(Math.floor(gb))} GB`
   if (gb >= 1) return `${(Math.floor(gb * 10) / 10).toFixed(1)} GB`
+  if (bytes < 2 ** 20) return lang === 'en' ? 'under 1 MB' : '不到 1 MB'
   return `${String(Math.floor(bytes / 2 ** 20))} MB`
+}
+
+// A later start shows the place line again once the drive is down to this share of the free
+// space it had when the data went there (start-window §5).
+export const LOW_SHARE = 0.2
+
+/** Whether `free` is down to LOW_SHARE of `freeAtStart`; an unknown size is not low. */
+export function runningLow(free, freeAtStart) {
+  return Number.isFinite(free) && Number.isFinite(freeAtStart) && freeAtStart > 0 && free <= freeAtStart * LOW_SHARE
 }
 
 /** The drive letter of a Windows path ('C'), or undefined. */
@@ -55,13 +70,13 @@ export function shortPath(path, home = homedir()) {
 /**
  * What the start page says about the place of the data: the drive and its free space on
  * Windows, the folder elsewhere.
- * @param {{ home?: string, free?: number }} what `free` from freeSpace(); none leaves it out
+ * @param {{ home?: string, free?: number, lang?: string }} what `free` from freeSpace(); none leaves it out
  * @returns {{ drive?: string, path?: string, free?: string }}
  */
-export function placeOf(dataDir, { home = homedir(), free } = {}) {
+export function placeOf(dataDir, { home = homedir(), free, lang } = {}) {
   const drive = driveOf(dataDir)
   const place = drive === undefined ? { path: shortPath(dataDir, home) } : { drive }
-  const text = formatBytes(free)
+  const text = formatBytes(free, lang)
   return text === undefined ? place : { ...place, free: text }
 }
 
@@ -163,7 +178,7 @@ export function rootOf(picked, { dshHome, program, env = process.env, probe = tr
 }
 
 // Makes only the missing layers, writes and removes a file, and removes what it made.
-function canWrite(folder) {
+export function canWrite(folder) {
   const made = []
   try {
     for (let at = resolve(folder); !existsSync(at); at = dirname(at)) {

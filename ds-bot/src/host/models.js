@@ -310,5 +310,8 @@ export function install(rt) {
     catalog, cachedCatalog: () => answerable(catalogCache.value), cachedDefault: () => pickDefault(catalogCache.value),
     defaultRef, defaultModel, defaultBotModel, defaultEffort, isUsable, resolveModel, desiredModel, reasoningOf, resolveEffort, desiredEffort,
     selectSessionModel, applyModel, waitForModel, syncModels, routeRefused, dropCatalog,
+    defaultRef, defaultModel, defaultEffort, resolveModel, desiredModel, reasoningOf, resolveEffort, desiredEffort,
+    selectSessionModel, applyModel, waitForModel, syncModels, routeRefused,
+    dropCatalog: () => { catalogCache = { at: 0, value: [] } },
   })
 }

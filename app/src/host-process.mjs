@@ -27,6 +27,30 @@ const settlesWithin = (promise, ms) => new Promise((resolve) => {
   void promise.then(() => { clearTimeout(timer); resolve(true) })
 })
 
+/**
+ * Write to one of this process's own streams, keeping a stream that cannot be written to from
+ * ending the process.
+ *
+ * A launcher that started the app and then went away leaves stdout and stderr as pipes with no
+ * reader: writing throws EPIPE, or emits it as an `error` event, and either one is uncaught and
+ * fatal. The Host's output is only echoed here, so a write that cannot be made is dropped.
+ * @param {NodeJS.WriteStream} stream - the stream to write to
+ * @param {string} text - what to write
+ */
+export function forward(stream, text) {
+  // The handler stays for the life of the stream: a later write fails the same way, and the
+  // write that failed has already been dropped.
+  if (!stream.__dsBotForwardGuard) {
+    stream.__dsBotForwardGuard = true
+    stream.on('error', () => {})
+  }
+  try {
+    stream.write(text)
+  } catch {
+    // EPIPE and its siblings: the reader is gone, so this output has nowhere to go.
+  }
+}
+
 export class HostProcess {
   #options
   #platform
@@ -51,13 +75,16 @@ export class HostProcess {
    */
   start() {
     this.#ready ??= new Promise((resolve, reject) => {
-      const { entry, cwd, env, pnpm, output = (stream, text) => { process[stream].write(text) } } = this.#options
+      const { entry, cwd, env, pnpm, output = (stream, text) => { forward(process[stream], text) } } = this.#options
       const child = spawn(hostExecutable(env.DS_BOT_RUNTIME_DIR, this.#platform), ['--expose-internals', entry, pnpm], {
         cwd, env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
       })
       this.#child = child
       child.stdout.setEncoding('utf8')
       child.stderr.setEncoding('utf8')
+      // The Host's output goes through the app's own `output` hook when it has one; the
+      // default writes to this process's stdout and stderr, which are pipes when the app
+      // was started by a launcher that has gone away. See forward().
       child.stdout.on('data', (chunk) => { output('stdout', redact(chunk)) })
       child.stderr.on('data', (chunk) => {
         output('stderr', redact(chunk))

@@ -6,6 +6,7 @@ import { clearClientErrors, clientErrors, clientFacts, failureLabel, issueUrl, W
 import { dateLocale, t } from './i18n.js'
 import { CloseIcon } from './icons.js'
 import { SPRING_SHAPE } from './motion.js'
+import { reserveWindow } from './open-window.js'
 
 export const FeedbackIcon = () => h('svg', { width: 15, height: 15, viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true },
   h('path', { d: 'M4 4.5h12a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H9l-3.5 3v-3H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z' }), h('path', { d: 'M10 7v2.6M10 11.4h.01' }))
@@ -37,25 +38,10 @@ function entrySummary(entry) {
   return entry.text
 }
 
-const SOURCES = { turn: 'Model call', host: 'DS Bot', api: 'DS Bot', browser: 'This window' }
+const SOURCES = { turn: 'Model call', host: 'LinkBot', api: 'LinkBot', browser: 'This window' }
 
-// Where the new issue opens; `go(url)` tells whether it did. In a browser the window is
-// reserved inside the click gesture and addressed once the diagnostics are gathered:
-// opening after the awaits would hit the popup blocker. The Desktop makes no window. It
-// hands an http(s) address to the system browser, has no blocker, and returns null even
-// then, so it gets the address itself.
-function issueWindow() {
-  if (window.dshDesktop !== undefined) return { go: (url) => { window.open(url, '_blank'); return true } }
-  const reserved = window.open('', '_blank')
-  if (reserved !== null) reserved.opener = null
-  return {
-    go: (url) => {
-      if (reserved === null) return false
-      reserved.location.href = url
-      return true
-    },
-  }
-}
+// Where the new issue opens; `go(url)` tells whether it did.
+const issueWindow = reserveWindow
 
 export function FeedbackPage({ actions, run, Section, Row }) {
   const [what, setWhat] = useState('')
@@ -114,19 +100,19 @@ export function FeedbackPage({ actions, run, Section, Row }) {
         h('button', { type: 'button', className: 'bt-soft bt-soft-sm', onClick: () => setPreview(!preview), 'aria-expanded': preview }, preview ? t('Hide') : t('Show')),
         h('button', { type: 'button', className: 'bt-soft bt-soft-sm', onClick: copyReport }, t('Copy'))),
       preview ? h('div', { className: 'bt-set-row bt-fb-preview' }, h('pre', { tabIndex: 0, 'aria-label': t('Diagnostics') }, report?.markdown || t('Loading…'))) : null,
-      h(Row, { label: t('GitHub issue'), hint: t('Opens a new issue in the DS Bot repository with all of this filled in. Nothing is sent until you submit it there.') },
+      h(Row, { label: t('GitHub issue'), hint: t('Opens a new issue in the LinkBot repository with all of this filled in. Nothing is sent until you submit it there.') },
         h('button', { type: 'button', className: 'bt-fb-primary', onClick: openIssue }, t('Report on GitHub')))),
     note ? h('div', { key: 'note', className: 'bt-note bt-fb-note', role: 'status' },
       note,
       issueLink ? [' ', h('a', { key: 'link', href: issueLink, target: '_blank', rel: 'noopener noreferrer' }, t('Open the issue'))] : null) : null,
     h(Section, { key: 'errors', title: report ? t('Recent errors · {count}', { count: total }) : t('Recent errors') },
       shown.length === 0
-        ? h(Row, { label: t('No errors recorded.'), hint: t('Failed model calls and DS Bot problems show here, newest first.') })
+        ? h(Row, { label: t('No errors recorded.'), hint: t('Failed model calls and LinkBot problems show here, newest first.') })
         : shown.map((entry, index) => h('div', { key: `${entry.time}-${index}`, className: 'bt-set-row bt-fb-entry', title: entry.text },
             h('span', { className: 'bt-fb-dot', 'data-level': entry.level, 'aria-hidden': true }),
             h('div', { className: 'bt-set-copy' },
               h('span', { className: 'bt-fb-text' }, entrySummary(entry)),
-              h('span', { className: 'bt-set-hint' }, [whenText(entry.time), entry.bot, entry.where, t(SOURCES[entry.source] ?? 'DS Bot')].filter(Boolean).join(' · '))),
+              h('span', { className: 'bt-set-hint' }, [whenText(entry.time), entry.bot, entry.where, t(SOURCES[entry.source] ?? 'LinkBot')].filter(Boolean).join(' · '))),
             entry.code ? h('span', { className: 'bt-tag bt-fb-code' }, entry.status ? `${entry.code} ${entry.status}` : entry.code) : null)),
       h(Row, { label: t('Error log'), hint: t('Kept on this computer across restarts, up to about 1 MB.') },
         h('button', { type: 'button', className: 'bt-soft bt-soft-sm', onClick: downloadLog }, t('Download')),

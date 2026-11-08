@@ -4,7 +4,7 @@
 
 English | [中文](README.zh.md)
 
-![version](https://img.shields.io/badge/version-v0.2_preview-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.4-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
+![version](https://img.shields.io/badge/version-v0.3_preview-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
 
 **[Download DS Bot for Windows 10/11 (64-bit) / 下载 Windows 10/11（64 位）版](https://github.com/Fei2411/DS-Bot/releases/latest)**, about 212 MB / 约 212 MB. A community project, not an official DeepSeek product. / 社区开源项目，不是 DeepSeek 官方产品。
 
@@ -79,8 +79,8 @@ DS Bot 0.2.1 and earlier cannot update themselves in DSH Desktop 0.2.1-rc.2 or l
 Needs Node.js `22.19` or later, and pnpm. On Linux it needs the same glibc 2.28 or newer as the desktop app — the DSH install loads its own native libraries, so CentOS 7 and other older-glibc systems take the Docker route below instead.
 
 ```sh
-npx @deepseek-ai/dsh@0.2.1-rc.5 plugin --profile web add ds-bot
-npx @deepseek-ai/dsh@0.2.1-rc.5 web
+npx @deepseek-ai/dsh@0.2.2-rc.1 plugin --profile web add ds-bot
+npx @deepseek-ai/dsh@0.2.2-rc.1 web
 ```
 
 **Docker (NAS, Linux server)**
@@ -119,17 +119,35 @@ Any bot can hand work to another bot with @. That bot does the work on its own, 
 
 A group chat has its own memory. What you tell the group stays in the group: its members use it there, and your other chats and the bots outside the group do not see it. You can manage it in the group's details.
 
+For larger work, a group chat can run a goal: the admin aligns with you on what "done" means, splits the work into stages across members, and checks each stage against evidence before moving on.
+
 ![Group chat: the admin, Chief, hands the work to Writer and Coder](docs/images/group.png)
 
 ### Capabilities
 
 Settings → **Capabilities** is a shared library of MCP servers, skills and packs. Add a capability to a Bot in its settings; it is available from that Bot's next message in its own chat and group chats. A local MCP command that a Bot adds needs your approval before it can run. While other Bots use a capability, only you or a Main Bot can change or delete it.
 
+### Connectors
+
+Settings → **Connectors** connects services such as GitHub, Gmail and other mailboxes, and remote MCP servers. Sign in once with OAuth or a key; the credentials stay in DS Bot's Secrets and never reach a Bot. Every Bot can use a connected service unless you turn it off in the Bot's details. A Bot that needs a service it does not have asks you with a card, and by default every email it writes waits for you to send it.
+
+### Local agents
+
+Coding-agent CLIs you already use — Devin CLI, Claude Code, Codex CLI, OpenCode and other ACP agents — can run a Bot. In Settings → **Local agents** DS Bot lists the CLIs it finds; pick one as a Bot's model. The Bot uses the CLI's own sign-in and plan, and still works like any Bot: private and group chats, handoffs, approvals and memory.
+
+### Computer use
+
+Bots can use the apps on your computer, as far as you allow. Turn it on in Settings → **Computer use**, then give each Bot a level and the apps it may use. You see when a Bot is working, can take over at any time and hand back, and some apps are never given to a Bot.
+
 ### Usage
 
 In **Settings** → **Usage**, you can see token usage by time, by bot and by model.
 
 ![Usage page](docs/images/usage.png)
+
+### IM
+
+Bots talk to you in your chat apps. In Settings → IM you can link a bot to Telegram, WeChat, Feishu, DingTalk, WeCom, QQ, Discord or Slack — pairing, group chats, approval cards and replies all work there without any public address or open port on your computer.
 
 ### Office files
 

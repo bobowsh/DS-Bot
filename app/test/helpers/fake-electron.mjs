@@ -9,13 +9,16 @@ import { join } from 'node:path'
 // The data of the app in this process: a folder of its own, so that a test never writes
 // into the data of the user.
 const root = mkdtempSync(join(tmpdir(), 'ds-bot-fake-user-data-'))
+// The layout of a real install: the program in <root>\app, its data beside it in <root>\data.
+const programFolder = join(root, 'app')
+mkdirSync(programFolder, { recursive: true })
 export const paths = {
   root,
   userData: join(root, 'userData'),
   downloads: join(root, 'downloads'),
-  exe: join(root, 'DS Bot.exe'),
+  exe: join(programFolder, 'LinkBot.exe'),
   // The folder of the app itself: the Host's pnpm lives in it.
-  appPath: join(root, 'app'),
+  appPath: programFolder,
 }
 for (const folder of [paths.userData, paths.downloads]) mkdirSync(folder, { recursive: true })
 
@@ -23,6 +26,7 @@ export const state = {
   windows: [],
   menus: [],
   dialogs: [],
+  pickers: [],
   quits: 0,
   relaunches: [],
   exits: [],
@@ -33,6 +37,10 @@ export const state = {
   // The app is a packaged one: it has an updater. It is set after the app starts, so that
   // the paths of the packaged app do not come into the way of the start.
   packaged: false,
+  // The app is an installed one: its data sits beside the program folder, the way a real
+  // install puts it. It is a question of its own, because the updater and the canonical
+  // restart belong to the packaged app and come after the start.
+  installed: false,
   // No page of the browser comes through.
   rejectLoads: false,
   // The cookies of the browser: the Host's address keeps one after the launch URL was used.
@@ -64,6 +72,7 @@ export class FakeWindow extends EventEmitter {
   setFullScreen(value) { this.fullScreen = value; if (!value) this.emit('leave-full-screen') }
   show() { this.visible = true; this.shown += 1; this.emit('show') }
   hide() { this.visible = false; this.emit('hide') }
+  setOpacity(value) { this.opacity = value }
   focus() { this.focused += 1 }
   restore() { this.minimized = false; this.visible = true; this.emit('restore') }
   minimize() { this.minimized = true }
@@ -104,6 +113,28 @@ export class FakeWindow extends EventEmitter {
   }
 }
 
+// The page's side of the app's picker (preload.cjs showPicker): it shows, then answers with
+// state.openAnswer, the shape of the system picker's answer that the tests set.
+function answerPicker(contents, request) {
+  state.pickers.push(request)
+  setImmediate(async () => {
+    const event = { sender: contents, senderFrame: contents.mainFrame }
+    state.ipc.get('ds-bot:app-picker-shown')(event, request.id)
+    const answer = typeof state.openAnswer === 'function' ? state.openAnswer(request) : (state.openAnswer ?? { canceled: true, filePaths: [] })
+    if (answer.canceled || answer.filePaths[0] === undefined) {
+      state.ipc.get('ds-bot:app-picker-cancel')(event, request.id)
+      return
+    }
+    // The user makes a folder that is not there yet with 〔新建文件夹〕, then chooses it.
+    if (request.mode === 'folder') {
+      try { mkdirSync(answer.filePaths[0], { recursive: true }) } catch {}
+    }
+    const chosen = await state.ipc.get('ds-bot:app-picker-choose')(event, request.id, answer.filePaths[0])
+    // A path that the picker refuses leaves it open; the user then cancels.
+    if (chosen?.error !== undefined) state.ipc.get('ds-bot:app-picker-cancel')(event, request.id)
+  })
+}
+
 class FakeWebContents extends EventEmitter {
   constructor(win) {
     super()
@@ -112,8 +143,13 @@ class FakeWebContents extends EventEmitter {
     this.mainFrame = {}
     this.isDestroyed = () => this.win.destroyed
     this.getURL = () => this.win.url
+    this.isLoading = () => false
     this.getTitle = () => 'DS Bot'
-    this.send = () => {}
+    this.sent = []
+    this.send = (...args) => {
+      this.sent.push(args)
+      if (args[0] === 'ds-bot:app-picker') answerPicker(this, args[1])
+    }
     this.setWindowOpenHandler = () => {}
     this.insertCSS = async () => {}
     this.toggleDevTools = () => {}
@@ -125,7 +161,7 @@ class FakeWebContents extends EventEmitter {
 class FakeApp extends EventEmitter {
   constructor() {
     super()
-    this.name = 'DS Bot'
+    this.name = 'LinkBot'
     this.getVersion = () => '0.2.2'
     this.getLocale = () => 'en-US'
     this.getPath = (name) => paths[name] ?? join(root, String(name))
@@ -156,6 +192,9 @@ class FakeApp extends EventEmitter {
   }
 
   get isPackaged() { return state.packaged === true }
+  // Whether the app is an installed one, which decides where its data goes. It is not the same
+  // question as isPackaged: the updater and the canonical restart belong to the packaged app.
+  get isInstalled() { return state.installed === true }
 }
 
 export const app = new FakeApp()

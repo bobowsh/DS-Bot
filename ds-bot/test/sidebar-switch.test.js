@@ -250,6 +250,62 @@ test('a sidebar row shows its name on hover when the name is hidden or cut', () 
   assert.equal(wide.BotRow.props.onMouseEnter, wide.RoomRow.props.onMouseEnter)
 })
 
+// The Bot's label rides its name's line, and the line under it keeps the preview.
+test('a sidebar row shows the Bot\'s label beside its name, and nowhere else', () => {
+  viewport.innerWidth = 1280
+  const partsOf = (role, busy = false) => {
+    const bot = { id: 'writer', name: 'Writer', role, createdAt: 1 }
+    const roster = { bots: [bot], rooms: [], agents: [], byId: { writer: bot }, ready: true, exchangeTurns: {} }
+    const rows = []
+    const walk = (node) => {
+      if (Array.isArray(node)) { node.forEach(walk); return }
+      if (!node || typeof node !== 'object') return
+      if (node.type?.name === 'BotRow') rows.push(node)
+      walk(node.props?.children)
+    }
+    walk(TeamSidebar({
+      wide: true,
+      actions: Object.fromEntries(['openSession', 'openAgent', 'openAgentSession', 'newAgentSession', 'openMenu', 'openPalette', 'openNewChat', 'toggleSidebar', 'clearUnread'].map(name => [name, () => {}])),
+      useRoster: pick => pick(roster), useUi: pick => pick({ unread: {} }), useRegistry: pick => pick({}),
+      useSessions: pick => pick({ ids: [], byId: {} }), useUpdate: () => ({}),
+      useSessionStatus: pick => pick(busy ? new Map([['writer', { running: true }]]) : new Map()), useSessionRetainInfo: () => null,
+      useActivity: pick => pick(busy ? { writer: 'working' } : {}), useWork: pick => pick({ waiting: {}, rooms: {}, approvals: [] }),
+    }))
+    const expand = (node) => {
+      if (Array.isArray(node)) return node.map(expand)
+      if (!node || typeof node !== 'object') return node
+      if (typeof node.type === 'function') return expand(node.type(node.props))
+      return { ...node, props: { ...node.props, children: expand(node.props.children) } }
+    }
+    const found = {}
+    const collect = (node) => {
+      if (Array.isArray(node)) { node.forEach(collect); return }
+      if (!node || typeof node !== 'object') return
+      if (['bt-row-name', 'bt-row-preview'].includes(node.props?.className)) found[node.props.className] = node
+      collect(node.props?.children)
+    }
+    collect(expand(rows[0].type(rows[0].props)))
+    return found
+  }
+  const text = node => (node === null || node === undefined || typeof node === 'boolean' ? ''
+    : typeof node === 'string' || typeof node === 'number' ? String(node)
+      : Array.isArray(node) ? node.map(text).join('') : text(node.props?.children))
+  const classesOf = line => line.props.children.map(child => child?.props?.className).filter(Boolean)
+  const labelled = partsOf('DSH 开发')
+  assert.deepEqual(classesOf(labelled['bt-row-name']), ['bt-row-title', 'bt-tag'])
+  assert.equal(text(labelled['bt-row-name'].props.children.find(child => child?.props?.className === 'bt-tag')), 'DSH 开发')
+  // No label: the name stands alone, and an absent one never leaves an empty tag.
+  assert.deepEqual(classesOf(partsOf(undefined)['bt-row-name']), ['bt-row-title'])
+  // The preview line never carries it.
+  assert.deepEqual(classesOf(partsOf('DSH 开发')['bt-row-preview'] ?? { props: { children: [] } }).filter(name => name === 'bt-tag'), [])
+  // The label shows the same whether the Bot is idle or at work: what it is doing moves to
+  // the line below and never displaces it.
+  const busy = partsOf('DSH 开发', true)
+  assert.deepEqual(classesOf(busy['bt-row-name']), ['bt-row-title', 'bt-tag'])
+  assert.deepEqual(classesOf(busy['bt-row-preview']).filter(name => name === 'bt-tag'), [])
+  assert.match(text(busy['bt-row-preview']), /…$/)
+})
+
 test('preparing sidebar navigation leaves actions elsewhere unchanged', () => {
   viewport.innerWidth = 390
   const { actions, calls } = navigationSidebar(true)
@@ -334,11 +390,34 @@ test('what the team view replaces in the shell sidebar stays out of sight', () =
   }
 })
 
-// The shell's collapsed sidebar keeps no track in the Bot view, so a hidden
-// column leaves nothing behind; the shell's right column keeps its own geometry.
-test('the shell\'s collapsed sidebar keeps no track while its right column is closed', () => {
-  const frame = [...rulesOf(SHELL_CSS), ...rulesOf(SIDEBAR_CSS)].find(rule => rule.selector.includes('[data-sidebar-collapsed][data-rightbar-collapsed]'))
-  assert.match(frame?.body ?? '', /grid-template-columns:0px/)
+function collapsedGridRules() {
+  const { document } = new JSDOM('<style></style>').window
+  document.querySelector('style').textContent = `${SHELL_CSS}\n${SIDEBAR_CSS}`
+  const frames = []
+  const visit = (rules, media = []) => {
+    for (const rule of rules) {
+      if (rule.selectorText?.includes('[data-sidebar-collapsed][data-rightbar-collapsed]'))
+        frames.push({ grid: rule.style.getPropertyValue('grid-template-columns'), media })
+      if (rule.cssRules?.length)
+        visit(rule.cssRules, rule.media ? [...media, rule.media.mediaText] : media)
+    }
+  }
+  visit(document.styleSheets[0].cssRules)
+  return frames
+}
+
+test('the wide shell\'s collapsed sidebar keeps no track while its right column is closed', () => {
+  const frames = collapsedGridRules()
+  assert.equal(frames.length, 1)
+  assert.match(frames[0].grid, /^0px\s+minmax\(0,\s*1fr\)\s+0px$/)
+})
+
+// A narrow host may place the conversation in its first track instead of its second.
+test('the collapsed shell grid override leaves layouts below 1024px to the host', () => {
+  const frames = collapsedGridRules()
+  assert.equal(frames.length, 1)
+  assert.ok(frames[0].media.some(query => /^\(min-width:\s*1024px\)$/.test(query)),
+    'the zero-width first track must not override a narrow host layout')
 })
 
 test('the column\'s top row hides it, on the rail too, and its edge is a drag grip', () => {
@@ -548,3 +627,24 @@ test('after a snap the spring stops and the drag follows the cursor', async () =
     assert.equal(column.style.width, '330px')
   })
 })
+
+test('TeamSidebar subscribes to specific ui slices rather than the whole ui object', () => {
+  const selectors = []
+  const base = { unread: {}, leftDrawer: false, details: null, view: 'details', panelYield: false, bootFailed: false }
+  TeamSidebar({
+    wide: true,
+    useRoster: pick => pick({ bots: [], rooms: [], agents: [], byId: {}, ready: true }),
+    useUi: (pick) => { selectors.push(pick); return pick(base) },
+    useRegistry: pick => pick({}),
+    useSessions: pick => pick({ ids: [], byId: {} }),
+    useUpdate: () => ({}),
+    actions: { toggleSidebar() {} },
+  })
+  assert.ok(selectors.length > 0)
+  for (const pick of selectors) {
+    const before = pick(base)
+    const after = pick({ ...base, palette: { query: 'test', token: 1 }, settings: { page: 'general' }, menu: { kind: 'bot', id: 'b1' }, toast: { text: 'err' } })
+    assert.equal(Object.is(before, after), true)
+  }
+})
+

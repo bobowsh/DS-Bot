@@ -35,7 +35,7 @@ function team({ group = false } = {}) {
   }
 }
 
-// Services for a full apply(): resolveAgent returns a per-Session agent that
+// Services for a full createRuntime(): resolveAgent returns a per-Session agent that
 // records followup/steer/inject/cancel calls.
 async function start(seed) {
   const home = mkdtempSync(join(tmpdir(), 'ds-bot-messages-'))

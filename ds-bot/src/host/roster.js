@@ -2,7 +2,7 @@
 // the first Main Bot of a new team.
 import { mkdir } from 'node:fs/promises'
 import { MAX_AVATAR_IMAGE, ROOM_MAX_MEMBERS, ROOM_MODES, ROOM_NAME_MAX, ROOM_NOTICE_MAX } from './constants.js'
-import { currentColor, isColor, normalize, unquote } from './text.js'
+import { currentColor, isColor, normalize, splitRef, unquote } from './text.js'
 import { nameProblem } from '../shared/mentions.js'
 
 const BROWSER_GRANT_KINDS = new Set(['post', 'upload', 'download', 'delete', '*'])
@@ -102,7 +102,7 @@ export function install(rt) {
     const avatar = {}
     if (typeof input.shape === 'string' && /^[a-z][\w-]{0,31}$/.test(input.shape)) avatar.shape = input.shape
     if (typeof input.image === 'string') {
-      if (!/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(input.image)) throw new Error('Avatar images must be PNG, JPEG, WebP, or GIF')
+      if (!/^data:image\/(png|jpeg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(input.image)) throw new Error('Avatar images must be PNG, JPEG, WebP, GIF, or SVG')
       if (input.image.length > MAX_AVATAR_IMAGE) throw new Error('Avatar image is too large')
       avatar.image = input.image
     }
@@ -145,7 +145,7 @@ export function install(rt) {
     return holdName('bot', cleanName, () => buildBot(cleanName, options))
   }
 
-  async function buildBot(cleanName, { role = '', instructions = '', color, brief = '', createdBy, main = false, avatar, model, effort, workDir, copyOf, pickModel = false }) {
+  async function buildBot(cleanName, { role = '', instructions = '', color, brief = '', createdBy, main = false, avatar, model, effort, workDir, copyOf, pickModel = false, factoryId, capabilities }) {
     const cleanAvatarValue = cleanAvatar(avatar)
     // The model is fixed at creation, so a later change of the DSH default leaves it alone.
     const modelRef = model ? await rt.resolveModel(model) : pickModel ? undefined : await rt.defaultBotModel()
@@ -175,7 +175,10 @@ export function install(rt) {
         instructions: String(instructions).trim(),
         createdAt: Date.now(),
         createdBy: createdBy ?? null,
-        capabilities: [],
+        // The skills a Bot starts with: a seeded Bot gets the ones its seed names, a Bot the user
+        // makes starts bare and is given skills later.
+        capabilities: Array.isArray(capabilities) ? [...capabilities] : [],
+        ...(factoryId ? { factoryId: String(factoryId) } : {}),
       }
       if (main) state.mainBotIds.push(id)
       const creator = rt.botOf(createdBy)
@@ -370,6 +373,7 @@ export function install(rt) {
       if (avatar) bot.avatar = avatar
       else delete bot.avatar
     }
+    const providerBefore = patch.model !== undefined ? splitRef(bot.appliedModel ?? bot.model)?.provider : undefined
     if (patch.model !== undefined) {
       // A failure that blocked the Bot was its old model's (turns.js).
       if ((modelRef ?? undefined) !== bot.model) delete bot.blocked
@@ -413,6 +417,17 @@ export function install(rt) {
         .catch(error => rt.warn('ds-bot: profile update for %s not delivered: %s', bot.name, error?.message ?? error))
     }
     if (modelChanged) await rt.applyModel(bot, { force: true })
+    // A different engine cannot share the conversation's CLI session: to or
+    // from a local agent route, or between two different local agents, the
+    // chat opens in a fresh part.
+    if (patch.model !== undefined) {
+      const providerAfter = splitRef(bot.appliedModel ?? bot.model)?.provider
+      const wasLocal = rt.isLocalAgentRoute?.(providerBefore) === true
+      const isLocal = rt.isLocalAgentRoute?.(providerAfter) === true
+      if ((wasLocal !== isLocal || (isLocal && providerBefore !== providerAfter)) && providerBefore !== providerAfter) {
+        void rt.newPart?.(rt.chatOf(bot.id)).catch(error => rt.warn('ds-bot: fresh part after the engine change of %s failed: %s', bot.name, error))
+      }
+    }
     if (moved) void rt.followFolder({ botId: bot.id })
     // A new model lifted what blocked the Bot; a new thinking level alone fixes nothing.
     // releaseKickoff itself leaves when the Bot still lacks a model or holds no greeting.
@@ -611,6 +626,9 @@ export function install(rt) {
       delete room.memberDirs
       changes.push(workDir ? `every member now works in ${workDir} here` : 'every member works in its own folder again')
       void rt.followFolder({ roomId: room.id })
+      // The files panel reads the current Session's cwd, so the group's own Session takes the
+      // folder now rather than at its next part (see adoptRoomFolder).
+      void rt.adoptRoomFolder?.(room.id)
     }
     const before = room.name
     if (name !== undefined) {
@@ -713,6 +731,7 @@ export function install(rt) {
     for (const part of parts) {
       delete state.questions[part]
       if (state.views !== undefined) delete state.views[part]
+      if (state.closedCards !== undefined) delete state.closedCards[part]
       delete state.exchangeTurns[part]
       delete state.switching[part]
     }
@@ -760,6 +779,10 @@ export function install(rt) {
   async function bootstrap() {
     await rt.load()
     void rt.syncModels()
+    // The factory seed runs before the default-Chief check: a shipped team fills mainBotIds
+    // so no default Chief is made, and an existing team gets its seed Bots refreshed to
+    // factory values on an upgrade. With no seed file this is a no-op.
+    await rt.applySeed()
     if (state.mainBotIds.some(id => rt.botOf(id))) return
     // Only the team's first Main Bot is stored as the DeepSeek whale; other Bots get a
     // look from their id, and a Bot made Main Bot later keeps its own.

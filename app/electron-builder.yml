@@ -1,7 +1,9 @@
-appId: io.github.fei2411.dsbot
-productName: DS Bot
+# The app id names the Windows uninstall entry and the single-instance lock: it is a technical
+# identifier, not a name the user sees, so it stays as it is.
+appId: io.github.fei2411.deepseekbot
+productName: LinkBot
 copyright: Copyright 2026 Fei2411 and the DS Bot contributors
-artifactName: DS-Bot-${version}-${os}-${arch}.${ext}
+artifactName: LinkBot-${version}-${os}-${arch}.${ext}
 directories:
   output: dist-pack
 files:
@@ -19,6 +21,11 @@ asarUnpack:
   - node_modules/ds-bot/office.js
   # Automatic unpacking misses versioned Linux libraries such as libvips-cpp.so.8.18.7.
   - node_modules/@img/sharp*/**
+  # The signed "DSH Computer Use" helper and the Cua Driver binaries are programs;
+  # inside the asar they would not run, and an ad-hoc re-sign would lose DeepSeek's
+  # Developer ID signature (mac.signIgnore below keeps it).
+  - node_modules/@deepseek-ai/dsh-experimental-cua-macos/**
+  - node_modules/@trycua/cua-driver*/**
 # The Office payload that scripts/prepare-runtime.mjs writes in beforePack (see package.json's
 # `runtime` script). build/ is not in `files`, so nothing of it lands inside the asar.
 extraResources:
@@ -33,6 +40,21 @@ extraResources:
   - from: node_modules/@deepseek-ai
     to: node_modules/@deepseek-ai
     filter: ['libreoffice-kit-*/**']
+
+  # The factory seed team and the bundled skills repo travel as plain directories under the
+  # app's resources, which is where the running app reads them from (src/factory.mjs uses
+  # process.resourcesPath). Both stay outside the asar: the skills repo is a git repository,
+  # and nothing reads a git dir through the archive.
+  - from: resources/factory
+    to: factory
+  - from: resources/skills-repo
+    to: skills-repo
+  # The import plugin is not a dependency of the app: it belongs to the profile, so the user may
+  # turn it off in the plugin manager. It still travels with the installer, as one archive the
+  # first start unpacks into the profile — the install never reaches the network.
+  # The archive is made by scripts/bundled-plugin.mjs in the beforePack hook.
+  - from: build/bundled-plugins
+    to: bundled-plugins
 # node-pty, sharp and koffi ship prebuilt binaries for each platform. A rebuild would compile
 # node-pty from source and needs a C++ toolchain.
 npmRebuild: false
@@ -49,6 +71,11 @@ nsis:
   oneClick: false
   perMachine: false
   allowElevation: false
+  # The install directory is the one the user picks on the directory page, and the
+  # page starts at <drive>\LinkBot\app (see build/installer.nsh): the app goes there
+  # and the data to <drive>\LinkBot\data beside it. The chosen path is used as it
+  # is; the product-name sub-folder electron-builder would append is kept away by
+  # the installer script.
   allowToChangeInstallationDirectory: true
   include: build/installer.nsh
   installerLanguages: [zh_CN, en_US]
@@ -58,6 +85,9 @@ mac:
   target: zip
   # Ad-hoc signing seals the bundle; no Developer ID or notarization.
   identity: '-'
+  # The DSH helper keeps the signature it was notarized with; the rest is ours to seal.
+  signIgnore:
+    - 'DSH Computer Use\.app'
   hardenedRuntime: false
   icon: assets/icon.png
   category: public.app-category.productivity
@@ -77,7 +107,7 @@ linux:
       arch: [x64]
   # The binary and the deb's menu entry take this name; productName has a space, which a
   # terminal command should not have.
-  executableName: dsbot
+  executableName: linkbot
   # A deb needs a maintainer; package.json's author has no email, so it goes here.
   maintainer: Fei2411 <https://github.com/Fei2411>
   # Links the running window to the menu entry (WM_CLASS = app id).

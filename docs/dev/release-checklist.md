@@ -7,12 +7,25 @@ CI 只跑单元测试和 Linux 上的测试台。窗口外框、输入法、高 
 ## 准备
 
 - Windows 10 / 11 x64，或 macOS（Apple 芯片）。
-- 官方的 DSH Desktop，版本和 README 里写的一致（现在是 `0.2.1-rc.5`）。只从 DeepSeek Harness 官方渠道下载。
+- 官方的 DSH Desktop，版本和 README 里写的一致（现在是 `0.2.2-rc.1`）。只从 DeepSeek Harness 官方渠道下载。
 - 要发的包：在 `ds-bot/` 里运行 `npm pack`，得到 `ds-bot-<版本>.tgz`。
 - 桌面应用的安装包：在 `app/` 里运行 `npm run dist`，得到 `app/dist-pack/DS-Bot-<版本>-win-x64.exe`。`app/package.json` 和 `ds-bot/package.json` 的版本号要一样。
 - 也可以用发版工作流的试运行：在 GitHub 的 Actions 里选 Release → Run workflow，勾着 dry run 运行。跑完后在这次运行的页面下载 Windows 安装包和两个 Mac 的 zip（保留 7 天）。它们和 Release 里的文件在同样的 runner 上、用同样的方法打包，不发布任何东西。
 - 一个能用的模型（DeepSeek API key 或账号）。测试里要填的密钥都用**假值**。
 - 想保留现有数据，先备份数据目录：Windows 是 `C:\Users\<用户名>\.dsh\`，macOS 是 `~/.dsh/`。最好用一台没有自己团队数据的机器或账户来测。
+
+## 改版本号
+
+发版前先把版本号改好。桌面应用和插件用同一个版本号，产物名里的 `<版本>` 由此而来。
+
+1. 改 `app/package.json` 的 `version` 和 `ds-bot/package.json` 的 `version`，两处相同。`app/test/package.test.mjs` 里有一条测试守着这个约束，它红了就是两处没改齐。
+2. 刷新 `ds-bot/package-lock.json`：在 `ds-bot/` 里运行 `npm install --package-lock-only`。它的根条目记着版本号，不刷新会和 `ds-bot/package.json` 对不上。
+3. `app/package-lock.json` 里 `node_modules/ds-bot` 那一条的 `version` 字段**不用管**：它是 `file:` 依赖，npm 装的是 `../ds-bot` 目录的实际内容，这个字段只是元数据，不决定装什么，强刷反而会重新求解整棵树。
+4. `app/node_modules/ds-bot` 是 `file:` 依赖**复制**出来的副本，不是链接。改了 `ds-bot/package.json` 的版本后，它还是旧的——打包打的是 `node_modules` 里的实际内容，所以在 `app/` 里运行一次 `npm ci`，让它按新版本重新复制。
+5. 核一下实际装的是新版：`node -e "console.log(require('./app/node_modules/ds-bot/package.json').version)"`，和两个 package.json 一致。
+6. 跑 `cd app && node --test test/package.test.mjs`，确认那条「两个版本一致」的测试是绿的。
+
+> 记一笔：`npm install --legacy-peer-deps` 用来装 peer 依赖版本对不上的包是可行的，但**它会重新求解整棵树**，把 `@electron/windows-sign`、`electron-winstaller` 这些打包要用的依赖从 lock 里剔掉，直接毁掉打包。要装新包，先 `npm install <包> --package-lock-only` 更新 lock，再 `npm ci` 恢复全树。
 
 ## 1. 安装 DSH Desktop
 
@@ -148,13 +161,13 @@ DSH Desktop 和桌面应用各做一遍。
 | # | 步骤 | 期望 | 结果 |
 |---|---|---|---|
 | 12.1 | 运行安装包，选安装位置，安装 | 不要管理员权限；只装给当前用户；开始菜单里有 DS Bot | |
-| 12.2 | 第一次打开：选数据位置和总工作区；有 DSH 团队时选复制 | 团队、对话、模型设置都在；DSH 里原来的团队不变 | |
+| 12.2 | 第一次打开：启动窗口出现（盘够时没有位置行）；有 DSH 团队时选复制 | 团队、对话、模型设置都在；DSH 里原来的团队不变 | |
 | 12.3 | 给一个 Bot 发消息；再打开设置 → 关于 DS Bot | 收到回复；DS Bot 一行写「随 DS Bot 应用一起更新。」 | |
 | 12.4 | 看窗口：拖标题栏，双击标题栏，点最小化、最大化、关闭；切换浅色和深色 | 没有系统边框；拖得动，双击会最大化，最大化后顶部没有缝；三个按钮都能用，底色和下面的界面一样；Windows 11 上侧栏透出 Mica，Windows 10 上标题栏和侧栏同色 | |
 | 12.5 | 按 `Ctrl+Alt+B` | 侧栏收起，再按一次展开 | |
 | 12.6 | 设置 → 通用 →「位置」：把总工作区换到另一个文件夹，给 Bot 发消息；再把数据位置换到一个空文件夹 | 总工作区换完，Bot 的下一轮在新文件夹里；数据复制完 App 自己重启，团队和对话都在，「位置」里是新的数据位置，旧文件夹还在 | |
 | 12.7 | 装上一个发布版本的 App，打开它，等它提示新版本已经下载好，选「立即重启」 | App 关掉后自己装好新版并重新打开；关于页里是新版本号；团队都在 | |
-| 12.8 | 再装一次上一个版本，等下载好的提示，选「稍后」，退出 App，等半分钟再打开 | 打开的是新版 | |
+| 12.8 | 再装一次上一个版本，等下载好的提示，选「先不重启」，从托盘退出 App，等半分钟再打开 | 打开的是新版 | |
 
 ## 13. 桌面应用（macOS）
 
@@ -164,7 +177,7 @@ DSH Desktop 和桌面应用各做一遍。
 |---|---|---|---|
 | 13.1 | 发布 Release，等工作流传完文件 | Release 里有 arm64 和 x64 两个 zip | |
 | 13.2 | 用 Safari 从 Release 页下载这台 Mac 的 zip（Safari 会自动解压），把 DS Bot 拖到「应用程序」，第一次打开 | Gatekeeper 拦下，不说「已损坏」；到「系统设置 → 隐私与安全性」点「仍要打开」后能打开 | |
-| 13.3 | 第一次打开：选数据位置和总工作区；有 DSH 团队时选复制；给一个 Bot 发消息 | 团队、对话、模型设置都在；收到回复；关于页写「随 DS Bot 应用一起更新。」 | |
+| 13.3 | 第一次打开：启动窗口出现（盘够时没有位置行）；有 DSH 团队时选复制；给一个 Bot 发消息 | 团队、对话、模型设置都在；收到回复；关于页写「随 DS Bot 应用一起更新。」 | |
 | 13.4 | 设置 → 通用 →「位置」：把总工作区换到另一个文件夹，给 Bot 发消息；再把数据位置换到一个空文件夹 | 总工作区换完，Bot 的下一轮在新文件夹里；数据复制完 App 自己重启，团队和对话都在，「位置」里是新的数据位置，旧文件夹还在 | |
-| 13.5 | 关闭窗口 | 应用退出，Dock 里不留着 | |
+| 13.5 | 关闭窗口，再从托盘或 Dock 重新打开；最后从托盘选「退出 DS Bot」 | 第一次关窗提示留在托盘继续运行，确认后窗口隐藏、引擎照常；点 Dock 图标或托盘「打开 DS Bot」窗口回来；托盘「退出 DS Bot」才完全退出 | |
 | 13.6 | 装上一个发布版本的 App 并打开，等新版提示后点「下载」 | 打开这次 Release 的发布页；应用不自己安装新版 | |

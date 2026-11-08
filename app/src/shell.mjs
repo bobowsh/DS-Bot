@@ -7,22 +7,24 @@ import { createTray } from './tray.mjs'
 
 export const SHELL_TEXT = {
   en: {
-    tooltip: 'DS Bot',
-    open: 'Open DS Bot',
-    quit: 'Quit DS Bot',
-    notice: 'DS Bot keeps running in the system tray. Its Bots go on working while the window is closed.',
+    tooltip: 'LinkBot',
+    open: 'Open LinkBot',
+    quit: 'Quit LinkBot',
+    notice: 'LinkBot keeps running in the system tray. Its Bots go on working while the window is closed.',
     noticeConfirm: 'OK',
-    fallback: 'The system tray is not available, so DS Bot cannot stay in the background. Do you want to end it?',
+    fallback: 'The system tray is not available, so LinkBot cannot stay in the background. Do you want to end it?',
     cancel: 'Cancel',
+    stopAll: 'Stop all',
   },
   zh: {
-    tooltip: 'DS Bot',
-    open: '打开 DS Bot',
-    quit: '退出 DS Bot',
-    notice: 'DS Bot 会留在系统托盘里继续运行，关掉窗口时 Bot 们照常工作。',
+    tooltip: 'LinkBot',
+    open: '打开 LinkBot',
+    quit: '退出 LinkBot',
+    notice: 'LinkBot 会留在系统托盘里继续运行，关掉窗口时 Bot 们照常工作。',
     noticeConfirm: '好',
-    fallback: '系统托盘不可用，DS Bot 不能留在后台。要结束它吗？',
+    fallback: '系统托盘不可用，LinkBot 不能留在后台。要结束它吗？',
     cancel: '取消',
+    stopAll: '全部停止',
   },
 }
 
@@ -133,12 +135,13 @@ export function createShell(options) {
         image, tooltip: text().tooltip,
         open: { label: text().open, run: () => { open() } },
         quit: { label: text().quit, run: () => { quit() } },
+        computer: { onAction: (kind, botId) => { options.computer?.(kind, botId) }, stopAll: () => text().stopAll },
         log,
       })
     } catch (error) {
       // Without a tray the window stays where the user can reach it; the app never vanishes.
       tray = undefined
-      log.warn(`DS Bot: the system tray is not available: ${error instanceof Error ? error.message : String(error)}`)
+      log.warn(`LinkBot: the system tray is not available: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
@@ -150,12 +153,12 @@ export function createShell(options) {
     const t = text()
     try {
       const { response } = await options.fallback.show({
-        type: 'question', title: 'DS Bot', message: t.fallback,
+        type: 'question', title: 'LinkBot', message: t.fallback,
         buttons: [t.quit, t.cancel], defaultId: 1, cancelId: 1, noLink: true,
       })
       if (response === 0) { quit(); return }
     } catch (error) {
-      log.warn(`DS Bot: the fallback quit could not be asked: ${error instanceof Error ? error.message : String(error)}`)
+      log.warn(`LinkBot: the fallback quit could not be asked: ${error instanceof Error ? error.message : String(error)}`)
     }
     // The window stays in the task bar, where the user can reach it.
     target.minimize()
@@ -204,7 +207,7 @@ export function createShell(options) {
       powerMonitor.on('shutdown', () => { sessionEnding = true })
     }
     notice = new BackgroundNotice({
-      marker: options.notice.marker(), show: options.notice.show, message: text().notice, confirm: text().noticeConfirm, log,
+      marker: options.notice.marker(), show: options.notice.show, focus: options.notice.focus, message: text().notice, confirm: text().noticeConfirm, log,
     })
     buildTray()
   }
@@ -225,6 +228,8 @@ export function createShell(options) {
     beginQuit,
     cancelQuit,
     dispose,
+    /** The same computer-use entries the floating indicator carries. */
+    setComputer: entries => { tray?.setComputer(entries) },
     hasTray: () => tray !== undefined,
     isQuitting: () => quitting,
     isHidden: (target) => hidden.has(target),

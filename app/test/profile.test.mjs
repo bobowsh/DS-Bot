@@ -28,7 +28,7 @@ describe('the app profile', () => {
     const profile = loadAppProfile()
     assert.deepEqual(profile.layers.map((layer) => layer.packageName), BUNDLES)
     assert.deepEqual(profile.skippedBundles, [])
-    entries = composeEntries([...profile.layers.map((layer) => layer.patches), profile.patches])
+    entries = composeEntries([...profile.layers.map(layer => layer.patches), profile.patches])
   })
   after(() => { rmSync(home, { recursive: true, force: true }) })
 
@@ -62,5 +62,13 @@ describe('claimBundles', () => {
     const before = readFileSync(join(dir, 'package.json'), 'utf8')
     claimBundles(dir)
     assert.equal(readFileSync(join(dir, 'package.json'), 'utf8'), before)
+  })
+
+  test('a bundle the user turned off is left out', () => {
+    // The plugin manager removes a bundle from the list when the user turns it off, and the app
+    // does not add it back: only the app's own bundles are claimed.
+    write([...BUNDLES, 'a-plugin'])
+    claimBundles(dir)
+    assert.ok(!read().dsh.profile.bundles.includes('dsh-chat-import'), 'it stays off')
   })
 })

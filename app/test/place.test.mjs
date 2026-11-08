@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync 
 import { tmpdir } from 'node:os'
 import { join, parse, resolve, sep } from 'node:path'
 import { test } from 'node:test'
-import { currentRootOf, DATA_DIR, driveOf, formatBytes, freeSpace, isEmptyTree, LAYER, pickFrom, placeOf, rootOf, shortPath, WORKSPACE_DIR } from '../src/place.mjs'
+import { currentRootOf, DATA_DIR, driveOf, formatBytes, freeSpace, isEmptyTree, LAYER, LOW_SHARE, pickFrom, placeOf, rootOf, runningLow, shortPath, WORKSPACE_DIR } from '../src/place.mjs'
 
 const win32 = process.platform === 'win32'
 const temp = (t) => {
@@ -17,7 +17,16 @@ test('free space is read at the nearest existing ancestor of a folder that is no
   const free = freeSpace(join(dir, 'not', 'yet'))
   assert.equal(typeof free, 'number')
   assert.ok(free > 0)
-  assert.equal(freeSpace(join(dir, 'not', 'yet')), freeSpace(dir))
+  // Other tests write to the same disk, so the free space can move by a block between two reads:
+  // the folder's own reads on both sides bound the nested read. A write and a delete in between
+  // can still leave it outside, so a few tries.
+  const between = () => {
+    const before = freeSpace(dir)
+    const nested = freeSpace(join(dir, 'not', 'yet'))
+    const after = freeSpace(dir)
+    return nested >= Math.min(before, after) && nested <= Math.max(before, after)
+  }
+  assert.ok(Array.from({ length: 20 }).some(between))
 })
 
 // Explorer's units: GB and MB of 1024, so the line agrees with what the user sees there.
@@ -26,6 +35,11 @@ test('sizes read as Explorer shows them', () => {
   assert.equal(formatBytes(10 * 2 ** 30), '10 GB')
   assert.equal(formatBytes(1.26 * 2 ** 30), '1.2 GB')
   assert.equal(formatBytes(900 * 2 ** 20), '900 MB')
+  // Under 1 MB, never 「0 MB」.
+  assert.equal(formatBytes(2 ** 20), '1 MB')
+  assert.equal(formatBytes(12_000), '不到 1 MB')
+  assert.equal(formatBytes(0), '不到 1 MB')
+  assert.equal(formatBytes(12_000, 'en'), 'under 1 MB')
   assert.equal(formatBytes(undefined), undefined)
   assert.equal(formatBytes(-1), undefined)
 })
@@ -53,6 +67,16 @@ test('the place line names the drive and its free space, or the folder', () => {
   } else {
     assert.deepEqual(placeOf('/home/user/.ds-bot', { home: '/home/user', free: 1.5 * 2 ** 30 }), { path: `~${sep}.ds-bot`, free: '1.5 GB' })
   }
+})
+
+test('a drive runs low at a fifth of the free space it had when the data went there', () => {
+  assert.equal(LOW_SHARE, 0.2)
+  // 412 GB at the start: the line comes back at 82.4 GB.
+  assert.equal(runningLow(82 * 2 ** 30, 412 * 2 ** 30), true)
+  assert.equal(runningLow(83 * 2 ** 30, 412 * 2 ** 30), false)
+  assert.equal(runningLow(20, 100), true)
+  assert.equal(runningLow(21, 100), false)
+  for (const [free, freeAtStart] of [[undefined, 100], [10, undefined], [10, 0], [Number.NaN, 100], [10, Number.POSITIVE_INFINITY]]) assert.equal(runningLow(free, freeAtStart), false)
 })
 
 test('the picker opens in the data folder\'s parent', (t) => {

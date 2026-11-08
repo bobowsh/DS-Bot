@@ -30,6 +30,20 @@ runInNewContext(bundle.outputFiles[0].text, {
 })
 const { AssistantCell, TurnTailCell, ThinkingRow, CellEmpty } = module.exports
 
+// #1: the process of a turn is a fold above the reply, holding the tools it
+// called and how fast the model wrote.
+const textOf = node => {
+  if (node === null || node === undefined || typeof node === 'boolean') return ''
+  if (Array.isArray(node)) return node.map(textOf).join('')
+  if (typeof node !== 'object') return String(node)
+  return textOf(node.children ?? node.props?.children)
+}
+const processOf = props => {
+  // The fold is drawn in the response part of the turn's step.
+  const out = expand(AssistantCell({ ...props, groupPart: 'response' }), ['ProcessView', 'ProcessStats', 'CallDisclosure', 'CallRow'])
+  return find(out, node => node.props?.className === 'bt-proc')
+}
+
 // Renders the named components of an element tree, leaving the rest as elements.
 const expand = (node, names) => {
   if (Array.isArray(node)) return node.flatMap(child => expand(child, names))
@@ -147,4 +161,49 @@ test('the thinking row shows only with its switch on, and the activity row is ne
     const { noted } = cell(prefs, replying.blocks, [replying])
     assert.ok(noted.every(id => id.startsWith('text:')))
   }
+})
+
+// #1: the process fold shows the tools the turn called and the speed it wrote
+// at. Its figures come from the host's own usage report and its own timing.
+test('the process fold shows the turn\'s tools, its speed and its tokens', () => {
+  const { props } = cellProps()
+  const steps = [{
+    turn: 3, step: 1, status: 'settled', time: 1_000, blocks: [],
+    finalNode: {
+      seq: 10, turn: 3, step: 1, time: 4_000, blocks: [],
+      usage: { inputTokens: 100, outputTokens: 200 },
+      timing: { stepStartTime: 1_000, firstTokenTime: 1_000, completedTime: 3_000 },
+    },
+  }]
+  props.useTurnSteps = () => steps
+  props.useTurnTools = () => [{
+    root: {
+      kind: 'tool-result', callId: 'c1', name: 'read_file', time: 5_000, callTime: 4_000,
+      call: { name: 'read_file', argsRaw: '{"path":"a.md"}' },
+      content: [{ type: 'text', text: 'the file' }], isError: false, subCalls: [],
+    },
+  }]
+  props.useTurnTail = () => [{ tokenUsage: { uncachedInputTokens: 100, outputTokens: 200, totalTokens: 300 } }]
+  const view = processOf(props)
+  assert.ok(view, 'the fold is drawn')
+  // 200 output tokens over two seconds of writing.
+  assert.match(textOf(view), /100\.0 tok\/s/)
+  assert.match(textOf(view), /1 tool call/)
+  assert.match(textOf(view), /Total 300/)
+  // The tool it called is in the fold, with the arguments it ran with.
+  assert.match(textOf(view), /read_file/)
+  assert.match(textOf(view), /\{"path":"a\.md"\}/)
+})
+
+// #1: a provider that has not reported its usage has no speed to show, and the
+// fold says so rather than showing zero.
+test('the fold says the speed is unavailable when the provider reported none', () => {
+  const { props } = cellProps()
+  props.useTurnSteps = () => [{
+    turn: 3, step: 1, status: 'settled', time: 1_000, blocks: [],
+    finalNode: { seq: 10, turn: 3, step: 1, time: 4_000, blocks: [], timing: { stepStartTime: 1_000, firstTokenTime: 1_000, completedTime: 3_000 } },
+  }]
+  const view = processOf(props)
+  assert.match(textOf(view), /Speed unavailable/)
+  assert.doesNotMatch(textOf(view), /0\.0 tok\/s/)
 })

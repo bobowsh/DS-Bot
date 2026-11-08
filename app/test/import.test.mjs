@@ -347,7 +347,7 @@ describe('finding the team', () => {
     assert.deepEqual(sessionIdsOf({ bots: {}, rooms: { 'session-r2': { id: 'session-r2' } } }), ['session-r2'])
   })
 
-  test('copies only the Sessions of the team for the check, and changes nothing in the old home', async () => {
+  test('copies only the Sessions of the team, and changes nothing in the old home', async () => {
     const oldTree = treeHash(from)
     const home = join(root, 'check')
     const ids = await copySessions(from, TEAM, home)
@@ -357,7 +357,7 @@ describe('finding the team', () => {
     assert.equal(treeHash(from), oldTree)
   })
 
-  test('stops copying for the check once the app quits', async () => {
+  test('stops copying once the app quits', async () => {
     const home = join(root, 'check-stopped')
     await assert.rejects(copySessions(from, TEAM, home, AbortSignal.abort()), { name: 'AbortError' })
     assert.equal(existsSync(join(home, 'sessions')), false)

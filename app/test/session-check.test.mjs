@@ -1,12 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { after, before, describe, test } from 'node:test'
-import { fileURLToPath } from 'node:url'
-import { zstdCompressSync } from 'node:zlib'
-import { HostProcess } from '../src/host-process.mjs'
-import { CHECK_PROFILE } from '../src/profile.mjs'
+import { test, describe } from 'node:test'
 import { unreadableSessions } from '../src/session-check.mjs'
 
 const named = (name, message) => Object.assign(new Error(message), { name })

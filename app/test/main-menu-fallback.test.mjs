@@ -14,7 +14,7 @@ Object.defineProperty(process, 'platform', { value: 'darwin' })
 before(async () => {
   // The desktop has no tray.
   state.trayFails = true
-  await startApp({ packaged: false })
+  await startApp({ packaged: false, later: true })
 })
 
 test('the application menu of macOS carries a Quit when there is no tray', async () => {
@@ -22,7 +22,7 @@ test('the application menu of macOS carries a Quit when there is no tray', async
   assert.equal(state.tray, undefined, 'there is no tray')
   const items = state.menus.at(-1).template[0].submenu
   const quit = items.at(-1)
-  assert.equal(quit.label, 'Quit DS Bot', 'the menu ends the app')
+  assert.equal(quit.label, 'Quit LinkBot', 'the menu ends the app')
   assert.equal(typeof quit.click, 'function', 'the entry works')
   quit.click()
   await waitFor(() => state.quits > 0, 'end the app')

@@ -453,6 +453,28 @@ test('a member turn that fails before it takes the call fails that member in the
   assert.deepEqual(result.replies.map(reply => [reply.kind ?? 'reply', reply.name]), [['failed', 'Chief'], ['reply', 'Writer']])
 })
 
+// #974: a turn that ends on a quota error stops the work it was doing. The round's red row
+// goes with the round, so the group log keeps a line that the admin and the members read.
+test('a member turn that runs out of quota leaves a lasting line in the group log', async (t) => {
+  const { call, emit, userMessage, relay, answer, stop, sent, rt } = start()
+  t.after(stop)
+  const room = await team(call, sent)
+  await emit(room.id, userMessage('Deploy it'))
+  const running = relay(room.id, 'relay')
+  const first = await turnFor(sent)
+  await emit(first.sessionId, { type: 'turn/start', data: { turn: 1 } })
+  await emit(first.sessionId, { type: 'turn/end', data: { reason: { kind: 'error', error: { message: 'coding plan quota used up', code: 'QUOTA', status: 402 } } } })
+  const second = await turnFor(sent, first)
+  await answer(second.sessionId, second.message.source.exchangeId, 'Writer here.', 1)
+  await running
+  const failed = rt.roomOf(room.id).log.filter(line => line.kind === 'notice' && line.reason === 'failed')
+  assert.equal(failed.length, 1)
+  assert.deepEqual(failed[0].names, ['Chief'])
+  assert.match(failed[0].detail, /^QUOTA/)
+  const { lineText } = await import('../src/host/groups.js')
+  assert.match(lineText(failed[0]), /^\[Chief stopped: its model call failed \(QUOTA.*\)\. What it was doing here is not finished; the user can switch its model in its settings or ask it to go on\.\]$/)
+})
+
 // A member deleted while its group Session is made sits the round out; the Session it was
 // getting belongs to no one, so it is archived instead of left over.
 test('a member deleted while its group Session is made is left out, and the Session is not kept', async (t) => {
@@ -595,6 +617,40 @@ test('a file the user sends in a group reaches each member the line is shown to,
   await running
 })
 
+// #955: an image the user sends in a group reaches each member the line is shown to as
+// an image block once, and the log line keeps its read-only copy path even when no
+// vision model can read it.
+test('an image the user sends in a group reaches each member the line is shown to, once, with its read-only path', async (t) => {
+  const { call, emit, relay, answer, stop, sent, ctx, rt } = start()
+  t.after(stop)
+  const savedPath = '/tmp/dsh-attachments/objects/ab/cd'
+  ctx.get = name => (name === 'attachments' ? { imageHostPath: () => savedPath } : undefined)
+  const room = await team(call, sent)
+  const png = { attachmentId: 'sha256:abcd1234', name: 'image.png', mediaType: 'image/png', bytes: 67_000, width: 800, height: 600 }
+  await emit(room.id, { type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'What is in this screenshot?' }, { type: 'image', attachment: png }] } })
+  let running = relay(room.id, 'r1')
+  const first = await turnFor(sent)
+  const images = message => message.content.filter(block => block.type === 'image').map(block => block.attachment)
+  assert.deepEqual(images(first.message), [png])
+  assert.match(first.message.content[0].text, /read-only copy saved at "\/tmp\/dsh-attachments\/objects\/ab\/cd"/)
+  await answer(first.sessionId, first.message.source.exchangeId, 'I see it.', 1)
+  const second = await turnFor(sent, first)
+  assert.deepEqual(images(second.message), [png])
+  await answer(second.sessionId, second.message.source.exchangeId, 'Me too.', 2)
+  await running
+  assert.deepEqual(rt.roomOf(room.id).log.find(line => line.who === 'User').images, [png])
+
+  sent.length = 0
+  await emit(room.id, { type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'Thanks' }] } })
+  running = relay(room.id, 'r2')
+  const next = await turnFor(sent)
+  assert.deepEqual(images(next.message), [])
+  await answer(next.sessionId, next.message.source.exchangeId, 'OK.', 3)
+  const after = await turnFor(sent, next)
+  await answer(after.sessionId, after.message.source.exchangeId, 'OK.', 4)
+  await running
+})
+
 // #206: a Bot's post past 20,000 characters goes as a file; the line keeps the file and
 // each member it is shown to gets it with its prompt.
 test('a long post goes to the group as a file, and reaches the member with its prompt', async (t) => {
@@ -702,6 +758,36 @@ test('calls parked under the old relay limit run in the group\'s next round', as
   assert.equal(state().paused, undefined)
   const saved = JSON.parse(readFileSync(join(home, 'state.json'), 'utf8')).rooms[room.id]
   assert.equal(saved.paused, undefined)
+})
+
+// #872: calls the idle guard parked wait for the user. A round a Bot's post opens
+// leaves them; the user's message that joins that round brings them in.
+test('calls the idle guard parked wait for the user\'s message, also one that joins a running round', async (t) => {
+  const { call, emit, compose, relay, answer, stop, sent, rt } = start()
+  t.after(stop)
+  const room = await team(call, sent)
+  await call('update-room', { id: room.id, mode: 'admin' })
+  const chief = rt.state.mainBotIds[0]
+  const writer = Object.values(rt.state.bots).find(bot => bot.name === 'Writer')
+  const state = () => rt.state.rooms[room.id]
+  state().paused = [{ id: writer.id, name: 'Writer', note: 'Chief mentioned you', by: chief, idle: true }]
+  await rt.save()
+
+  await emit(room.id, { type: 'user/message', data: { source: { kind: 'bot', form: 'relay', role: 'post', exchangeId: 'p1', senderSessionId: writer.id, senderName: 'Writer', roomId: room.id }, content: [{ type: 'text', text: '[Group post from Writer]\n@Chief the draft is up' }] } })
+  const running = relay(room.id, 'relay')
+  const first = await turnFor(sent)
+  assert.equal(first.sessionId, state().sessions[chief])
+  assert.equal(state().paused.length, 1, 'a Bot\'s post does not bring the parked call in')
+
+  await compose(room.id, 'Go on, both of you')
+  await answer(first.sessionId, first.message.source.exchangeId, 'Thanks.', 1)
+  const parked = await waitFor(() => sent.find(entry => entry !== first && entry.message.source.role === 'room' && /Chief mentioned you/.test(entry.message.content[0].text)))
+  assert.ok(parked, 'the user\'s message brings the parked call in')
+  assert.equal(state().paused, undefined)
+  const again = await waitFor(() => sent.find(entry => entry !== first && entry !== parked && entry.message.source.role === 'room'))
+  await answer(parked.sessionId, parked.message.source.exchangeId, 'On it.', 1)
+  await answer(again.sessionId, again.message.source.exchangeId, 'Fine.', 2)
+  await running
 })
 
 test('a member the reply timeout cut short is told to the group, not left as silence', async (t) => {

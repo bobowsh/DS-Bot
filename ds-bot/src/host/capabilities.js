@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { join, sep } from 'node:path'
 import { encodeUrlComponent } from './secrets.js'
 import { own } from './store.js'
 
@@ -7,10 +9,13 @@ const NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 const SECRET_REFERENCE = /\$DSH_SECRET_([A-Z][A-Z0-9_]*)/g
 const ENSURE_TIMEOUT_MS = 15_000
 
-export function validateCapabilityName(value) {
+// Connector ids are reserved: a capability named like one would collide with
+// its mcp__<id>__* tool prefix. The connectors module registers its ids here.
+export const CONNECTOR_IDS = new Set(['github', 'mail'])
+export function validateCapabilityName(value, reserved = CONNECTOR_IDS) {
   const name = String(value ?? '').trim()
-  if (name.length > 32 || !NAME.test(name) || name === 'github') {
-    throw new Error('Use a capability name with lowercase letters, digits, and single hyphens; "github" is reserved.')
+  if (name.length > 32 || !NAME.test(name) || name === 'github' || reserved.has(name)) {
+    throw new Error('Use a capability name with lowercase letters, digits, and single hyphens; connector names are reserved.')
   }
   return name
 }
@@ -120,6 +125,8 @@ export function install(rt) {
         Object.assign(item, { transport, url, headers: stringMap(body.headers, 'Headers'), approved: true })
       }
     } else if (kind === 'skill') {
+      const locator = String(body.locator ?? '').trim()
+      if (locator !== '') item.locator = locator
       item.content = String(body.content ?? '').trim()
     } else {
       const names = [...new Set(strings(body.items))]
@@ -279,7 +286,17 @@ export function install(rt) {
   const resolveUrl = (url, botId) => String(url).replace(SECRET_REFERENCE, (_match, name) => encodeUrlComponent(secretFor(name, botId)))
   const resolveList = (list, botId) => (list ?? []).map(raw => String(raw).replace(SECRET_REFERENCE, (_match, name) => secretFor(name, botId)))
   const configFor = (item, botId) => {
-    if (item.kind === 'skill') return { name: item.name, description: item.description, content: item.content }
+    if (item.kind === 'skill') {
+      if (item.locator) {
+        const directory = item.locator.split(sep).join('/')
+        return {
+          name: item.name, description: item.description,
+          content: readFileSync(join(item.locator, 'SKILL.md'), 'utf8'),
+          resourceBase: { kind: 'directory', path: directory },
+        }
+      }
+      return { name: item.name, description: item.description, content: item.content }
+    }
     if (item.transport === 'stdio') return { transport: 'stdio', serverName: item.name, command: item.command, args: resolveList(item.args, botId), env: resolveValues(item.env, botId), failOnStartupError: true }
     return { transport: 'streamable-http', serverName: item.name, url: resolveUrl(item.url, botId), headers: resolveValues(item.headers, botId), failOnStartupError: true }
   }
@@ -316,7 +333,10 @@ export function install(rt) {
           name: `ds-bot-capability-skill-${name}`,
           inject: ['skills'],
           apply(c) {
-            c.effect(() => c.skills.register({ name: config.name, description: config.description, source: 'runtime', content: config.content }))
+            c.effect(() => c.skills.register({
+              name: config.name, description: config.description, source: 'runtime', content: config.content,
+              ...(config.resourceBase ? { resourceBase: config.resourceBase } : {}),
+            }))
           },
         }
         : await loadMcpPlugin()
