@@ -1094,7 +1094,6 @@ export const RETURN_CSS = `
 .bt-return .bt-mark svg{width:100%;height:100%;overflow:visible}
 /* Shell styles carry --bt-ink-deepseek and Agent mode withdraws them; pin it here. */
 .bt-return .bt-mark{--bt-ink-deepseek:#4D6BFE}
-.bt-return-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 `
 
 // The host's own footer holds a row of entries: the account button, the AIDE button, the
