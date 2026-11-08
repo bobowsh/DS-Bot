@@ -30,20 +30,6 @@ runInNewContext(bundle.outputFiles[0].text, {
 })
 const { AssistantCell, TurnTailCell, ThinkingRow, CellEmpty } = module.exports
 
-// #1: the process of a turn is a fold above the reply, holding the tools it
-// called and how fast the model wrote.
-const textOf = node => {
-  if (node === null || node === undefined || typeof node === 'boolean') return ''
-  if (Array.isArray(node)) return node.map(textOf).join('')
-  if (typeof node !== 'object') return String(node)
-  return textOf(node.children ?? node.props?.children)
-}
-const processOf = props => {
-  // The fold is drawn in the response part of the turn's step.
-  const out = expand(AssistantCell({ ...props, groupPart: 'response' }), ['ProcessView', 'ProcessStats', 'CallDisclosure', 'CallRow'])
-  return find(out, node => node.props?.className === 'bt-proc')
-}
-
 // Renders the named components of an element tree, leaving the rest as elements.
 const expand = (node, names) => {
   if (Array.isArray(node)) return node.flatMap(child => expand(child, names))
@@ -129,81 +115,37 @@ test('a Bot reply in its own chat stays whole up to 20,000 characters', () => {
   assert.equal(reply('w'.repeat(25_000)), 'w'.repeat(600))
 })
 
-// #465: the thinking row stays a switchable extra, and the one activity row is
-// never given up to it.
-test('the thinking row shows only with its switch on, and the activity row is never yielded to it', () => {
-  const cell = (prefs, blocks, steps) => {
+// #465: the reasoning row follows the host's work-details mode, and the one
+// activity row is never given up to it. DS Bot keeps no thinking switch of its own.
+test('the reasoning row follows the host work-details mode, and the activity row is never yielded to it', () => {
+  const cell = (mode, blocks, steps) => {
     effects.length = 0
     const noted = []
     const { props } = cellProps()
     props.node.data = { turn: 3, step: 1, seq: 10, status: 'running', finalNode: { seq: 10 }, blocks }
     props.useTurnSteps = () => steps
+    props.useWorkDetails = select => select(mode)
     props.actions = { noteLive: (sessionId, id) => noted.push(id) }
-    const useRoster = select => select({ ...roster, prefs })
+    const useRoster = select => select({ ...roster })
     const out = expand(AssistantCell({ ...props, useRoster }), [])
     for (const run of effects) run()
     return { out, noted }
   }
   const reason = [{ kind: 'reasoning', text: 'Weighing it' }]
   const thinking = { turn: 3, step: 1, status: 'running', blocks: reason }
-  // Off: a thinking step draws nothing — the empty mark — and notes nothing.
-  const off = cell({}, reason, [thinking])
+  // The host's compact mode folds a settled thought away, so nothing draws.
+  const off = cell('compact', reason, [thinking])
   assert.equal(off.out?.type, CellEmpty)
   assert.deepEqual(off.noted, [])
-  // On: the live row shows — and still notes nothing, so the activity row stays.
-  const on = cell({ thinking: true }, reason, [thinking])
+  // The host's standard mode shows the reasoning row; it notes nothing, so the
+  // one activity row stays for the running call.
+  const on = cell('standard', reason, [thinking])
   assert.equal(find(on.out, node => node.type === ThinkingRow).length, 1)
-  assert.equal(on.noted.filter(id => id.startsWith('think:')).length, 0)
   assert.deepEqual(on.noted, [])
-  // A reply streaming in does give the activity row its one note, on or off.
+  // A reply streaming in does give the activity row its one note.
   const replying = { turn: 3, step: 1, status: 'running', blocks: [{ kind: 'reasoning', text: 'Weighing it' }, { kind: 'text', text: 'Done' }] }
-  for (const prefs of [{}, { thinking: true }]) {
-    const { noted } = cell(prefs, replying.blocks, [replying])
-    assert.ok(noted.every(id => id.startsWith('text:')))
-  }
+  const { noted } = cell('standard', replying.blocks, [replying])
+  assert.ok(noted.every(id => id.startsWith('text:')))
 })
 
-// #1: the process fold shows the tools the turn called and the speed it wrote
-// at. Its figures come from the host's own usage report and its own timing.
-test('the process fold shows the turn\'s tools, its speed and its tokens', () => {
-  const { props } = cellProps()
-  const steps = [{
-    turn: 3, step: 1, status: 'settled', time: 1_000, blocks: [],
-    finalNode: {
-      seq: 10, turn: 3, step: 1, time: 4_000, blocks: [],
-      usage: { inputTokens: 100, outputTokens: 200 },
-      timing: { stepStartTime: 1_000, firstTokenTime: 1_000, completedTime: 3_000 },
-    },
-  }]
-  props.useTurnSteps = () => steps
-  props.useTurnTools = () => [{
-    root: {
-      kind: 'tool-result', callId: 'c1', name: 'read_file', time: 5_000, callTime: 4_000,
-      call: { name: 'read_file', argsRaw: '{"path":"a.md"}' },
-      content: [{ type: 'text', text: 'the file' }], isError: false, subCalls: [],
-    },
-  }]
-  props.useTurnTail = () => [{ tokenUsage: { uncachedInputTokens: 100, outputTokens: 200, totalTokens: 300 } }]
-  const view = processOf(props)
-  assert.ok(view, 'the fold is drawn')
-  // 200 output tokens over two seconds of writing.
-  assert.match(textOf(view), /100\.0 tok\/s/)
-  assert.match(textOf(view), /1 tool call/)
-  assert.match(textOf(view), /Total 300/)
-  // The tool it called is in the fold, with the arguments it ran with.
-  assert.match(textOf(view), /read_file/)
-  assert.match(textOf(view), /\{"path":"a\.md"\}/)
-})
 
-// #1: a provider that has not reported its usage has no speed to show, and the
-// fold says so rather than showing zero.
-test('the fold says the speed is unavailable when the provider reported none', () => {
-  const { props } = cellProps()
-  props.useTurnSteps = () => [{
-    turn: 3, step: 1, status: 'settled', time: 1_000, blocks: [],
-    finalNode: { seq: 10, turn: 3, step: 1, time: 4_000, blocks: [], timing: { stepStartTime: 1_000, firstTokenTime: 1_000, completedTime: 3_000 } },
-  }]
-  const view = processOf(props)
-  assert.match(textOf(view), /Speed unavailable/)
-  assert.doesNotMatch(textOf(view), /0\.0 tok\/s/)
-})

@@ -1009,28 +1009,6 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 .bt-think-text[data-fade=bottom]{mask-image:linear-gradient(to top,transparent,#000 18px)}
 .bt-think-text[data-fade=both]{mask-image:linear-gradient(to bottom,transparent,#000 18px,#000 calc(100% - 18px),transparent)}
 /* The process of a turn: the tools it called and how fast it wrote. */
-.bt-proc{font-size:12px;line-height:16px;color:var(--bt-ink-2);margin:2px 0 6px;max-width:calc(var(--bt-msg-w) * 100%)}
-body[data-bt-layout=flat] .bt-proc{max-width:calc(var(--bt-flat-w) * 100%)}
-.bt-proc>summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
-.bt-proc>summary::-webkit-details-marker{display:none}
-.bt-proc-title{color:var(--bt-ink-2)}
-.bt-proc-stats{font-variant-numeric:tabular-nums;white-space:nowrap}
-.bt-proc-rate[data-available=no]{color:var(--bt-ink-3)}
-.bt-proc-tokens{font-variant-numeric:tabular-nums;white-space:nowrap}
-.bt-proc-body{display:flex;flex-direction:column;gap:6px;margin-top:6px;padding-left:10px;border-left:2px solid var(--bt-line-2)}
-.bt-proc-block{display:flex;flex-direction:column;gap:2px}
-.bt-proc-label{color:var(--bt-ink-3)}
-.bt-proc-code{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/16px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--bt-ink-2)}
-.bt-proc-calls{display:flex;flex-direction:column;gap:2px}
-.bt-proc-callwrap>summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:6px}
-.bt-proc-callwrap>summary::-webkit-details-marker{display:none}
-.bt-proc-callwrap[data-depth="1"]>summary,.bt-proc-callwrap[data-depth="2"]>summary,.bt-proc-callwrap[data-depth="3"]>summary{padding-left:12px}
-.bt-proc-call{display:inline-flex;align-items:center;gap:6px}
-.bt-proc-call-name{color:var(--bt-ink)}
-.bt-proc-call-state[data-state=running]{color:var(--bt-ink-3)}
-.bt-proc-call-state[data-state=failed]{color:var(--bt-danger)}
-.bt-proc-call-time{font-variant-numeric:tabular-nums;white-space:nowrap}
-.bt-proc-detail{display:flex;flex-direction:column;gap:6px;margin:2px 0 6px 12px}
 .bt-event{display:flex;justify-content:center;align-items:center;gap:2px;min-height:24px;margin:2px 0;font-size:12px;line-height:16px;color:var(--bt-ink-2);flex-wrap:wrap}
 .bt-event>span{padding:0 2px}
 .bt-event button:not(.bt-soft){border:0;background:none;color:inherit;font:inherit;display:inline-flex;align-items:center;gap:4px;cursor:pointer;height:24px;padding:4px 6px 4px 4px;border-radius:999px;box-sizing:border-box;transition:background-color .12s ease}
@@ -1046,13 +1024,9 @@ body[data-bt-layout=flat] .bt-proc{max-width:calc(var(--bt-flat-w) * 100%)}
 [class*="_scroll"]>[class*="_column"]::before{content:var(--bt-first-sep,none);display:block;flex:none;height:28px;margin:17px 0 12px;font-size:12px;line-height:28px;text-align:center;color:var(--bt-ink-2);white-space:nowrap}
 .bt-activity{display:flex;align-items:center;gap:10px;margin:8px 0 4px 2px;font-size:14px;color:var(--bt-ink-2)}
 .bt-group-replies{display:contents}
-/* A Bot chat is flat in every work-details mode, without changing the user's mode
-   (it is a DSH-wide setting): step groups lose their header and stay open, and what a
-   mode folds away in a finished turn stays shown. TurnProcessCell also opens that
-   fold; these rules cover the first frame before it does. */
-[data-step-process]>div:first-child{display:none!important}
-[data-step-process]>[data-step-process-body]{display:block!important;content-visibility:visible!important;max-height:none!important;overflow:visible!important;mask-image:none!important;scrollbar-gutter:auto!important}
-:is([data-step-process],[data-turn-process-hidden])[hidden]{content-visibility:visible!important}
+/* The work-details mode is the Host's own setting, and it decides what a finished
+   turn folds away. The team follows it: the Host draws the header and the fold, and the
+   rules below only take the empty seats away. */
 [class*="_flowItem"]:has(> [data-slot="conversation.chat.node"]:empty, > [data-slot="conversation.chat.node"][data-bt-emptied]){display:none!important}
 /* A turn's process seat is a flow child of its own, not a flowItem: a seat whose
    member cells all emptied themselves (a hidden exchange turn, a turn whose
@@ -1270,6 +1244,9 @@ div:has(> nav [class*="_marks"]){display:none!important}
 .bt-agent-session.is-current{background:var(--bt-hover);cursor:default;font-weight:600}
 .bt-agent-session-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .bt-agent-session-meta{flex:0 0 auto;font-size:12px;font-weight:400;color:var(--bt-ink-3,var(--bt-ink-2))}
+.bt-fold-header{display:inline-flex;align-items:center;gap:8px;margin:2px 0 4px;padding:2px 8px;border:0;border-radius:999px;background:none;color:var(--bt-ink-2);font:inherit;font-size:12.5px;line-height:18px;cursor:pointer;transition:background-color .12s ease}
+.bt-fold-header:hover{background:var(--bt-hover)}
+.bt-fold-header-mark{flex:none;width:0;height:0;border-left:5px solid var(--bt-ink-3,currentColor);border-top:4px solid transparent;border-bottom:4px solid transparent;opacity:.6}
 .bt-agent-activity{display:flex;flex-direction:column;gap:2px;margin:4px 0 6px;max-width:100%}
 .bt-agent-act{display:flex;align-items:center;gap:8px;min-height:22px;font-size:12.5px;line-height:18px;color:var(--bt-ink-2);min-width:0}
 .bt-agent-act-mark{flex:0 0 6px;width:6px;height:6px;border-radius:50%;background:var(--bt-ink-3,currentColor);opacity:.55}

@@ -523,11 +523,16 @@ test('the rail spaces its icons on the open column\'s rhythm', () => {
 })
 
 // #452: the Connect plugins button left the footer; what DS Bot puts there is
-// the account menu and the way back from Agent mode.
-test('the Bot footer holds the account and the return button only', () => {
+// the account menu and the way back from Agent mode. The way out to the classic
+// Agent page is an icon in the foot of our own column, not a host slot.
+test('the Bot footer holds the account and the return button', () => {
   const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
   const ids = [...source.matchAll(/shadow\('sidebar\.footer\.action',\s*\{[^}]*?id:\s*['"]([^'"]+)['"]/g)].map(match => match[1])
   assert.deepEqual(ids.sort(), ['bot-account', 'bot-return'])
+  // The way out of the Bot team sits in the column's own foot, beside the account.
+  const sidebar = readFileSync(new URL('../src/client/sidebar.js', import.meta.url), 'utf8')
+  assert.match(sidebar, /className: 'bt-leftcol-foot'[^]*?toAgent/u)
+  assert.match(sidebar, /t\('Switch to classic Agent mode'\)/u)
 })
 
 // The edge drag writes the column and the chat's margins straight into the page, so these
