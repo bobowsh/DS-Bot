@@ -228,6 +228,10 @@ var ZH = {
   "Conversation": "会话内容",
   "Work details": "工作步骤",
   "Show the work of a turn": "显示这一轮做过的事",
+  "Compact": "简洁",
+  "Standard": "标准",
+  "Detailed": "详细",
+  "Verbose": "完全展开",
   "{turns} turns, {steps} steps": "{turns} 轮 {steps} 步",
   "Show the work of this turn": "展开这一轮做过的事",
   "Hide the work of this turn": "收起这一轮做过的事",
@@ -4176,7 +4180,13 @@ body[data-bt-goal] [class*="_scroll"]:has(> [class*="_column"]){padding-top:calc
 @keyframes bt-icon-swap{from{opacity:0;transform:scale(.5) rotate(-30deg)}}
 [data-composer-card] button[class*="_primary"] svg{width:14px;height:14px}
 [data-composer-card] button[class*="_primary"]:disabled{display:none!important}
-[data-composer-dock]{display:none!important}
+/* The host's composer dock carries its own readings: the activity and token pills,
+   and the context ring. They stand under the input box, where the host puts them,
+   and they read the host's own projections — so the numbers never disagree with the
+   chat. Nothing here hides them; only our own side question takes the dock's place
+   while it is up, because it is a card of its own. */
+[data-composer-dock]:has(.bt-btw){display:flex!important;flex-direction:column;align-items:center;width:100%;max-width:var(--dsh-composer-card-max-width,748px)}
+[data-composer-dock]:has(.bt-btw)>:not([data-slot="conversation.composer.dock"]){display:none!important}
 .bt-mic,.bt-voice{flex:none;width:28px;height:28px;border-radius:50%;border:0;padding:0;display:inline-grid;place-items:center;cursor:pointer;transition:background-color .15s ease,color .15s ease,${spring(SPRING_TAP, "scale")}}
 .bt-mic{background:color-mix(in srgb,var(--bt-ink) 5%,transparent);box-shadow:inset 0 0 0 .5px var(--bt-line);color:var(--bt-ink-2)}
 .bt-mic:hover{background:color-mix(in srgb,var(--bt-ink) 10%,transparent);color:var(--bt-ink)}
@@ -4286,9 +4296,6 @@ div:has(> nav [class*="_marks"]){display:none!important}
 .bt-agent-act code{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bt-hover);border-radius:4px;padding:1px 5px;color:var(--bt-ink-1,inherit)}
 .bt-part-line{display:flex;align-items:center;gap:10px;margin:10px 0 6px;font-size:11px;line-height:14px;color:var(--bt-ink-3)}
 .bt-part-line::before,.bt-part-line::after{content:"";flex:1;height:1px;background:var(--bt-line)}
-/* The dock wrapper also holds the context meter, so it stays hidden until a side question is in it. */
-[data-composer-dock]:has(.bt-btw){display:flex!important;flex-direction:column;align-items:center;width:100%;max-width:var(--dsh-composer-card-max-width,748px)}
-[data-composer-dock]:has(.bt-btw)>:not([data-slot="conversation.composer.dock"]){display:none!important}
 .bt-btw-dock,.bt-btw-stack{display:flex;flex-direction:column;gap:6px;width:100%;max-width:var(--dsh-composer-card-max-width,748px)}
 .bt-btw{box-sizing:border-box;width:100%;margin:6px auto;padding:8px 12px;border:1px solid var(--bt-line);border-radius:12px;background:var(--bt-card);color:var(--bt-ink)}
 .bt-btw-dock .bt-btw,.bt-btw-stack .bt-btw{margin:0}
@@ -4688,8 +4695,26 @@ var SETTINGS_ICONS = { general: GearIcon, bots: PeopleIcon, groups: ChatsIcon, i
 
 // src/client/aide-bridge.js
 var AIDE_SHOW_EVENT = "dvw-workbench-show";
+var AIDE_OVERLAY_SELECTOR = ".dvw-overlay";
 function requestAideWorkbench() {
   window.dispatchEvent(new Event(AIDE_SHOW_EVENT));
+}
+var aideWorkbenchOpen = (root = typeof document === "undefined" ? void 0 : document) => root !== void 0 && root.querySelector(AIDE_OVERLAY_SELECTOR) !== null;
+function watchAideWorkbench(onChange) {
+  let last = aideWorkbenchOpen();
+  onChange(last);
+  if (typeof MutationObserver !== "function" || typeof document === "undefined") return () => {
+  };
+  const observer = new MutationObserver(() => {
+    const open = aideWorkbenchOpen();
+    if (open === last) return;
+    last = open;
+    onChange(open);
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  return () => {
+    observer.disconnect();
+  };
 }
 
 // src/client/aide-button.js
@@ -13253,8 +13278,22 @@ var WORK_DETAILS = [
   ["detailed", "Detailed"],
   ["verbose", "Verbose"]
 ];
-var DEFAULT_WORK_DETAILS = "standard";
+var WORK_DETAILS_MODES = WORK_DETAILS.map(([mode]) => mode);
+var isWorkDetailsMode = (value) => typeof value === "string" && WORK_DETAILS_MODES.includes(value);
 var reasoningShown = (mode) => mode === "standard" || mode === "detailed" || mode === "verbose";
+var thinkingShown = (prefs, mode) => {
+  if (typeof prefs?.thinking === "boolean") return prefs.thinking;
+  return reasoningShown(mode);
+};
+function workDetailsToApply(saved, hostMode) {
+  if (!isWorkDetailsMode(saved)) return void 0;
+  return saved === hostMode ? void 0 : saved;
+}
+function workDetailsToSave(hostMode, saved) {
+  if (!isWorkDetailsMode(hostMode)) return void 0;
+  if (hostMode === saved) return void 0;
+  return hostMode;
+}
 
 // src/client/cells.js
 var import_react32 = require("react");
@@ -13520,7 +13559,7 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
   const texts2 = groupPart === "reasoning" ? [] : data.blocks.filter((block) => block.kind === "text" && block.text.trim() !== "").map((block) => block.text);
   const running = data.status === "running";
   const members = steps.length ? steps : [data];
-  const shown = reasoningShown(useWorkDetails?.((value) => value));
+  const shown = thinkingShown(roster.prefs, useWorkDetails?.((value) => value));
   const folded = roster.prefs?.processShown === false || turnProcess !== void 0 && turnProcess.foldable && !turnProcess.open;
   const reasoning = groupPart === "response" || !shown ? "" : turnReasoning(steps, data);
   const thinking = groupPart === "response" || !shown ? void 0 : thinkingStep(members);
@@ -15082,8 +15121,11 @@ function TeamSidebar(props) {
   });
   const [drag, setDrag] = (0, import_react34.useState)(null);
   const mode = drag?.left ?? layout.left;
-  const [held, leaving] = useLinger(mode === "hidden" ? null : mode, SPRING_SHAPE.duration);
-  const shown = held ?? mode;
+  const [workbenchUp, setWorkbenchUp] = (0, import_react34.useState)(false);
+  (0, import_react34.useEffect)(() => watchAideWorkbench(setWorkbenchUp), []);
+  const shownMode2 = workbenchUp ? "hidden" : mode;
+  const [held, leaving] = useLinger(shownMode2 === "hidden" ? null : shownMode2, SPRING_SHAPE.duration);
+  const shown = held ?? shownMode2;
   const wideContent = shown !== "rail";
   const updated = useSessions((list) => {
     const stamps = {};
@@ -15106,7 +15148,7 @@ function TeamSidebar(props) {
   useReportReady(roster.ready, roster);
   const openWidth = drag?.width ?? frameSnap.sidebarWidth;
   const ourWidth = shown === "rail" ? RAIL_WIDTH : openWidth;
-  const pushed = mode === "open" ? openWidth : mode === "hidden" ? 0 : RAIL_WIDTH;
+  const pushed = shownMode2 === "open" ? openWidth : shownMode2 === "hidden" ? 0 : RAIL_WIDTH;
   (0, import_react34.useLayoutEffect)(() => {
     if (typeof document === "undefined") return;
     chatRoom.setLeft(Math.max(0, pushed - (frameSnap.collapsedWidth ?? 0)));
@@ -15347,7 +15389,7 @@ function TeamSidebar(props) {
   return (0, import_react34.createElement)(
     import_react34.Fragment,
     null,
-    (0, import_react34.createElement)(TitleToggle, { hidden: mode === "hidden", onToggle }),
+    (0, import_react34.createElement)(TitleToggle, { hidden: shownMode2 === "hidden", onToggle }),
     shown === "hidden" ? null : (0, import_react34.createElement)(LeftColumn, { mode: shown, width: ourWidth, onGrip: startDrag, leaving }, content)
   );
 }
@@ -23022,6 +23064,18 @@ function GeneralPage({ roster, actions, run: run2 }) {
         SetRow,
         { label: t("Show the work of a turn") },
         (0, import_react54.createElement)(Switch, { label: t("Show the work of a turn"), on: prefs.processShown !== false, onChange: (processShown) => run2(actions.setPrefs({ processShown })) })
+      ),
+      // Whether a settled thought shows beside its answer. Unset: the work-details
+      // mode decides it, and only the compact mode folds it away. The user's own
+      // switch wins over the mode once they have made one.
+      (0, import_react54.createElement)(
+        SetRow,
+        { label: t("Show thinking") },
+        (0, import_react54.createElement)(Switch, {
+          label: t("Show thinking"),
+          on: prefs.thinking ?? reasoningShown(actions.workDetails?.()),
+          onChange: (thinking) => run2(actions.setPrefs({ thinking }))
+        })
       )
     ),
     actions.setSurface ? (0, import_react54.createElement)(
@@ -27442,20 +27496,42 @@ function apply(ctx) {
   const yieldBrowser = (state) => state.panelYield === true || panelFolded("browser");
   const workDetails = createSource(void 0);
   const chatSettings = ctx.get("configForms")?.get("ui-chat");
+  const savedWorkDetails = createSource(void 0);
   if (chatSettings !== void 0) {
-    const adopt = () => {
-      const value = chatSettings.getSnapshot().value;
-      workDetails.set(value?.transcriptView);
-    };
+    const hostMode = () => chatSettings.getSnapshot().value?.transcriptView;
     ctx.effect(() => {
+      const off = roster.subscribe(() => {
+        const saved = roster.getSnapshot().prefs?.workDetails;
+        if (saved === void 0) return;
+        savedWorkDetails.set(saved);
+        const mode = workDetailsToApply(saved, hostMode());
+        if (mode === void 0) return;
+        void chatSettings.set("transcriptView", mode).catch(() => {
+        });
+      });
+      return off;
+    }, "ds-bot: the team work details");
+    ctx.effect(() => {
+      const adopt = () => {
+        const mode = hostMode();
+        workDetails.set(mode);
+        const save = workDetailsToSave(mode, savedWorkDetails.getSnapshot());
+        if (save === void 0) return;
+        savedWorkDetails.set(save);
+        void actions.setPrefs({ workDetails: save }).catch(() => {
+        });
+      };
       adopt();
       return chatSettings.subscribe(adopt);
     }, "ds-bot: the host work details");
   }
   const setWorkDetails = (mode) => {
     workDetails.set(mode);
+    savedWorkDetails.set(mode);
+    const saved = actions.setPrefs({ workDetails: mode });
     void chatSettings?.set("transcriptView", mode).catch(() => {
     });
+    return saved;
   };
   const homeToMainBot = () => {
     const snapshot = roster.getSnapshot();
@@ -28028,10 +28104,6 @@ function apply(ctx) {
     () => installFrameSync(),
     () => installTheme(),
     () => shadow("sidebar.workspaces", { priority: BOT_PRIORITY, inject: face }, TeamSidebar),
-    () => shadow("sidebar.footer.action", { id: "bot-account", order: -200, inject: face }, FooterAccount),
-    // The AIDE workbench, in the foot of the host's own sidebar (the DSH page), beside the
-    // account button. The same button sits in the foot of our own Bot column.
-    () => shadow("sidebar.footer.action", { id: "bot-aide", order: -190, inject: face }, AideFooterButton),
     () => shadow("settings.trigger", { priority: BOT_PRIORITY }, YouAvatar),
     // The whale wins the seat over a shell account plugin's own launcher (the
     // Desktop's "··· More"), which comes back in Agent mode.
@@ -28105,6 +28177,8 @@ function apply(ctx) {
   shadow("sidebar.footer.action", { id: "bot-return", order: -300, inject: face }, BotReturn);
   shadow("sidebar.brand.mark", { priority: BOT_PRIORITY }, BrandMark);
   shadow("sidebar.brand.name", { priority: BOT_PRIORITY }, BrandName);
+  shadow("sidebar.footer.action", { id: "bot-aide", order: -190, inject: face }, AideFooterButton);
+  shadow("sidebar.footer.action", { id: "bot-account", order: -200, inject: face }, FooterAccount);
   ctx.effect(() => {
     let previous;
     const sync = () => {

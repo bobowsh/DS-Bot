@@ -5,6 +5,7 @@ import { isMainOf } from './sources.js'
 import { currentPart, previewOf, relativeShort } from './text.js'
 import { PlusIcon, SearchIcon, SidebarIcon, GaugeIcon, ClockIcon, GearIcon, PinMarkIcon, ConnectorIcon, CloudDownloadIcon, SignInIcon, SignOutIcon, SlidersIcon, SwitchIcon } from './icons.js'
 import { AideButton } from './aide-button.js'
+import { watchAideWorkbench } from './aide-bridge.js'
 import { lookOf, MAIN_LOOK } from './characters.js'
 import { botState, BotMark, BotAvatar, RoomAvatar } from './mark.js'
 import { AgentBadge } from './agent-badge.js'
@@ -332,9 +333,15 @@ export function TeamSidebar(props) {
   // A drag of the column's edge shows where it would land, live.
   const [drag, setDrag] = useState(null)
   const mode = drag?.left ?? layout.left
+  // The AIDE workbench stands in the host's main area. While it is up, our own
+  // column has no business beside it: the user is in the workbench, not in the
+  // conversation. The column slides out and comes back when the workbench goes.
+  const [workbenchUp, setWorkbenchUp] = useState(false)
+  useEffect(() => watchAideWorkbench(setWorkbenchUp), [])
+  const shownMode = workbenchUp ? 'hidden' : mode
   // A hidden column stays mounted for its slide out; `shown` is the mode it last had.
-  const [held, leaving] = useLinger(mode === 'hidden' ? null : mode, SPRING_SHAPE.duration)
-  const shown = held ?? mode
+  const [held, leaving] = useLinger(shownMode === 'hidden' ? null : shownMode, SPRING_SHAPE.duration)
+  const shown = held ?? shownMode
   const wideContent = shown !== 'rail'
   const updated = useSessions(list => {
     const stamps = {}
@@ -361,7 +368,7 @@ export function TeamSidebar(props) {
   // as the rail and the chat stays put when it opens or closes.
   const openWidth = drag?.width ?? frameSnap.sidebarWidth
   const ourWidth = shown === 'rail' ? RAIL_WIDTH : openWidth
-  const pushed = mode === 'open' ? openWidth : mode === 'hidden' ? 0 : RAIL_WIDTH
+  const pushed = shownMode === 'open' ? openWidth : shownMode === 'hidden' ? 0 : RAIL_WIDTH
   useLayoutEffect(() => {
     if (typeof document === 'undefined') return
     chatRoom.setLeft(Math.max(0, pushed - (frameSnap.collapsedWidth ?? 0)))
@@ -616,7 +623,7 @@ export function TeamSidebar(props) {
           : h(AgentRow, { key: entry.item.id, ...rowProps, agent: entry.item, marked: markedUnread[entry.item.id] === true })))),
     foot)
   return h(Fragment, null,
-    h(TitleToggle, { hidden: mode === 'hidden', onToggle }),
+    h(TitleToggle, { hidden: shownMode === 'hidden', onToggle }),
     shown === 'hidden' ? null : h(LeftColumn, { mode: shown, width: ourWidth, onGrip: startDrag, leaving }, content))
 }
 

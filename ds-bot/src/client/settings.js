@@ -25,6 +25,7 @@ import { LocalAgentsPage } from './local-agents-page.js'
 import { FolderMenu } from './folder-menu.js'
 import { ModelMenu } from './model-menu.js'
 import { t } from './i18n.js'
+import { reasoningShown } from './work-details.js'
 
 const capitalize = word => word[0].toUpperCase() + word.slice(1)
 
@@ -127,7 +128,16 @@ function GeneralPage({ roster, actions, run }) {
         h(Switch, { label: t('Enter sends message'), on: prefs.enterToSend !== false, onChange: enterToSend => run(actions.setPrefs({ enterToSend })) }))),
     h(SetSection, { key: 'work', title: t('Work details') },
       h(SetRow, { label: t('Show the work of a turn') },
-        h(Switch, { label: t('Show the work of a turn'), on: prefs.processShown !== false, onChange: processShown => run(actions.setPrefs({ processShown })) }))),
+        h(Switch, { label: t('Show the work of a turn'), on: prefs.processShown !== false, onChange: processShown => run(actions.setPrefs({ processShown })) })),
+      // Whether a settled thought shows beside its answer. Unset: the work-details
+      // mode decides it, and only the compact mode folds it away. The user's own
+      // switch wins over the mode once they have made one.
+      h(SetRow, { label: t('Show thinking') },
+        h(Switch, {
+          label: t('Show thinking'),
+          on: prefs.thinking ?? reasoningShown(actions.workDetails?.()),
+          onChange: thinking => run(actions.setPrefs({ thinking })),
+        }))),
     actions.setSurface ? h(SetSection, { key: 'mode', title: t('Mode') },
       h(SetRow, { label: t('Classic Agent mode') },
         h('button', { type: 'button', className: 'bt-soft bt-soft-sm', onClick: () => actions.setSurface('agent') }, t('Switch')))) : null,

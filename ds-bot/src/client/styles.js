@@ -1151,7 +1151,13 @@ body[data-bt-goal] [class*="_scroll"]:has(> [class*="_column"]){padding-top:calc
 @keyframes bt-icon-swap{from{opacity:0;transform:scale(.5) rotate(-30deg)}}
 [data-composer-card] button[class*="_primary"] svg{width:14px;height:14px}
 [data-composer-card] button[class*="_primary"]:disabled{display:none!important}
-[data-composer-dock]{display:none!important}
+/* The host's composer dock carries its own readings: the activity and token pills,
+   and the context ring. They stand under the input box, where the host puts them,
+   and they read the host's own projections — so the numbers never disagree with the
+   chat. Nothing here hides them; only our own side question takes the dock's place
+   while it is up, because it is a card of its own. */
+[data-composer-dock]:has(.bt-btw){display:flex!important;flex-direction:column;align-items:center;width:100%;max-width:var(--dsh-composer-card-max-width,748px)}
+[data-composer-dock]:has(.bt-btw)>:not([data-slot="conversation.composer.dock"]){display:none!important}
 .bt-mic,.bt-voice{flex:none;width:28px;height:28px;border-radius:50%;border:0;padding:0;display:inline-grid;place-items:center;cursor:pointer;transition:background-color .15s ease,color .15s ease,${spring(SPRING_TAP, 'scale')}}
 .bt-mic{background:color-mix(in srgb,var(--bt-ink) 5%,transparent);box-shadow:inset 0 0 0 .5px var(--bt-line);color:var(--bt-ink-2)}
 .bt-mic:hover{background:color-mix(in srgb,var(--bt-ink) 10%,transparent);color:var(--bt-ink)}
@@ -1261,9 +1267,6 @@ div:has(> nav [class*="_marks"]){display:none!important}
 .bt-agent-act code{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bt-hover);border-radius:4px;padding:1px 5px;color:var(--bt-ink-1,inherit)}
 .bt-part-line{display:flex;align-items:center;gap:10px;margin:10px 0 6px;font-size:11px;line-height:14px;color:var(--bt-ink-3)}
 .bt-part-line::before,.bt-part-line::after{content:"";flex:1;height:1px;background:var(--bt-line)}
-/* The dock wrapper also holds the context meter, so it stays hidden until a side question is in it. */
-[data-composer-dock]:has(.bt-btw){display:flex!important;flex-direction:column;align-items:center;width:100%;max-width:var(--dsh-composer-card-max-width,748px)}
-[data-composer-dock]:has(.bt-btw)>:not([data-slot="conversation.composer.dock"]){display:none!important}
 .bt-btw-dock,.bt-btw-stack{display:flex;flex-direction:column;gap:6px;width:100%;max-width:var(--dsh-composer-card-max-width,748px)}
 .bt-btw{box-sizing:border-box;width:100%;margin:6px auto;padding:8px 12px;border:1px solid var(--bt-line);border-radius:12px;background:var(--bt-card);color:var(--bt-ink)}
 .bt-btw-dock .bt-btw,.bt-btw-stack .bt-btw{margin:0}

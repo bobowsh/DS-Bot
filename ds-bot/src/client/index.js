@@ -54,6 +54,7 @@ import { USER_MESSAGE_CSS, UserMessageCell, canDrawUserMessages } from './user-m
 import { QueueDock, QUEUE_CSS } from './queue-dock.js'
 import { noticeApprovals } from './approval-notices.js'
 import { listedOpener } from './open-listed.js'
+import { workDetailsToApply, workDetailsToSave } from './work-details.js'
 
 export const inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout', 'configForms']
 
@@ -426,23 +427,49 @@ export function apply(ctx) {
   // The host's own settings namespace for the chat. It is served only when the
   // host exposes it, so the row waits for it.
   const chatSettings = ctx.get('configForms')?.get('ui-chat')
+  // The team's own preferences hold the choice as well, as a second place it is
+  // written to: a start reads it back and hands it to the host when the host's own
+  // layer did not keep it.
+  const savedWorkDetails = createSource(undefined)
   if (chatSettings !== undefined) {
-    // Nothing is written here. The host owns the mode and its own default (the
-    // desktop app opens on 'standard'); writing one on startup would land in the
-    // profile's patch row, where it outranks the user's own choice — the choice
-    // in the settings page would then not survive a restart.
-    const adopt = () => {
-      const value = chatSettings.getSnapshot().value
-      workDetails.set(value?.transcriptView)
-    }
+    const hostMode = () => chatSettings.getSnapshot().value?.transcriptView
+    // The team's mode reaches the host once the roster answers — and only when it
+    // has one. A profile that never chose a mode keeps the host's own value; the
+    // earlier builds wrote a default on every start, and that is what made the
+    // choice in the settings page impossible to keep.
     ctx.effect(() => {
+      const off = roster.subscribe(() => {
+        const saved = roster.getSnapshot().prefs?.workDetails
+        if (saved === undefined) return
+        savedWorkDetails.set(saved)
+        const mode = workDetailsToApply(saved, hostMode())
+        if (mode === undefined) return
+        void chatSettings.set('transcriptView', mode).catch(() => {})
+      })
+      return off
+    }, 'ds-bot: the team work details')
+    ctx.effect(() => {
+      const adopt = () => {
+        const mode = hostMode()
+        workDetails.set(mode)
+        // A mode the user picks in the settings page is the team's mode too.
+        const save = workDetailsToSave(mode, savedWorkDetails.getSnapshot())
+        if (save === undefined) return
+        savedWorkDetails.set(save)
+        void actions.setPrefs({ workDetails: save }).catch(() => {})
+      }
       adopt()
       return chatSettings.subscribe(adopt)
     }, 'ds-bot: the host work details')
   }
   const setWorkDetails = mode => {
     workDetails.set(mode)
+    savedWorkDetails.set(mode)
+    // The host's own field is where the chat reads it from; the team's preferences
+    // are a second place it is written to, so a start can hand it back.
+    const saved = actions.setPrefs({ workDetails: mode })
     void chatSettings?.set('transcriptView', mode).catch(() => {})
+    return saved
   }
   // Bot mode's view must hold a team conversation; an outside Session wears the
   // Bot skin without one. Runs whenever the surface is (or stays) Bot mode —
@@ -1053,10 +1080,6 @@ export function apply(ctx) {
     () => installFrameSync(),
     () => installTheme(),
     () => shadow('sidebar.workspaces', { priority: BOT_PRIORITY, inject: face }, TeamSidebar),
-    () => shadow('sidebar.footer.action', { id: 'bot-account', order: -200, inject: face }, FooterAccount),
-    // The AIDE workbench, in the foot of the host's own sidebar (the DSH page), beside the
-    // account button. The same button sits in the foot of our own Bot column.
-    () => shadow('sidebar.footer.action', { id: 'bot-aide', order: -190, inject: face }, AideFooterButton),
     () => shadow('settings.trigger', { priority: BOT_PRIORITY }, YouAvatar),
     // The whale wins the seat over a shell account plugin's own launcher (the
     // Desktop's "··· More"), which comes back in Agent mode.
@@ -1135,6 +1158,15 @@ export function apply(ctx) {
   // both surfaces, so the Agent page carries the same mark as the Bot column.
   shadow('sidebar.brand.mark', { priority: BOT_PRIORITY }, BrandMark)
   shadow('sidebar.brand.name', { priority: BOT_PRIORITY }, BrandName)
+
+  // The AIDE workbench's entry in the foot of the host's own sidebar (the DSH page),
+  // beside the account button. It belongs to neither group for the same reason: the
+  // classic Agent page has no Bot column, so the button there is the only way in.
+  // The same button sits in the foot of our own Bot column.
+  shadow('sidebar.footer.action', { id: 'bot-aide', order: -190, inject: face }, AideFooterButton)
+  // The account menu stands in for the shell's own footer when no plugin holds the
+  // settings seat. It is the shell's footer, so it belongs to neither group.
+  shadow('sidebar.footer.action', { id: 'bot-account', order: -200, inject: face }, FooterAccount)
 
   // The main view decides `plain`: a DSH Agent Session keeps the Bot shell but
   // withdraws the conversation replacements, so the native dsh page shows. A jump

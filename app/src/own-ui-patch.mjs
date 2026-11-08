@@ -88,29 +88,32 @@ export function reconcileOwnUi(profile, factoryOff = []) {
 }
 
 // The work-details mode of the host's own chat: how much of a turn's tool calls
-// shows. It is a field of the `ui-chat` settings namespace, and the host's settings
-// document is the profile's own patch file — so a `transcriptView` there is the
-// user's own choice, and the host's own settings page reads it back.
+// shows. It is a field of the `ui-chat` plugin's own configuration, and the host's
+// settings document IS the profile's patch file: a `transcriptView` in the profile's
+// `ui-chat` row is the user's own layer, and the host's settings page reads it back.
 //
-// Earlier builds of DS Bot wrote *their* default mode into that file on startup, so
-// profiles that ran them carry a mode the user never chose — and because a patch
-// row's config outranks the settings document, every later choice in the settings
-// page is overwritten again on the next start. That is why the choice did not stick.
+// Earlier builds of DS Bot wrote *their* default mode into that row on every start,
+// so a profile that ran them carries a mode the user never chose, and the choice in
+// the settings page never survives a restart.
 //
-// This removes the mode from the profile's patch file once, so the host's settings
-// page owns it from then on. A profile whose patch file already has no mode is left
-// alone, and the removal is idempotent.
+// This realigns that one field to the mode the team wants: 'standard'. The row itself
+// stays — it is the user's layer, and the host writes the user's choice back into it.
+//
+// A row with nothing but an id and a name is a leftover shell: the Host writes it when
+// it takes the row over, and it serves no purpose of its own. It goes too.
 const WORK_DETAILS_FIELD = 'transcriptView'
 const CHAT_ROW_ID = 'ui-chat'
+const DEFAULT_WORK_DETAILS = 'standard'
 
 /**
- * Remove the work-details mode from the profile's `ui-chat` patch row, and the row
- * itself when nothing else is left in it. `undefined` when there was no such file.
+ * Realign the work-details mode in the profile's `ui-chat` patch row to 'standard',
+ * and drop a row that holds nothing but an id and a name.
+ * `undefined` when there was no such file.
  * @param {string} file - the profile's `cordis.patch.yml`
  * @param {{ read?: typeof readFileSync, write?: typeof writeFileSync }} [io] - injectable for tests
  * @returns {boolean | undefined} whether the file was rewritten, or `undefined` when absent
  */
-export function dropWorkDetailsPatch(file, { read = readFileSync, write = writeFileSync } = {}) {
+export function alignWorkDetailsPatch(file, { read = readFileSync, write = writeFileSync } = {}) {
   let content
   try {
     content = read(file, 'utf8')
@@ -123,17 +126,18 @@ export function dropWorkDetailsPatch(file, { read = readFileSync, write = writeF
   let end = start + 1
   while (end < lines.length && !lines[end].startsWith('- ')) end += 1
   const block = lines.slice(start, end)
-  if (!block.some(line => line.trim().startsWith(`${WORK_DETAILS_FIELD}:`))) return false
-  const kept = block.filter(line => !line.trim().startsWith(`${WORK_DETAILS_FIELD}:`))
-  // The row's config is a nested mapping; with the mode gone it may hold nothing.
-  const config = kept.findIndex(line => line === '  config:')
-  const hasConfig = config !== -1 && kept.slice(config + 1).some(line => /^ {4}\S/u.test(line))
-  const withoutConfig = config === -1 ? kept : kept.filter((line, index) => index !== config || hasConfig)
-  // Nothing but the id and the name is left: the row has no purpose of its own.
-  const onlyIdentity = withoutConfig.every(line => /^(- id: |  name: )/u.test(line))
-  const next = onlyIdentity
-    ? [...lines.slice(0, start), ...lines.slice(end)]
-    : [...lines.slice(0, start), ...withoutConfig, ...lines.slice(end)]
-  write(file, next.join('\n'), 'utf8')
+  const field = block.findIndex(line => line.trim().startsWith(`${WORK_DETAILS_FIELD}:`))
+  if (field === -1) {
+    // A row with only an id and a name is a leftover shell, and it goes.
+    const onlyIdentity = block.every(line => /^(- id: | {2}name: )/u.test(line))
+    if (!onlyIdentity) return false
+    write(file, [...lines.slice(0, start), ...lines.slice(end)].join('\n'), 'utf8')
+    return true
+  }
+  const value = block[field].slice(block[field].indexOf(':') + 1).trim()
+  if (value === DEFAULT_WORK_DETAILS) return false
+  const kept = [...block]
+  kept[field] = `${block[field].slice(0, block[field].indexOf(':') + 1)} ${DEFAULT_WORK_DETAILS}`
+  write(file, [...lines.slice(0, start), ...kept, ...lines.slice(end)].join('\n'), 'utf8')
   return true
 }
