@@ -44,4 +44,4 @@ try {
 } finally { rmSync(root, { recursive: true, force: true }) }
 
 console.log('helpers selfcheck: OK (fakeFetch / makeArchive / fingerprint 全部可用)')
-console.log('注意：仅自检 helpers，E 组三个验收场景未实跑')
+console.log('注意：仅自检 helpers 本身；E 组场景见 tests/issue12/*.test.mjs')

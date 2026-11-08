@@ -23,10 +23,18 @@ export function makeArchive(files) {
   return gzipSync(Buffer.concat(blocks))
 }
 
-/** 一个插件包：package.json（带 name/version）+ 若干文件。 */
-export function pluginArchive(name, version, extra = {}) {
+/**
+ * 一个插件包：package.json 带 name/version 和 `dsh` 清单（C4 的 dsh 门要求），
+ * 可选地覆盖 manifest 字段（例如塞 install scripts）或注入额外文件。
+ * @param {string} name
+ * @param {string} version
+ * @param {{ files?: Record<string,string>, manifest?: object, noDsh?: boolean }} [options]
+ */
+export function pluginArchive(name, version, options = {}) {
+  const { files: extra = {}, manifest = {}, noDsh = false } = options
+  const body = { name, version, ...(noDsh ? {} : { dsh: { profile: {} } }), ...manifest }
   const files = [
-    { path: 'package/package.json', body: Buffer.from(JSON.stringify({ name, version }), 'utf8') },
+    { path: 'package/package.json', body: Buffer.from(JSON.stringify(body), 'utf8') },
   ]
   for (const [path, content] of Object.entries(extra)) {
     files.push({ path: `package/${path}`, body: Buffer.from(content, 'utf8') })

@@ -5,8 +5,18 @@
 2. **catalog 新增条目自动装 + 自动写 bundles 启用**（Q2）
 3. **失败回滚**：换到一半失败要退回旧版
 
-状态：**只准备，不实跑**。等小柚子 C3/C4 落地、两行接线补齐后再跑。
-脚本落 `tests/issue12/`，临时数据落 `tmp/`，不碰 `D:\LinkBot\data` 与用户真实 DSH_HOME。
+状态：**四个场景脚本已写成并实跑**（15 pass / 0 fail / 2 skip）；插件通道三场景全绿，
+技能通道两 case 因 C5 模块未落地明确 `BLOCKED` + `skip`，**不算通过**。
+脚本落 `tests/issue12/`，临时数据落系统 temp，不碰 `D:\LinkBot\data` 与用户真实 DSH_HOME。
+
+运行（PR #20 未合进 dev-me 时，用 `FACTORY_UPDATE_MODULE` 指向 C 组 worktree）：
+
+```sh
+FACTORY_UPDATE_MODULE=E:/dsbot-work/DS-Bot-issue12/app/src/factory-update.mjs \
+  node --test --test-timeout=20000 tests/issue12/*.test.mjs
+```
+
+C5 落地后，`FACTORY_SKILLS_MODULE` 指向 `app/src/factory-skills-update.mjs` 即可把 S2/S3 转为实跑。
 
 ## 依据的真实代码（对着写代码，不凭设想）
 
@@ -51,17 +61,20 @@ HTTPS_PROXY=http://127.0.0.1:1 HTTP_PROXY=http://127.0.0.1:1 ALL_PROXY=http://12
 
 ```
 tests/issue12/
-├── README.md                 本文件
-├── e2e-offline.mjs           场景 1：断网全流程（catalog 加插件→安装→替换→回滚）
-├── e2e-catalog-add.mjs       场景 2：新增条目自动装 + 写 bundles 启用
-├── e2e-rollback.mjs          场景 3：换到一半失败回滚
+├── README.md                     本文件
+├── e2e-offline.test.mjs          场景 1：断网全流程（A1-A4 全绿）
+├── e2e-catalog-add.test.mjs      场景 2：新增自动装+写 bundles / 禁用保持 / 删除只停更（B1-B3 全绿）
+├── e2e-rollback.test.mjs         场景 3：版本不符/解包失败/无 dsh 清单/安装脚本门/连败拉黑/半成品清理（C1-C6 全绿）
+├── e2e-skills.test.mjs           场景 4：技能通道契约 + C5 落地后的落盘与提示（S2/S3 当前 BLOCKED）
 └── helpers/
-    ├── fake-fetch.mjs        路由表 mock（含死端口拒绝）
-    ├── make-archive.mjs      最小 ustar+gzip 打包器（照 factory-update.test.mjs）
-    └── fingerprint.mjs       目录文件 SHA256 指纹，比对「未变/已替换/已回滚」
+    ├── fake-fetch.mjs            路由表 mock（含死端口拒绝）
+    ├── make-archive.mjs          最小 ustar+gzip 打包器，支持 dsh 清单/坏包/install scripts
+    ├── fingerprint.mjs           目录 SHA256 指纹，比对「未变/已替换/已回滚」
+    ├── load-module.mjs           加载被测模块（PR 未合并时可指向 worktree）
+    └── selfcheck.mjs             helpers 自检
 ```
 
-每个场景自带 `node --test` 超时（≤20s/case）、`t.after()` 清理临时目录，不残留进程。
+每个场景自带 `node --test` 超时（≤20s/case）、`after()` 清理临时目录，不残留进程。
 
 ## 断言清单（逐条可判真假）
 
@@ -81,22 +94,41 @@ tests/issue12/
   这是 C3 要实现的能力，等小柚子落地后此断言才可判通过
 
 ### 场景 3 失败回滚
-- C1 archive 版本与 catalog 不符 → `installUpdate` 返回 `updated:false`、reason 含 `not <version>`，旧目录指纹不变
-- C2 archive 解包失败（非法 gzip）→ `updated:false`、reason 含 `unpack failed`，旧目录不变
-- C3 swap 阶段失败（注入 rename 抛错 / 目标占用）→ backup 放回，**旧版 version 与文件都在**
-- C4 连败 3 次 → state.failures 累计到 3，次日之前 `skipped` 含该插件、`updated` 不含
-- C5 每次失败后 `data/factory-update-staging` 与 `factory-update-backup` 被清理，不留半成品
+- C1 archive 版本与 catalog 不符 → 拒装，旧目录指纹不变 ✅
+- C2 archive 解包失败（非法 gzip）→ 拒装，旧版不变 ✅
+- C3 C4 闸门：archive 无 `dsh` 清单 → 拒装，旧版不变 ✅
+- C4 C4 闸门：带 install scripts 且不在出厂清单 → 拒装；在 `data/factory/plugins.json` 清单上 → 放行 ✅
+- C5 连败 3 次拉黑 → `skipped` 含该插件、`failed` 不含，`FAILURE_LIMIT` 生效 ✅
+- C6 每次失败后 `data/factory-update-staging` 与 `factory-update-backup` 被清理 ✅
+- 说明：C3 原计划「swap 阶段注入 rename 抛错」因 `installUpdate` 不暴露 rename 注入点，
+  改为通过 C1/C2/C3/C4 覆盖所有「换之前就拒绝」的路径 + C6 验证无半成品；
+  真 swap 失败的回滚由 `factory-update.test.mjs` 的单元测试覆盖，此处不重复造。
 
-## 门禁（实跑后要贴的真实输出）
+### 场景 4 技能通道（队长纠偏 ② 补上）
+- S1 源契约：`/api/cli/v1/skills/{ns}/{slug}/resolve` →
+  `/api/v1/skills/{ns}/{slug}/versions/{version}/file?path=SKILL.md`（带 namespace + version）✅
+- S2 已装技能 vs SkillHub latest → 落盘、正文更新 —— **BLOCKED：C5 模块未落地，skip 不算通过**
+- S3 「已更新 N 项，重启生效」提示 —— **BLOCKED：同上**
+- S4 断网时技能目录原样保留 ✅
 
-- `node --test --test-timeout=20000 tests/issue12/*.mjs`：全绿、无挂起
-- 关键回归：`app/test/factory-registry.test.mjs`(7/7)、`data-packaging.test.mjs`(12/12)、
-  `DS-Bot-issue12/app/test/factory-update.test.mjs`(14/14)
-- 贴每个场景的日志末行（含 outcome JSON 与指纹比对结果），不是「应该通过」
+## 实跑结果（2026-11-08，真实输出）
 
-## 未验证（准备阶段如实标注）
+```
+$ FACTORY_UPDATE_MODULE=E:/dsbot-work/DS-Bot-issue12/app/src/factory-update.mjs \
+    node --test --test-timeout=20000 tests/issue12/*.test.mjs
+tests 17 | suites 4 | pass 15 | fail 0 | cancelled 0 | skipped 2 | duration 312ms
+```
 
-- 三个场景脚本尚未写、尚未跑；以上断言是**对着源码推导的判据**，不是实测结论
-- helpers 已自检通过（`node tests/issue12/helpers/selfcheck.mjs` → `OK`，仅验证工具本身可用，未跑场景）
-- E 组实跑条件：C 组 PR（含 C3/C4 + 两行接线）合进 dev-me 后，在最新基线上跑
-- 断网方式只设计了进程级方案，未在本机对被测 app 实跑验证
+- 插件通道三场景 **14/14 全绿**（A1-A4、B1-B3、C1-C6）
+- 技能通道 S1/S4 通过；**S2/S3 `BLOCKED` skip**，明确打印「C5 模块未落地，不算通过」
+- 关键回归：`app/test/import-skills.test.mjs` + `factory-registry.test.mjs` + `data-packaging.test.mjs` = **31/31**
+- helpers 自检 `node tests/issue12/helpers/selfcheck.mjs` → `OK`
+
+## 未验证 / 依赖（如实标注）
+
+- **E 组仍不算完整通过**：技能通道 S2/S3 被 C5 阻塞；C5 落地后需重跑把 skip 转成实跑
+- 本次用 `FACTORY_UPDATE_MODULE` 指向 C 组 worktree（PR #20 未合进 dev-me）；
+  **两个 PR 合进 dev-me 后需在最新基线上不带该环境变量再跑一遍**，才算正式验收
+- 断网是进程级 mock fetch（等价死端口），未对真实打包后的 app 起进程实测；
+  不碰系统 hosts / 路由 / 防火墙
+- 真 swap 阶段失败的回滚由 `factory-update.test.mjs` 单测覆盖，本脚手架未重造
