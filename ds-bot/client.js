@@ -232,6 +232,7 @@ var ZH = {
   "Show the work of this turn": "展开这一轮做过的事",
   "Hide the work of this turn": "收起这一轮做过的事",
   "Switch to classic Agent mode": "切换经典 Agent 模式",
+  "AIDE workbench": "AIDE 工作台",
   "Back to the Bot team": "回到 Bot 团队界面",
   "Only “Full details” keeps the process rows of a finished turn.": "只有「完全展开」会保留已完成轮次的过程行。",
   "Switch": "切换",
@@ -3658,6 +3659,12 @@ button.bt-set-row:hover{background:var(--bt-hover)}
 /* Shell chrome reshaped for the team view. Selectors use stable data attributes where the
    shell offers them and CSS-module name suffixes elsewhere. */
 [class*="_newSession"],nav[class*="_panelList"],[class*="_logoRow"]>[class*="_brand"],[class*="_logoRow"]:not(:has([class*="_toggle"])){display:none!important}
+/* The shell's panel list names every entry; the user asked for icons only, so the
+   names go and the glyphs take the row. The shell renders the title only when its
+   sidebar is wide, so hiding it leaves the icon alone. Written after the rule
+   above so it wins where the two meet. */
+[class*="_panelList"] [class*="_panelTitle"]{display:none!important}
+[class*="_panelList"] [class*="_panelRow"]{justify-content:center;padding-left:0;padding-right:0}
 /* The shell's sidebar switch stays where the shell puts it whenever the sidebar is
    collapsed: on the rail, or fixed in a Windows title bar, where it also stays while
    the sidebar is open. Elsewhere an open sidebar uses the team's own top row. */
@@ -4666,6 +4673,12 @@ var FolderIcon = lineIcon(["M3 6A1.5 1.5 0 0 1 4.5 4.5h3.2l1.8 2h6A1.5 1.5 0 0 1
 var MonitorIcon = lineIcon(["M3.5 4.5h13A1.5 1.5 0 0 1 18 6v7a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 13V6a1.5 1.5 0 0 1 1.5-1.5z", "M8 17.5h4", "M10 14.5v3"]);
 var SideIcon = lineIcon(["M4.5 4h11A1.5 1.5 0 0 1 17 5.5v6a1.5 1.5 0 0 1-1.5 1.5H9L5.5 16v-3h-1A1.5 1.5 0 0 1 3 11.5v-6A1.5 1.5 0 0 1 4.5 4z", "M6.5 7h7", "M6.5 10h4.5"]);
 var GoalIcon = lineIcon(["M15.1 8.8A6.5 6.5 0 1 1 11.2 4.9", "M9 8a3 3 0 1 0 0 6 3 3 0 1 0 0-6", "M9 11l7.5-7.5", "M14.6 2.8v2.6h2.6"]);
+var AideIcon = () => (0, import_react3.createElement)(
+  "svg",
+  { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true },
+  (0, import_react3.createElement)("rect", { x: 3, y: 3, width: 18, height: 18, rx: 4.5 }),
+  (0, import_react3.createElement)("path", { d: "M10 8.5 7.5 12l2.5 3.5M14 8.5l2.5 3.5-2.5 3.5" })
+);
 var ChatsIcon = lineIcon(["M3.5 5.5A1.5 1.5 0 0 1 5 4h7a1.5 1.5 0 0 1 1.5 1.5V10A1.5 1.5 0 0 1 12 11.5H8L5 14v-2.5A1.5 1.5 0 0 1 3.5 10z", "M13.5 7.5H15A1.5 1.5 0 0 1 16.5 9v4.5A1.5 1.5 0 0 1 15 15v2l-2.5-2h-3A1.5 1.5 0 0 1 8 13.5V13"]);
 var ImIcon = lineIcon(["M6.5 3.5h7A1.5 1.5 0 0 1 15 5v10a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 5 15V5a1.5 1.5 0 0 1 1.5-1.5z", "M8 15.8h4", "M8 6.5h4A1 1 0 0 1 13 7.5v2a1 1 0 0 1-1 1h-2.5L8 12v-5.5A1 1 0 0 1 8 6.5z"]);
 var QueueIcon = lineIcon(["M4 6h12", "M4 10h12", "M4 14h8", "M14 12.5l2 1.5-2 1.5"]);
@@ -14685,6 +14698,12 @@ function installFrameWatch(frame) {
   };
 }
 
+// src/client/aide-bridge.js
+var AIDE_SHOW_EVENT = "dvw-workbench-show";
+function requestAideWorkbench() {
+  window.dispatchEvent(new Event(AIDE_SHOW_EVENT));
+}
+
 // src/client/sidebar.js
 var import_react33 = require("react");
 var import_react_dom5 = require("react-dom");
@@ -15283,11 +15302,19 @@ function TeamSidebar(props) {
     title: t("Switch to classic Agent mode"),
     onClick: () => actions.setSurface("agent")
   }, (0, import_react33.createElement)(SwitchIcon));
-  const foot = wideContent ? (0, import_react33.createElement)("div", { className: "bt-leftcol-foot" }, toAgent, (0, import_react33.createElement)(AccountLauncher, { seat: false, actions })) : (0, import_react33.createElement)(
+  const toAide = (0, import_react33.createElement)("button", {
+    type: "button",
+    className: "bt-round",
+    "aria-label": t("AIDE workbench"),
+    title: t("AIDE workbench"),
+    onClick: () => window.dispatchEvent(new Event(AIDE_SHOW_EVENT))
+  }, (0, import_react33.createElement)(AideIcon));
+  const foot = wideContent ? (0, import_react33.createElement)("div", { className: "bt-leftcol-foot" }, toAgent, toAide, (0, import_react33.createElement)(AccountLauncher, { seat: false, actions })) : (0, import_react33.createElement)(
     "div",
     { className: "bt-leftcol-foot bt-leftcol-foot-rail" },
     (0, import_react33.createElement)("button", { type: "button", className: "bt-round", "aria-label": t("New…"), title: t("New…"), onClick: () => actions.openNewChat("new") }, (0, import_react33.createElement)(PlusIcon)),
     toAgent,
+    toAide,
     (0, import_react33.createElement)(AccountLauncher, { seat: false, actions })
   );
   const content = (0, import_react33.createElement)(

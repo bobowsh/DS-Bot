@@ -101,6 +101,12 @@ export const MonitorIcon = lineIcon(['M3.5 4.5h13A1.5 1.5 0 0 1 18 6v7a1.5 1.5 0
 export const SideIcon = lineIcon(['M4.5 4h11A1.5 1.5 0 0 1 17 5.5v6a1.5 1.5 0 0 1-1.5 1.5H9L5.5 16v-3h-1A1.5 1.5 0 0 1 3 11.5v-6A1.5 1.5 0 0 1 4.5 4z', 'M6.5 7h7', 'M6.5 10h4.5'])
 // An arrow stuck in a target: a group's goal.
 export const GoalIcon = lineIcon(['M15.1 8.8A6.5 6.5 0 1 1 11.2 4.9', 'M9 8a3 3 0 1 0 0 6 3 3 0 1 0 0-6', 'M9 11l7.5-7.5', 'M14.6 2.8v2.6h2.6'])
+// The AIDE workbench's mark, simplified for a 16 px slot: the frame and the code
+// brackets of the upstream brand logo. The 512×512 original (with its glow and
+// gradient strokes) turns into a smear at this size, so only its shapes are kept.
+export const AideIcon = () => h('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true },
+  h('rect', { x: 3, y: 3, width: 18, height: 18, rx: 4.5 }),
+  h('path', { d: 'M10 8.5 7.5 12l2.5 3.5M14 8.5l2.5 3.5-2.5 3.5' }))
 // Defined here, after the icons: SettingsDialog only reads them at render time.
 // Two speech bubbles, the back one peeking out: a group chat.
 export const ChatsIcon = lineIcon(['M3.5 5.5A1.5 1.5 0 0 1 5 4h7a1.5 1.5 0 0 1 1.5 1.5V10A1.5 1.5 0 0 1 12 11.5H8L5 14v-2.5A1.5 1.5 0 0 1 3.5 10z', 'M13.5 7.5H15A1.5 1.5 0 0 1 16.5 9v4.5A1.5 1.5 0 0 1 15 15v2l-2.5-2h-3A1.5 1.5 0 0 1 8 13.5V13'])

@@ -633,6 +633,12 @@ button.bt-set-row:hover{background:var(--bt-hover)}
 /* Shell chrome reshaped for the team view. Selectors use stable data attributes where the
    shell offers them and CSS-module name suffixes elsewhere. */
 [class*="_newSession"],nav[class*="_panelList"],[class*="_logoRow"]>[class*="_brand"],[class*="_logoRow"]:not(:has([class*="_toggle"])){display:none!important}
+/* The shell's panel list names every entry; the user asked for icons only, so the
+   names go and the glyphs take the row. The shell renders the title only when its
+   sidebar is wide, so hiding it leaves the icon alone. Written after the rule
+   above so it wins where the two meet. */
+[class*="_panelList"] [class*="_panelTitle"]{display:none!important}
+[class*="_panelList"] [class*="_panelRow"]{justify-content:center;padding-left:0;padding-right:0}
 /* The shell's sidebar switch stays where the shell puts it whenever the sidebar is
    collapsed: on the rail, or fixed in a Windows title bar, where it also stays while
    the sidebar is open. Elsewhere an open sidebar uses the team's own top row. */

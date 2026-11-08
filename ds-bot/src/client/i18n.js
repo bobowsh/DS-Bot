@@ -195,6 +195,7 @@ const ZH = {
   'Show the work of this turn': '展开这一轮做过的事',
   'Hide the work of this turn': '收起这一轮做过的事',
   'Switch to classic Agent mode': '切换经典 Agent 模式',
+  'AIDE workbench': 'AIDE 工作台',
   'Back to the Bot team': '回到 Bot 团队界面',
   'Only “Full details” keeps the process rows of a finished turn.': '只有「完全展开」会保留已完成轮次的过程行。',
   'Switch': '切换',
