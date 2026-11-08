@@ -24,6 +24,7 @@ import { currentRootOf, driveOf, formatBytes, freeSpace, isEmptyTree, pickFrom, 
 import { createShell, SHELL_TEXT } from './shell.mjs'
 import { readStartFrame, writeStartFrame } from './start-frame.mjs'
 import { explainOf, StartWindow } from './start-window.mjs'
+import { watchFactoryPlugins } from './factory-update.mjs'
 import { langOf } from './start/text.mjs'
 import { createDeferredPrompt } from './update-prompt.mjs'
 import { CAPTION_HEIGHT, cssColor, micaAvailable, nativeThemeSource } from './window-frame.mjs'
@@ -507,6 +508,14 @@ async function boot(mine) {
       .catch(error => { console.error('LinkBot: the factory resources were not put in place:', error) })
   })
   setImmediate(() => { void pullSkillsRepo({ dataDir: places.dataDir, resourcesDir: resourcesDir() }) })
+  // The factory plugins update themselves after 22:00: the app asks the intranet catalog what
+  // they have become and puts the newer ones in place. The Host runs them, so the new copy
+  // takes effect on the next start; the reader is told so.
+  watchFactoryPlugins({
+    dataDir: places.dataDir,
+    profileDirOf: () => profileDir(),
+    onUpdated: names => { void tellPluginsUpdated(names) },
+  })
   startWindow.done('data')
   const engine = await startEngine(mine)
   if (engine === undefined || mine !== attempt) return
@@ -1256,6 +1265,21 @@ async function askRestartNow(version) {
 async function askDownloadNow(version) {
   if (failed || !await afterHandoff()) return false
   return await askInWindow({ message: tx('dialog.update.available', { version }), detail: tx('dialog.update.availableDetail'), buttons: [{ label: tx('btn.download'), primary: true }, { label: tx('btn.notNowDownload') }], cancel: 1 }) === 0
+}
+
+// The plugins that were replaced are running inside the Host, so the new copies only take
+// effect on the next start. The reader is told which ones changed and that a restart is what
+// makes it count.
+async function tellPluginsUpdated(names) {
+  if (names.length === 0) return
+  console.info(`LinkBot: plugins updated: ${names.join(', ')}`)
+  if (failed || !await afterHandoff()) return
+  await askInWindow({
+    message: tx('dialog.plugin.updated', { count: names.length, names: names.join(', ') }),
+    detail: tx('dialog.plugin.updatedDetail'),
+    buttons: [{ label: tx('btn.ok') }],
+    cancel: 0,
+  })
 }
 
 // The cards that the team window shows, by id, until they have their answer.
