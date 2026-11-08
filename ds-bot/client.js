@@ -3147,6 +3147,7 @@ body[data-bt-motion=quiet] .bt-mark[data-poke]{cursor:default}
 .bt-side-top{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:6px 5px 0 0}
 .bt-brand{display:inline-flex;align-items:center;gap:6px;margin-right:auto;padding:4px 8px 4px 4px;border:0;border-radius:8px;background:none;cursor:pointer;font-family:inherit;font-size:15px;line-height:20px;font-weight:600;letter-spacing:-.01em;color:var(--bt-ink);white-space:nowrap}
 .bt-brand-whale{display:inline-flex;color:var(--bt-accent)}
+.bt-brand-name{font-weight:600;font-size:14px;white-space:nowrap}
 .bt-round{width:36px;height:36px;border-radius:50%;border:1px solid var(--bt-line);background:var(--bt-main);color:var(--bt-ink);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:background-color .12s ease,transform .12s ease}
 .bt-round:hover{background:var(--bt-hover)}
 .bt-round:active{transform:scale(.94)}
@@ -15817,7 +15818,7 @@ function FooterAccount(props) {
   if (seated) return null;
   return (0, import_react34.createElement)("span", { className: "bt-foot-account" }, (0, import_react34.createElement)(AccountLauncher, { ...props, seat: false }));
 }
-function BotReturn({ wide, useSurface, useRoster, actions }) {
+function BotReturn({ useSurface, useRoster, actions }) {
   const mode = useSurface((value) => value.mode);
   const ready = useRoster((value) => value.ready);
   useReportReady(mode === "agent" && ready);
@@ -15825,8 +15826,7 @@ function BotReturn({ wide, useSurface, useRoster, actions }) {
   return (0, import_react34.createElement)(
     "button",
     { type: "button", className: "bt-return", "aria-label": t("LinkBot"), title: t("LinkBot"), onClick: () => actions.setSurface("bot") },
-    (0, import_react34.createElement)(BotMark, { look: MAIN_LOOK, size: 20 }),
-    wide ? (0, import_react34.createElement)("span", { className: "bt-return-name" }, t("LinkBot")) : null
+    (0, import_react34.createElement)(BotMark, { look: MAIN_LOOK, size: 20 })
   );
 }
 var RETURN_CSS = `
@@ -15839,11 +15839,17 @@ var RETURN_CSS = `
 .bt-return .bt-mark{--bt-ink-deepseek:#4D6BFE}
 .bt-return-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 `;
+var FOOTER_CSS = `
+[class*="_footArea"] button{font-size:0!important;gap:0!important}
+[class*="_footArea"] button svg{font-size:14px}
+[class*="_footArea"] button>span{font-size:0!important}
+[class*="_footArea"] button[class*="_trigger"]{padding:0 6px!important}
+`;
 function BrandMark({ size = 24 }) {
   return (0, import_react34.createElement)("span", { className: "bt-brand-whale" }, (0, import_react34.createElement)(BotMark, { look: MAIN_LOOK, size }));
 }
 function BrandName() {
-  return (0, import_react34.createElement)("span", { style: { fontWeight: 600, fontSize: 14 } }, "LinkBot");
+  return (0, import_react34.createElement)("span", { className: "bt-brand-name" }, "LinkHarness 智能工作台");
 }
 var SIDEBAR_CSS = `
 .bt-confirm{width:260px;max-width:72vw;padding:10px 12px 12px;display:flex;flex-direction:column;gap:10px}
@@ -28023,8 +28029,6 @@ function apply(ctx) {
     () => installFrameSync(),
     () => installTheme(),
     () => shadow("sidebar.workspaces", { priority: BOT_PRIORITY, inject: face }, TeamSidebar),
-    () => shadow("sidebar.brand.mark", { priority: BOT_PRIORITY }, BrandMark),
-    () => shadow("sidebar.brand.name", { priority: BOT_PRIORITY }, BrandName),
     () => shadow("sidebar.footer.action", { id: "bot-account", order: -200, inject: face }, FooterAccount),
     // The AIDE workbench, in the foot of the host's own sidebar (the DSH page), beside the
     // account button. The same button sits in the foot of our own Bot column.
@@ -28097,8 +28101,11 @@ function apply(ctx) {
     () => shadow("conversation.input.dock", { id: "queue", order: 20, priority: BOT_PRIORITY, inject: queueFace }, QueueDock)
   ];
   ctx.effect(() => installCompiledStyles(RETURN_CSS, "return"), "ds-bot: return styles");
+  ctx.effect(() => installCompiledStyles(FOOTER_CSS, "footer"), "ds-bot: footer styles");
   ctx.effect(() => installCompiledStyles(COMPUTER_CSS, "computer"), "ds-bot: computer styles");
   shadow("sidebar.footer.action", { id: "bot-return", order: -300, inject: face }, BotReturn);
+  shadow("sidebar.brand.mark", { priority: BOT_PRIORITY }, BrandMark);
+  shadow("sidebar.brand.name", { priority: BOT_PRIORITY }, BrandName);
   ctx.effect(() => {
     let previous;
     const sync = () => {

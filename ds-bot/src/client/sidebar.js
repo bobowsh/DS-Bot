@@ -1071,15 +1071,16 @@ export function FooterAccount(props) {
 
 // The only entry registered in every mode: in Agent mode the whole Bot surface is
 // withdrawn, and this button in the shell's own footer is the way back.
-export function BotReturn({ wide, useSurface, useRoster, actions }) {
+export function BotReturn({ useSurface, useRoster, actions }) {
   const mode = useSurface(value => value.mode)
   const ready = useRoster(value => value.ready)
   // Agent mode draws no team sidebar; there this button is the team interface.
   useReportReady(mode === 'agent' && ready)
   if (mode !== 'agent') return null
+  // The foot of the column carries icons only: the word beside the mark would be the only
+  // text in a row of icons, and the mark is the same one the column's top carries.
   return h('button', { type: 'button', className: 'bt-return', 'aria-label': t('LinkBot'), title: t('LinkBot'), onClick: () => actions.setSurface('bot') },
-    h(BotMark, { look: MAIN_LOOK, size: 20 }),
-    wide ? h('span', { className: 'bt-return-name' }, t('LinkBot')) : null)
+    h(BotMark, { look: MAIN_LOOK, size: 20 }))
 }
 
 // The one switch between the two surfaces: the Bot team and the classic Agent page.
@@ -1096,11 +1097,22 @@ export const RETURN_CSS = `
 .bt-return-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 `
 
+// The host's own footer holds a row of entries: the account button, the AIDE button, the
+// import button and the settings trigger. The user reads that row as a row of icons, so
+// the words beside them go: the font size of the row's buttons drops to zero, which
+// takes the text with it and leaves the icons — which carry their own size — alone.
+export const FOOTER_CSS = `
+[class*="_footArea"] button{font-size:0!important;gap:0!important}
+[class*="_footArea"] button svg{font-size:14px}
+[class*="_footArea"] button>span{font-size:0!important}
+[class*="_footArea"] button[class*="_trigger"]{padding:0 6px!important}
+`
+
 export function BrandMark({ size = 24 }) {
   return h('span', { className: 'bt-brand-whale' }, h(BotMark, { look: MAIN_LOOK, size }))
 }
 export function BrandName() {
-  return h('span', { style: { fontWeight: 600, fontSize: 14 } }, 'LinkBot')
+  return h('span', { className: 'bt-brand-name' }, 'LinkHarness 智能工作台')
 }
 
 // With the whale holding the settings seat, the Bot row is just the account menu;
