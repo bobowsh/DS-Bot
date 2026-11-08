@@ -125,22 +125,36 @@ export function install(rt) {
     const empty = Object.keys(state.bots).length === 0
     if (!empty && state.factorySeedVersion === version) return
     applyCapabilities(seed)
+    // A seed Bot that fails is skipped so the rest of the seed goes on, but the version is
+    // only recorded when every Bot is there: a Bot the Host could not create yet (its Session
+    // was made but the workspace attach lost a race with the Host's first write) is created by
+    // the next start rather than lost for good.
+    let missing = 0
     for (const seedBot of seed.bots) {
       const existing = seedBot.factoryId ? Object.values(state.bots).find(bot => bot.factoryId === seedBot.factoryId) : undefined
       if (existing) refreshBot(existing, seedBot)
       else {
-        // One bad seed Bot (a name that clashes with a user's Bot, a failed Session create)
-        // must not abort the whole seed or hang startup: skip it, keep the rest, and record
-        // the version so the next launch does not retry the same failure every boot.
         try {
           await createSeedBot(seedBot)
-        } catch (error) {
-          rt.warn('ds-bot: factory seed Bot %s not created: %s', seedBot.factoryId ?? seedBot.name, error?.message ?? error)
+        } catch {
+          // The race is gone by the time the second attempt comes, so the Bot is created
+          // after all.
+          try {
+            await createSeedBot(seedBot)
+            rt.warn('ds-bot: the factory seed Bot %s was created on the second try', seedBot.factoryId ?? seedBot.name)
+          } catch (second) {
+            missing += 1
+            rt.warn('ds-bot: factory seed Bot %s not created: %s', seedBot.factoryId ?? seedBot.name, second?.message ?? second)
+          }
         }
       }
     }
-    state.factorySeedVersion = version
-    await rt.save()
+    if (missing === 0) {
+      state.factorySeedVersion = version
+      await rt.save()
+    } else {
+      rt.warn('ds-bot: %s factory seed Bots are not there yet; the next start tries again', missing)
+    }
   }
 
   Object.assign(rt, { applySeed })

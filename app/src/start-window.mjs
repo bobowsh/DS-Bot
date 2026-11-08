@@ -912,14 +912,15 @@ export class StartWindow {
     const how = win.isMinimized() ? 'minimized' : win.isFocused() ? 'focused' : 'behind'
     if (this.#under && how !== 'minimized') { this.#crossfade(main, win, how); return }
     if (this.#under) this.#unlay(main)
-    if (how === 'focused') {
-      main.show()
-      main.focus()
-    } else if (how === 'minimized') {
+    if (how === 'minimized') {
       main.minimize()
     } else {
-      main.showInactive()
-      try { main.moveAbove(win.getMediaSourceId()) } catch { /* the order stays the system's */ }
+      // The user started the app to look at it: the team window comes up front, whatever
+      // held the focus while the engine was starting. Windows may only flash the taskbar
+      // button instead; the flash is then the fallback, not the way in.
+      main.show()
+      main.focus()
+      try { main.moveTop() } catch { /* the order stays the system's */ }
     }
     if (how !== 'focused') {
       main.flashFrame(true)

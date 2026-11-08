@@ -21,7 +21,7 @@ The Bot team:
 
 1. **Build on DSH; never patch it.** Bot features use the documented plugin APIs. The desktop app starts DSH only through its documented entry points (`@deepseek-ai/dsh/profile-boot`, the `dsh` CLI). Never patch DeepSeek Harness or depend on files inside a DSH install. If something is missing in DSH, stop and say so; do not work around it with a patch.
 2. **No secrets.** Never write, print or commit API keys, tokens, cookies or `DSH_HOME` contents. Use the mock model (`ds-bot/dev/mock-llm.mjs`) for tests; it needs no key.
-3. **Reuse only under a compatible license, and always name the source.** Do not copy code, text, icons, logos or graphics from other products or websites unless the source carries a license compatible with Apache 2.0 (MIT, BSD, ISC and CC0 are). DeepSeek Harness counts as such a source: its code may be reused, and for interface work reuse its own components or code wherever they are exported and callable, so the interface keeps matching the host instead of drifting into a look-alike. Every reuse needs all three: the file header says which file and project the code comes from, the `NOTICE` file lists it, and the copied code keeps working on its own (no import from inside a DSH install). Prefer calling an exported host component over copying it; copy only what it does not export. This rule is about DS Bot's own interface. To name a third-party product that DS Bot connects to (for example the agent CLI a Bot runs on), use that product's official logo, and list it in `NOTICE` with its source and owner.
+3. **Copying code from other products is allowed.** You may copy code (including from the DSH host packages bundled with the app) when that is the fastest correct path. For interface work, prefer calling a host component that is exported and callable over copying it, so our interface keeps matching the host instead of drifting into a look-alike; copy only what the host does not export. Say where copied code comes from — a source comment or an entry in the `NOTICE` file. To name a third-party product that DS Bot connects to (for example the agent CLI a Bot runs on), use that product's official logo, and list it in `NOTICE` with its source and owner.
 4. **`client.js` is generated.** Change `ds-bot/src/client/`, then run `npm run build` and commit both files. Never edit `client.js` by hand.
 5. **Do not touch the user's own DSH data.** The desktop app keeps its data in its own `DSH_HOME`; its import only reads `~/.dsh` and never writes there. The test bench keeps its data in `.dsh-test-<name>/`. Never point a test at `~/.dsh`, at the desktop app's data or at a DSH that the user runs.
 
@@ -41,6 +41,19 @@ dev/bench.sh smoke 3096 8796 stop
 ```
 
 A change is done when `npm test`, the `--check` and `npm run lint` pass; CI runs them on every pull request. Run the smoke test as well for changes to `index.js` or `src/host/`. Use a free port for each bench, and stop every bench and process that you started.
+
+### Packaging the desktop app
+
+`app/` takes `ds-bot` as a `file:` dependency, which npm **copies** into `app/node_modules/ds-bot` at install time: editing `ds-bot/` never updates that copy. A package built without re-installing ships the old plugin, and the symptom is a packaged app that starts normally but lacks the change.
+
+Before every `npm run pack` / `npm run dist` in `app/`:
+
+```sh
+npm ci                                                                          # re-copy ds-bot/ into node_modules
+node -e "console.log(require('./node_modules/ds-bot/package.json').version)"     # must equal ds-bot/package.json's version
+```
+
+Never resolve this with `npm install --legacy-peer-deps`: it re-resolves the whole tree and drops `@electron/windows-sign` and `electron-winstaller`, which breaks packaging. The full release flow is in [docs/dev/release-checklist.md](docs/dev/release-checklist.md).
 
 ## Branches, pull requests and issues
 

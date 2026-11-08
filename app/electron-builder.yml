@@ -41,20 +41,18 @@ extraResources:
     to: node_modules/@deepseek-ai
     filter: ['libreoffice-kit-*/**']
 
-  # The factory seed team and the bundled skills repo travel as plain directories under the
-  # app's resources, which is where the running app reads them from (src/factory.mjs uses
-  # process.resourcesPath). Both stay outside the asar: the skills repo is a git repository,
-  # and nothing reads a git dir through the archive.
+  # The factory seed team travels as a plain directory under the app's resources, which is
+  # where the running app reads it from (src/factory.mjs uses process.resourcesPath). It stays
+  # outside the asar: nothing reads it through the archive.
   - from: resources/factory
     to: factory
-  - from: resources/skills-repo
-    to: skills-repo
-  # The import plugin is not a dependency of the app: it belongs to the profile, so the user may
-  # turn it off in the plugin manager. It still travels with the installer, as one archive the
-  # first start unpacks into the profile — the install never reaches the network.
-  # The archive is made by scripts/bundled-plugin.mjs in the beforePack hook.
-  - from: build/bundled-plugins
-    to: bundled-plugins
+# The factory plugins (a DSH home tree: profiles/ds-bot/node_modules), the skills repository and
+# the factory list travel in the data directory beside the program, as plain folders. The
+# installer moves profiles/ and skills-repo/ to the data home beside the program
+# (build/installer.nsh); when that fails the first start reads the tree from here.
+extraFiles:
+  - from: build/data
+    to: data
 # node-pty, sharp and koffi ship prebuilt binaries for each platform. A rebuild would compile
 # node-pty from source and needs a C++ toolchain.
 npmRebuild: false

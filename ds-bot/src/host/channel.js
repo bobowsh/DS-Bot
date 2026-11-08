@@ -170,15 +170,15 @@ export function install(rt) {
       if (body.defaultBotModel === null || body.defaultBotModel === '') delete state.prefs.defaultBotModel
       else state.prefs.defaultBotModel = await rt.resolveModel(body.defaultBotModel)
     }
-    if (body.thinking !== undefined) {
-      // A value this version does not know is ignored, not refused: the toggle
-      // may grow more states later.
-      if (body.thinking === true) state.prefs.thinking = true
-      else if (body.thinking === false || body.thinking === null) delete state.prefs.thinking
-    }
     if (body.enterToSend !== undefined) {
       if (body.enterToSend === false) state.prefs.enterToSend = false
       else if (body.enterToSend === true || body.enterToSend === null) delete state.prefs.enterToSend
+    }
+    // Whether the Bot chat draws the work of a turn. False hides the process rows
+    // whatever the host's own work-details mode says.
+    if (body.processShown !== undefined) {
+      if (body.processShown === false) state.prefs.processShown = false
+      else if (body.processShown === true || body.processShown === null) delete state.prefs.processShown
     }
     return rt.save()
   }

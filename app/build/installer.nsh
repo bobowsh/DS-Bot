@@ -212,3 +212,116 @@
     FunctionEnd
   !endif
 !macroend
+
+; The factory plugins (a DSH home tree: profiles/ds-bot/node_modules/<plugin>), the skills
+; repository and the factory list travel in <INSTDIR>\data (extraFiles). The data home of an
+; install is the folder beside the program, so the installer moves them there after the install.
+;
+; Only the two whitelisted folders are written, and inside profiles only the names on the
+; factory list: the data home holds the user's own data (bot/, profiles/, sessions/ ...), and
+; a plugin the user installed themselves must not be replaced or removed by an upgrade.
+;
+; The skills repository is a git repository the user may have pulled new skills into. A copy
+; that was changed is kept, and the factory one is dropped: an upgrade must not take the
+; user's work away.
+;
+; A move that fails (the parent folder cannot be written, as under Program Files) does not stop
+; the install: the first start reads the tree from <INSTDIR>\data and copies it into the profile
+; from there (src/main.mjs bundledDataHome).
+!macro customInstall
+  ${StdUtils.GetParentPath} $R0 "$INSTDIR"
+  ${If} $R0 == ""
+    Goto dsbDataDone
+  ${EndIf}
+  ; The data home beside the program. $R7 stays 0 while every move succeeds; a failure keeps
+  ; the copy in <INSTDIR>\data so the first start can read it from there.
+  StrCpy $R1 "$R0\data"
+  StrCpy $R7 0
+
+  ; The factory list: a plain-text name per line (build writes it in build/data/factory).
+  ; The first start reads the JSON copy from the same folder; both are build output.
+  ${If} ${FileExists} "$INSTDIR\data\factory\plugins.txt"
+    ClearErrors
+    FileOpen $R2 "$INSTDIR\data\factory\plugins.txt" r
+    ${If} ${Errors}
+      DetailPrint "LinkBot: the factory plugin list could not be read."
+      Goto dsbFactoryDone
+    ${EndIf}
+    dsbFactoryLoop:
+      FileRead $R2 $3
+      ${If} $3 == ""
+        Goto dsbFactoryEnd
+      ${EndIf}
+      ; Trim the trailing newline/CR from the name.
+      StrCpy $4 $3 -1
+      ${If} $4 == ""
+        Goto dsbFactoryLoop
+      ${EndIf}
+      StrCpy $5 "$INSTDIR\data\profiles\ds-bot\node_modules\$4"
+      StrCpy $6 "$R1\profiles\ds-bot\node_modules\$4"
+      ${If} ${FileExists} "$5\*.*"
+        ClearErrors
+        RMDir /r "$6"
+        CreateDirectory "$6"
+        CopyFiles /SILENT "$5\*.*" "$6"
+        ${If} ${Errors}
+          DetailPrint "LinkBot: the plugin $4 could not be moved to the data folder."
+          StrCpy $R7 1
+        ${EndIf}
+      ${EndIf}
+      Goto dsbFactoryLoop
+    dsbFactoryEnd:
+      FileClose $R2
+    dsbFactoryDone:
+  ${EndIf}
+  ; The factory list itself travels as build output, so the first start can tell the factory
+  ; plugins from the ones the user installed later.
+  ${If} ${FileExists} "$INSTDIR\data\factory\*.*"
+    CreateDirectory "$R1\factory"
+    CopyFiles /SILENT "$INSTDIR\data\factory\*.*" "$R1\factory"
+  ${EndIf}
+  ; The skills repository: a copy the user changed is kept.
+  ${If} ${FileExists} "$INSTDIR\data\skills-repo\.git\*.*"
+    ${If} ${FileExists} "$R1\skills-repo\.git\*.*"
+      ; The installed repository is there. Whether the user changed it is asked of git, which
+      ; may not be there; without git the copy is kept, because a user who pulled skills in
+      ; has a repository git can read.
+      nsExec::ExecToLog 'cmd /c cd /d "%R1\skills-repo" && git status --porcelain > "%TEMP%\dsb-skills-dirty.txt" 2>nul'
+      ${If} $0 == 0
+        ClearErrors
+        FileOpen $R2 "$TEMP%\dsb-skills-dirty.txt" r
+        ${If} ${Errors}
+          ; The file could not be read: the copy is kept.
+        ${Else}
+          FileRead $R2 $3
+          FileClose $R2
+          Delete "$TEMP%\dsb-skills-dirty.txt"
+          ${If} $3 != ""
+            ; The user changed the repository: it is kept, and the factory one is dropped.
+            DetailPrint "LinkBot: the skills repository was changed and is kept."
+            RMDir /r "$INSTDIR\data\skills-repo"
+            Goto dsbDataDone
+          ${EndIf}
+        ${EndIf}
+      ${Else}
+        ; No git: the copy is kept.
+        DetailPrint "LinkBot: the skills repository was kept."
+        RMDir /r "$INSTDIR\data\skills-repo"
+        Goto dsbDataDone
+      ${EndIf}
+    ${EndIf}
+    ClearErrors
+    RMDir /r "$R1\skills-repo"
+    CopyFiles /SILENT "$INSTDIR\data\skills-repo" "$R1\skills-repo"
+    ${If} ${Errors}
+      DetailPrint "LinkBot: the skills repository could not be moved to the data folder."
+      StrCpy $R7 1
+    ${EndIf}
+  ${EndIf}
+  ; Only when everything was moved is the installer's own data tree removed. A failed move
+  ; leaves it in place: the first start reads the factory tree from <INSTDIR>\data instead.
+  ${If} $R7 == 0
+    RMDir /r "$INSTDIR\data"
+  ${EndIf}
+  dsbDataDone:
+!macroend
