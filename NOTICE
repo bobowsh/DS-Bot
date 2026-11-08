@@ -49,6 +49,13 @@ MIT License, Copyright (c) 2026 DeepSeek
     app/engine/preset-standard.patch.yml copies its standard preset
     (presets/standard.patch.yml), including the plan-mode prompt text,
     without the goal rows.
+  - ds-bot/src/client/usage-line.js copies the composer statistics pills of
+    packages/client/ui-chat/src/client/chat/StatsPills.tsx with token-format.ts
+    and stat-dialog.ts, and the context meter of
+    packages/client/ui-conversation/src/client/skeleton/ContextMeter.tsx with
+    context-occupancy.ts. The host does not export these components, so the
+    code is copied with bt- prefixed class names; every figure it shows still
+    comes from the host's own projections.
   - .agents/skills/record-browser-gif/ comes from the skill of the same name
     in DeepSeek Harness (.agents/skills/record-browser-gif/): SKILL.md is
     adapted and translated for this repository; scripts/encode_gif.py and
