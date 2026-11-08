@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import { FishLogo } from './dsh-primitives.js'
 import { isMainOf } from './sources.js'
 import { currentPart, previewOf, relativeShort } from './text.js'
-import { PlusIcon, SearchIcon, SidebarIcon, GaugeIcon, ClockIcon, GearIcon, PinMarkIcon, ConnectorIcon, CloudDownloadIcon, SignInIcon, SignOutIcon, SlidersIcon, SwitchIcon, AideIcon } from './icons.js'
+import { PlusIcon, SearchIcon, SidebarIcon, GaugeIcon, ClockIcon, GearIcon, PinMarkIcon, ConnectorIcon, CloudDownloadIcon, SignInIcon, SignOutIcon, SlidersIcon, SwitchIcon } from './icons.js'
+import { AideButton } from './aide-button.js'
 import { lookOf, MAIN_LOOK } from './characters.js'
 import { botState, BotMark, BotAvatar, RoomAvatar } from './mark.js'
 import { AgentBadge } from './agent-badge.js'
@@ -16,7 +17,6 @@ import { showsDshRow } from './dsh-offer.js'
 import { quietly } from './diagnostics.js'
 import { frameLayout, dragColumn, RAIL_WIDTH, FALLBACK_SIDEBAR_WIDTH, userSidebarToggle } from './frame-layout.js'
 import { chatRoom, dshCollapsed } from './frame-watch.js'
-import { AIDE_SHOW_EVENT } from './aide-bridge.js'
 
 // -------------------------------------------------------------------------
 // Sidebar
@@ -596,10 +596,7 @@ export function TeamSidebar(props) {
   // and shows its workbench; the path through the host's panel list is deliberately
   // not taken, because selecting a panel there replaces the main area and unloads
   // the whole session view — opening the workbench would cost a full-screen rebuild.
-  const toAide = h('button', {
-    type: 'button', className: 'bt-round', 'aria-label': t('AIDE workbench'), title: t('AIDE workbench'),
-    onClick: () => window.dispatchEvent(new Event(AIDE_SHOW_EVENT)),
-  }, h(AideIcon))
+  const toAide = h(AideButton, { label: t('AIDE workbench') })
   const foot = wideContent
     ? h('div', { className: 'bt-leftcol-foot' }, toAgent, toAide, h(AccountLauncher, { seat: false, actions }))
     : h('div', { className: 'bt-leftcol-foot bt-leftcol-foot-rail' },
