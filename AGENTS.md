@@ -80,6 +80,6 @@ The full workflow is in [CONTRIBUTING.md](CONTRIBUTING.md#how-we-work). The part
 
 - Follow the code around your change. Keep functions small and names plain.
 - Write a comment only when the reason is not clear from the code: a hidden constraint, an invariant, a workaround. Do not describe what the code does.
-- Commit messages in English, imperative subject, the reason in the body. Keep commits small.
+- Commit messages in Chinese (the team works in Chinese), imperative subject, the reason in the body. Keep commits small. Code identifiers, API names and file names stay in English.
 - The person who asked for the change is the commit author. Do not set an AI agent or bot as author or committer, and do not add `Co-authored-by` lines for one.
 - User-facing text in the plugin is English. Keep the README and README.zh.md in step when you change one of them.
