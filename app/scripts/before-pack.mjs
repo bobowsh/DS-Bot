@@ -67,7 +67,9 @@ export async function beforePack(context, prepare = preparePrimaryRuntime, prepa
   await prepareSkills(appDir, manifest.skills)
   // The plugins the app carries are resolved from the factory manifest: the intranet registry
   // first, the local development folder when it cannot be reached, the build stops on neither.
-  await preparePlugins(appDir, manifest.plugins)
+  // The plugins the manifest marks as shipped turned off travel as well, but the first start
+  // keeps them out of the bundle list.
+  await preparePlugins(appDir, manifest.plugins, undefined, manifest.disabledByDefault ?? [])
   // The language servers travel as plain files too: they are native programs, so they go on
   // the Host's PATH rather than into a plugin.
   await prepareServers(appDir, manifest.languageServers ?? [])

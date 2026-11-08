@@ -54,7 +54,7 @@ export async function copyPlugin(from, to) {
  * @param {{ name: string, version: string }[]} entries - the manifest's plugin entries
  * @param {string} [pluginsDev] - the local plugin development folder (the offline fallback)
  */
-export async function prepareBundledPlugins(appDir, entries, pluginsDev = defaultPluginsDev(appDir)) {
+export async function prepareBundledPlugins(appDir, entries, pluginsDev = defaultPluginsDev(appDir), disabled = []) {
   // Build from nothing: an old flat `data/plugins` tree from an earlier layout must not survive
   // into the package and be mistaken for the current output. Only our own old trees go.
   await rm(join(bundledDataDir(appDir), 'plugins'), { recursive: true, force: true })
@@ -89,6 +89,11 @@ export async function prepareBundledPlugins(appDir, entries, pluginsDev = defaul
   }, undefined, 2)}\n`, 'utf8')
   writeFileSync(join(factory, 'plugins.txt'),
     `${made.map(({ name }) => name.replace(/\//gu, '\\')).join('\n')}\n`, 'utf8')
+  // The plugins that ship turned off: the first start puts them in place but keeps them out of
+  // the bundle list, so the Host does not load them until the user turns them on.
+  writeFileSync(join(factory, 'disabled.json'), `${JSON.stringify({
+    plugins: disabled.map(({ name, reason }) => ({ name, reason })),
+  }, undefined, 2)}\n`, 'utf8')
   return made.map(({ folder }) => folder)
 }
 

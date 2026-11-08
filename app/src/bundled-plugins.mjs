@@ -28,6 +28,25 @@ function factoryNames(dataDir) {
 }
 
 /**
+ * The factory plugins that ship turned off: they travel with the installer, but the Host must
+ * not load them until the user turns them on in the plugin manager. The build writes the list
+ * beside the factory list, so the first start reads the same decision the build made.
+ * @param {string} dataDir - the data directory (DSH home)
+ * @returns {{ name: string, reason?: string }[]}
+ */
+export function factoryDisabledPlugins(dataDir) {
+  try {
+    const list = JSON.parse(readFileSync(join(dataDir, 'factory', 'disabled.json'), 'utf8'))
+    if (!Array.isArray(list.plugins)) return []
+    return list.plugins
+      .filter(entry => entry && typeof entry.name === 'string')
+      .map(entry => ({ name: entry.name, reason: typeof entry.reason === 'string' ? entry.reason : undefined }))
+  } catch {
+    return []
+  }
+}
+
+/**
  * The factory plugins the installer carries, as folders in the data directory. Only names on the
  * shipped factory list are returned, so a plugin the user installed never becomes "factory".
  * @param {string} dataDir - the data directory (DSH home)

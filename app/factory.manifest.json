@@ -22,5 +22,8 @@
   "languageServers": [
     { "name": "clangd" },
     { "name": "pyright" }
+  ],
+  "disabledByDefault": [
+    { "name": "ds-harness-remote", "reason": "它连的是远程服务，没有授权就连不上，界面右下角一直显示「正在重连」；用户 2026-11-08 定为出厂默认关闭，需要时在插件管理器里打开。" }
   ]
 }

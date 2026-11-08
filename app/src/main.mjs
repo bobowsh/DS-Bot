@@ -21,7 +21,7 @@ import { hostPort } from './host-port.mjs'
 import { captureStdio, LogFile } from './logs.mjs'
 import { Pickers } from './picker-host.mjs'
 import { currentRootOf, driveOf, formatBytes, freeSpace, isEmptyTree, pickFrom, placeOf, rootOf, runningLow } from './place.mjs'
-import { bundledPlugins, findBundledPlugin } from './bundled-plugins.mjs'
+import { bundledPlugins, factoryDisabledPlugins, findBundledPlugin } from './bundled-plugins.mjs'
 import { createShell, SHELL_TEXT } from './shell.mjs'
 import { readStartFrame, writeStartFrame } from './start-frame.mjs'
 import { explainOf, StartWindow } from './start-window.mjs'
@@ -471,12 +471,16 @@ async function boot(mine) {
   // bundle list. A plugin turned off stays off: installImportPlugin reads the profile's own
   // manifest and does not put a bundle back into a list the user removed it from.
   const factoryHome = bundledDataHome(places.dataDir)
+  // A plugin the factory ships turned off is put in place but not into the bundle list, so the
+  // Host does not load it until the user turns it on. The list comes from the build's manifest.
+  const turnedOff = new Set(factoryDisabledPlugins(factoryHome).map(entry => entry.name))
   for (const entry of bundledPlugins(factoryHome)) {
     await installImportPlugin({
       profileDir: profileDir(),
       folder: entry.folder,
       name: entry.name,
       version: entry.version,
+      disabledByDefault: turnedOff.has(entry.name),
     }).catch(error => { console.error(`LinkBot: the plugin ${entry.name} was not put in place:`, error) })
   }
   // The factory seed lands before the Host starts: ds-bot builds the seeded team at its
