@@ -108,18 +108,19 @@ function harness({ platform = 'win32', trayFails = false, busy = false, ready = 
 
 describe('the window and the tray', () => {
   test('a close asks what to do, and the tray answer hides the window', async (t) => {
-    const app = harness({ answer: 0 })
+    const app = harness({ answer: 1 })
     t.after(app.cleanup)
     assert.equal(app.close(), true, 'the close is held')
     await settle()
     assert.equal(app.asked.length, 1, 'the question is asked')
     assert.equal(app.asked[0].buttons.length, 3, 'it offers three answers')
+    assert.equal(app.asked[0].defaultId, 0, 'quitting is the default')
     assert.equal(app.window().visible, false, 'the window is hidden')
     assert.equal(app.calls.quit, 0, 'the app is still running')
   })
 
   test('the quit answer ends the app', async (t) => {
-    const app = harness({ answer: 1 })
+    const app = harness({ answer: 0 })
     t.after(app.cleanup)
     app.close()
     await settle()
@@ -138,7 +139,7 @@ describe('the window and the tray', () => {
   })
 
   test('every close asks again; the answer is not remembered', async (t) => {
-    const app = harness({ answer: 0 })
+    const app = harness({ answer: 1 })
     t.after(app.cleanup)
     app.close()
     await settle()
@@ -158,7 +159,7 @@ describe('the window and the tray', () => {
   })
 
   test('the tray opens the window again', async (t) => {
-    const app = harness({ answer: 0 })
+    const app = harness({ answer: 1 })
     t.after(app.cleanup)
     app.close()
     await settle()
@@ -252,7 +253,7 @@ describe('the window and the tray', () => {
   })
 
   test('a cancelled macOS shutdown leaves the app running', async (t) => {
-    const app = harness({ platform: 'darwin', answer: 0 })
+    const app = harness({ platform: 'darwin', answer: 1 })
     t.after(app.cleanup)
     app.powerMonitor.emit('shutdown')
     assert.equal(app.close(), false, 'the window closes for good')
@@ -264,7 +265,7 @@ describe('the window and the tray', () => {
   })
 
   test('on macOS the Dock icon opens the window, and a fullscreen window leaves fullscreen first', async (t) => {
-    const app = harness({ platform: 'darwin', answer: 0 })
+    const app = harness({ platform: 'darwin', answer: 1 })
     t.after(app.cleanup)
     app.close()
     await settle()
@@ -290,7 +291,7 @@ describe('the window and the tray', () => {
   })
 
   test('a window that is opened again while it leaves fullscreen stays', async (t) => {
-    const app = harness({ platform: 'darwin', answer: 0 })
+    const app = harness({ platform: 'darwin', answer: 1 })
     t.after(app.cleanup)
     const window = app.window()
     window.fullScreen = true

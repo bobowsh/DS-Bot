@@ -190,8 +190,9 @@ export function createShell(options) {
   }
 
   /**
-   * The close question, asked on every window close: minimize to the tray, end the app, or
-   * leave the window as it is. The quit goes through the tray's own quit, so a first-run
+   * The close question, asked on every window close: end the app, minimize to the tray, or
+   * leave the window as it is. Quitting is the first answer and the default one, so a press
+   * that lands on it ends the app. The quit goes through the tray's own quit, so a first-run
    * dialog or a running copy can still refuse it.
    * @param {any} target the window the question is about
    */
@@ -200,10 +201,10 @@ export function createShell(options) {
     try {
       const { response } = await options.closeAsk.show({
         type: 'question', title: DISPLAY_NAME, message: t.message,
-        buttons: [t.toTray, t.quit, t.cancel], defaultId: 0, cancelId: 2, noLink: true,
+        buttons: [t.quit, t.toTray, t.cancel], defaultId: 0, cancelId: 2, noLink: true,
       })
-      if (response === 0) { hide(target); return }
-      if (response === 1) { quit(); return }
+      if (response === 0) { quit(); return }
+      if (response === 1) { hide(target); return }
     } catch (error) {
       log.warn(`LinkBot: the close question could not be asked: ${error instanceof Error ? error.message : String(error)}`)
     }
