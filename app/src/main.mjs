@@ -25,6 +25,7 @@ import { bundledPlugins, findBundledPlugin } from './bundled-plugins.mjs'
 import { createShell, SHELL_TEXT } from './shell.mjs'
 import { readStartFrame, writeStartFrame } from './start-frame.mjs'
 import { explainOf, StartWindow } from './start-window.mjs'
+import { watchFactoryPlugins } from './factory-update.mjs'
 import { langOf } from './start/text.mjs'
 import { createDeferredPrompt } from './update-prompt.mjs'
 import { CAPTION_HEIGHT, cssColor, micaAvailable, nativeThemeSource } from './window-frame.mjs'
@@ -81,7 +82,7 @@ const frameFile = join(app.getPath('userData'), 'start-frame.json')
 // Loaded once the start window is up (loadModules).
 let BotBrowserGuests, partitionOf, BotViews, isBotId, importFromBrowser, listSources, applyCookies, CookieImports, parseCookieFile
 let downloadSaver, chooseLocations, defaultPlaces, lang, pickerLabels, pickRoot, programFolder, saveLocations, teamIn, teamsAt, tx, HostProcess
-let copySessions, findTeam, importTeam, restoreSessions, teamInUse, teamSizes, userDshHome, copyData, copyReason, moveProblem, CHECK_PROFILE, PROFILE, ImportFlow
+let copySessions, findTeam, importTeam, restoreSessions, teamInUse, teamSizes, userDshHome, copyData, copyReason, moveProblem, CHECK_PROFILE, PROFILE, DSHM_REGISTRY_URL, ImportFlow
 let watchReleases, watchUpdates, RELEASE_PAGE, getDshRuntimeVersion, electronUpdater
 let installFactoryResources, pullSkillsRepo, removeDshHomeVariableWithNotice
 let installImportPlugin
@@ -347,7 +348,7 @@ async function loadModules() {
   ;({ copySessions, findTeam, importTeam, restoreSessions, teamInUse, teamSizes, userDshHome } = imports)
   ;({ ImportFlow } = flows)
   ;({ copyData, copyReason, moveProblem } = moves)
-  ;({ CHECK_PROFILE, PROFILE } = profile)
+  ;({ CHECK_PROFILE, PROFILE, DSHM_REGISTRY_URL } = profile)
   ;({ watchReleases, watchUpdates, RELEASE_PAGE } = updatesModule)
   ;({ getDshRuntimeVersion } = boot)
   ;({ installFactoryResources, pullSkillsRepo } = factory)
@@ -487,6 +488,15 @@ async function boot(mine) {
       .catch(error => { console.error('LinkBot: the factory resources were not put in place:', error) })
   })
   setImmediate(() => { void pullSkillsRepo({ dataDir: places.dataDir, resourcesDir: resourcesDir() }) })
+  // The factory plugins update themselves after 22:00: the app asks the intranet catalog what
+  // they have become and puts the newer ones in place. The Host runs them, so the new copy
+  // takes effect on the next start; the reader is told so.
+  watchFactoryPlugins({
+    dataDir: places.dataDir,
+    profileDirOf: () => profileDir(),
+    hostVersionOf: () => getDshRuntimeVersion(),
+    onUpdated: names => { void tellPluginsUpdated(names) },
+  })
   startWindow.done('data')
   const engine = await startEngine(mine)
   if (engine === undefined || mine !== attempt) return
@@ -646,7 +656,7 @@ function newHost() {
   return new HostProcess({
     entry: join(here, 'host.mjs'),
     cwd: profileDir(),
-    env: { ...process.env, DSH_HOME: places.dataDir, DS_BOT_PORT: String(port), DS_BOT_APP: '1', DS_BOT_USER_DSH_HOME: userDshHome(), DS_BOT_FACTORY_RESOURCES: resourcesDir(), DS_BOT_RUNTIME_DIR: runtimeDir(), ...(places.workspace ? { DS_BOT_WORKSPACE: places.workspace } : {}) },
+    env: { ...process.env, DSH_HOME: places.dataDir, DS_BOT_PORT: String(port), DS_BOT_APP: '1', DS_BOT_USER_DSH_HOME: userDshHome(), DS_BOT_FACTORY_RESOURCES: resourcesDir(), DS_BOT_RUNTIME_DIR: runtimeDir(), DSHM_REGISTRY_URL, ...(places.workspace ? { DS_BOT_WORKSPACE: places.workspace } : {}) },
     pnpm: pnpmEntry(),
     onFailure: (error) => { if (mine === attempt) void fail(error) },
     output: hostOutput,
@@ -1236,6 +1246,21 @@ async function askRestartNow(version) {
 async function askDownloadNow(version) {
   if (failed || !await afterHandoff()) return false
   return await askInWindow({ message: tx('dialog.update.available', { version }), detail: tx('dialog.update.availableDetail'), buttons: [{ label: tx('btn.download'), primary: true }, { label: tx('btn.notNowDownload') }], cancel: 1 }) === 0
+}
+
+// The plugins that were replaced are running inside the Host, so the new copies only take
+// effect on the next start. The reader is told which ones changed and that a restart is what
+// makes it count.
+async function tellPluginsUpdated(names) {
+  if (names.length === 0) return
+  console.info(`LinkBot: plugins updated: ${names.join(', ')}`)
+  if (failed || !await afterHandoff()) return
+  await askInWindow({
+    message: tx('dialog.plugin.updated', { count: names.length, names: names.join(', ') }),
+    detail: tx('dialog.plugin.updatedDetail'),
+    buttons: [{ label: tx('btn.ok') }],
+    cancel: 0,
+  })
 }
 
 // The cards that the team window shows, by id, until they have their answer.

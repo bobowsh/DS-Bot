@@ -204,6 +204,8 @@ export const TEXT = {
     'dialog.update.availableDetail': '这个版本不能自己更新。请到发布页下载新版，再用它替换「应用程序」里的 DS Bot。',
     'dialog.update.onFailure': 'DS Bot {version} 下载完会自动安装，然后重新打开。',
     'dialog.update.onFailurePage': 'DS Bot {version} 已经发布。关掉这个对话框后，会打开它的下载页面。',
+    'dialog.plugin.updated': '{count} 个插件已经更新：{names}',
+    'dialog.plugin.updatedDetail': '这些插件在 DeepSeek Harness 里运行，重启 DS Bot 之后才会用上新版。',
   },
   en: {
     // voice
@@ -387,6 +389,8 @@ export const TEXT = {
     'dialog.update.availableDetail': 'This version can’t update itself. Download the new version from its release page, then replace DS Bot in Applications with it.',
     'dialog.update.onFailure': 'DS Bot {version} installs itself when its download is done, and then opens again.',
     'dialog.update.onFailurePage': 'DS Bot {version} is out. Once this box is closed, its download page opens.',
+    'dialog.plugin.updated': '{count} plugins have been updated: {names}',
+    'dialog.plugin.updatedDetail': 'These plugins run inside DeepSeek Harness, so the new ones take effect after DS Bot restarts.',
   },
 }
 
