@@ -1,0 +1,29 @@
+{
+  "comment": "出厂插件与技能清单（用户 2026-11-08 拍板）。plugins 打进 data/profiles/ds-bot/node_modules/（scoped 包按 name 建 scoped 目录），skills 打进 data/skills/<slug>/，languageServers 打进 data/lsp/<name>/（原生程序，由宿主 PATH 找到）。运行时清单 data/factory/plugins.json 由打包脚本按本清单生成，格式不变。",
+  "plugins": [
+    { "name": "dsh-chat-import", "version": "0.26.4" },
+    { "name": "dsh-xdpool", "version": "2.6.1" },
+    { "name": "dshmarket", "version": "1.70.2" },
+    { "name": "@linxin666/dsh-client-ui-git-graph", "version": "0.4.12" },
+    { "name": "dsh-rule-manager", "version": "0.1.0" },
+    { "name": "@astron-team/skillhub-dsh", "version": "0.6.2" },
+    { "name": "dsh-aide", "version": "0.12.0" },
+    { "name": "dsh-better-sidebar", "version": "0.28.2" },
+    { "name": "dsh-screenshot-native", "version": "1.0.0" },
+    { "name": "ds-harness-remote", "version": "0.6.3" },
+    { "name": "dsh-plugin-guide", "version": "0.3.39" }
+  ],
+  "skills": [
+    { "slug": "grilling" },
+    { "slug": "ub-mode" },
+    { "slug": "cua-driver" },
+    { "slug": "skillhub-cli" }
+  ],
+  "languageServers": [
+    { "name": "clangd" },
+    { "name": "pyright" }
+  ],
+  "disabledByDefault": [
+    { "name": "ds-harness-remote", "reason": "它连的是远程服务，没有授权就连不上，界面右下角一直显示「正在重连」；用户 2026-11-08 定为出厂默认关闭，需要时在插件管理器里打开。" }
+  ]
+}

@@ -75,8 +75,9 @@ test('the first start offers the DSH team on the import card, copies it on cards
   assert.equal(JSON.parse(readFileSync(join(paths.userData, 'locations.json'), 'utf8')).dataDir, home)
   assert.deepEqual(messageBoxes(), [], 'no message box on the way')
   assert.equal(hostState.starts, 3, 'the warm engine, the chats\' check and the team\'s engine')
-  // On Linux the check's Host runs from the runtime folder, as the team's does.
-  const runtime = fileURLToPath(new URL('../build/runtime', import.meta.url))
+  // On Linux the check's Host runs from the runtime folder, as the team's does. A packaged app
+  // reads it from its resources folder; the folder holds the primary runtime beside it.
+  const runtime = process.resourcesPath
   const check = hostState.envs.find(env => env.DS_BOT_CHECK)
   assert.equal(check.DS_BOT_RUNTIME_DIR, runtime)
   assert.equal(hostExecutable(check.DS_BOT_RUNTIME_DIR, 'linux'), join(runtime, 'primary-runtime', 'dependencies', 'node', 'bin', 'node'))

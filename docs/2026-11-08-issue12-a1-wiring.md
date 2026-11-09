@@ -46,3 +46,17 @@ env: { ...process.env, ..., DSHM_REGISTRY_URL, ... }
 
 `node --test --test-timeout=20000 test/factory-registry.test.mjs` → 7/7
 `node --test test/app-patch.test.mjs test/import-plugin.test.mjs test/host.test.mjs` → 22/22
+
+## B2 实测结论：dsh-skill-market 暂不能进出厂清单
+
+`pn1024/dsh-skill-market@1.0.1`（MIT，main 分支）的 host 侧 `src/index.js`：
+
+- 支持 `config.skillhubApiBase` / `config.clawhubApiBase`（L534-535、L948-952），可指向内网；
+- 但它调用的 4 个端点是 `${apiBase}/api/skills`、`/api/v1/skills/batch`、`/api/v1/skills/{slug}/file`、`/api/v1/download?slug=`；
+- 内网 iflytek SkillHub 实测的是 `/api/v1/skills`（带 namespace `global`）、`/api/web/skills`、`/api/cli/v1/skills/search`、`/api/v1/skills/{ns}/{slug}/...` —— **形状对不上**（无 `/api/skills`、无 `/api/v1/download`，且 skill 需 namespace）。
+
+即：直接把 `dsh-skill-market` 加进 `BUNDLED_PLUGINS` 会装上一个在离线/内网机上连不上的插件。**B2 需与 D2（4 端点兼容实测 / fork 改字段映射）一起做**，或改用已在出厂清单里的 iflytek 官方 `skillhub-dsh`（已配 `registryUrl` 指向 8081，端点契约已实测兼容）。这不是漏做，是依赖顺序问题，需队长拍板选哪条路。
+
+## B1 已完成
+
+`app/scripts/gen-catalog.mjs`：扫 Gitea `dshplugin` org 的各仓 + npm registry 的已发布版本，自动生成 13 条 `plugins.json`（`url`/`upstream` 指原作者 GitHub，人审 diff 后 `--write`）。dry-run 实测：13 条、与现有 catalog 名字零增删。

@@ -15,8 +15,14 @@
 ; that keeps the path as it is. The check for a writable folder runs between the
 ; directory page and the install (#626).
 ;
-; An earlier installation's folder is the default the page starts at, so an
-; upgrade lands where the copy already is.
+; The directory page starts at <drive>\LinkBot\app, which customInit works out and writes
+; back to the registry: NSIS's InstallDir page reads the previous install's registered
+; location as its starting value, so without the write-back it would start at wherever an
+; old copy once lived. The path is used exactly as it is chosen: electron-builder appends a
+; product-name sub-folder to any path that lacks it (assistedInstaller.nsh,
+; instFilesPre), but customPageAfterChangeDir replaces that function with one
+; that keeps the path as it is. The check for a writable folder runs between the
+; directory page and the install (#626).
 !macro customInit
   ; The /D= switch wins over everything else: that is how a silent install in
   ; the acceptance run aims the app at a throwaway folder.
@@ -27,10 +33,11 @@
     ; The folder is fixed: <drive>\LinkBot\app, with the data at
     ; <drive>\LinkBot\data beside it.
     ;
-    ; The registered location of an earlier installation is deliberately NOT read.
-    ; It was the one thing that kept an install from ever reaching this folder: a
-    ; copy that once landed elsewhere (in a drive's root, or under another
-    ; product name) left its path behind, and every later install followed it.
+    ; The registered location of an earlier installation is deliberately NOT read: a copy
+    ; that once landed elsewhere (in a drive's root, or under another product name) left
+    ; its path behind, and every later install followed it. But the InstallDir page does
+    ; read that registry value as its starting point, so the folder worked out here is
+    ; written back over it — the page then starts where this installer means to install.
     ; A drive is detected with a wildcard: "D:\" and "D:\." both fail, because a
     ; backslash at the end of the string is an escape and the path never resolves.
     IfFileExists "D:\*" 0 useE
@@ -45,6 +52,7 @@
     ; Neither drive: the program folder of the current user is the last resort.
     StrCpy $INSTDIR "$LocalAppData\Programs\LinkBot\app"
     done:
+    WriteRegStr HKCU "Software\32c46dfc-ed78-5d41-85a4-a3c7f083f2e0" "InstallLocation" "$INSTDIR"
   ${EndIf}
 
   ; The installer never asks for administrator rights, so a folder the user cannot
@@ -211,4 +219,125 @@
       Abort
     FunctionEnd
   !endif
+!macroend
+
+; The factory plugins (a DSH home tree: profiles/ds-bot/node_modules/<plugin>), the skills
+; repository and the factory list travel in <INSTDIR>\data (extraFiles). The data home of an
+; install is the folder beside the program, so the installer moves them there after the install.
+;
+; Only the two whitelisted folders are written, and inside profiles only the names on the
+; factory list: the data home holds the user's own data (bot/, profiles/, sessions/ ...), and
+; a plugin the user installed themselves must not be replaced or removed by an upgrade.
+;
+; The factory skills are the package's own copies: an installed one is replaced, but one backup
+; of the replaced content is kept (<data>\skills\<slug>.bak, the most recent previous content
+; only). A skill the package does not carry is the user's own and is left alone.
+;
+; A move that fails (the parent folder cannot be written, as under Program Files) does not stop
+; the install: the first start reads the tree from <INSTDIR>\data and copies it into the profile
+; from there (src/main.mjs bundledDataHome).
+!macro customInstall
+  ${StdUtils.GetParentPath} $R0 "$INSTDIR"
+  ${If} $R0 == ""
+    Goto dsbDataDone
+  ${EndIf}
+  ; The data home beside the program. $R7 stays 0 while every move succeeds; a failure keeps
+  ; the copy in <INSTDIR>\data so the first start can read it from there.
+  StrCpy $R1 "$R0\data"
+  StrCpy $R7 0
+
+  ; The factory list: a plain-text name per line (build writes it in build/data/factory).
+  ; The first start reads the JSON copy from the same folder; both are build output.
+  ${If} ${FileExists} "$INSTDIR\data\factory\plugins.txt"
+    ClearErrors
+    FileOpen $R2 "$INSTDIR\data\factory\plugins.txt" r
+    ${If} ${Errors}
+      DetailPrint "LinkBot: the factory plugin list could not be read."
+      Goto dsbFactoryDone
+    ${EndIf}
+    dsbFactoryLoop:
+      FileRead $R2 $3
+      ${If} $3 == ""
+        Goto dsbFactoryEnd
+      ${EndIf}
+      ; Trim the trailing newline/CR from the name.
+      StrCpy $4 $3 -1
+      ${If} $4 == ""
+        Goto dsbFactoryLoop
+      ${EndIf}
+      StrCpy $5 "$INSTDIR\data\profiles\ds-bot\node_modules\$4"
+      StrCpy $6 "$R1\profiles\ds-bot\node_modules\$4"
+      ${If} ${FileExists} "$5\*.*"
+        ClearErrors
+        RMDir /r "$6"
+        CreateDirectory "$6"
+        CopyFiles /SILENT "$5\*.*" "$6"
+        ${If} ${Errors}
+          DetailPrint "LinkBot: the plugin $4 could not be moved to the data folder."
+          StrCpy $R7 1
+        ${EndIf}
+      ${EndIf}
+      Goto dsbFactoryLoop
+    dsbFactoryEnd:
+      FileClose $R2
+    dsbFactoryDone:
+  ${EndIf}
+  ; The factory list itself travels as build output, so the first start can tell the factory
+  ; plugins from the ones the user installed later.
+  ${If} ${FileExists} "$INSTDIR\data\factory\*.*"
+    CreateDirectory "$R1\factory"
+    CopyFiles /SILENT "$INSTDIR\data\factory\*.*" "$R1\factory"
+  ${EndIf}
+  ; The language servers travel as plain files: they are native programs the Host finds on its
+  ; PATH, so the whole folder is moved beside the data.
+  ${If} ${FileExists} "$INSTDIR\data\lsp\*.*"
+    ClearErrors
+    RMDir /r "$R1\lsp"
+    CreateDirectory "$R1\lsp"
+    CopyFiles /SILENT "$INSTDIR\data\lsp\*.*" "$R1\lsp"
+    ${If} ${Errors}
+      DetailPrint "LinkBot: the language servers could not be moved to the data folder."
+      StrCpy $R7 1
+    ${EndIf}
+  ${EndIf}
+  ; The factory skills: replace the installed copies, keeping one .bak of each replaced skill,
+  ; and leave the skills the package does not carry alone. The sync state file is dropped when
+  ; the package carries skills, so the next start re-records versions instead of downloading
+  ; what the package just put in place.
+  ${If} ${FileExists} "$INSTDIR\data\skills\*.*"
+    Delete "$R1\skills-sync.json"
+    FindFirst $R2 $3 "$INSTDIR\data\skills\*.*"
+    dsbSkillsLoop:
+      StrCmp $3 "" dsbSkillsEnd
+      StrCmp $3 "." dsbSkillsNext
+      StrCmp $3 ".." dsbSkillsNext
+      ${If} ${FileExists} "$INSTDIR\data\skills\$3\*.*"
+        StrCpy $5 "$INSTDIR\data\skills\$3"
+        StrCpy $6 "$R1\skills\$3"
+        ${If} ${FileExists} "$6\*.*"
+          RMDir /r "$R1\skills\$3.bak"
+          CreateDirectory "$R1\skills\$3.bak"
+          CopyFiles /SILENT "$6\*.*" "$R1\skills\$3.bak"
+        ${EndIf}
+        ClearErrors
+        RMDir /r "$6"
+        CreateDirectory "$6"
+        CopyFiles /SILENT "$5\*.*" "$6"
+        ${If} ${Errors}
+          DetailPrint "LinkBot: the skill $3 could not be moved to the data folder."
+          StrCpy $R7 1
+        ${EndIf}
+      ${EndIf}
+      dsbSkillsNext:
+      FindNext $R2 $3
+      Goto dsbSkillsLoop
+    dsbSkillsEnd:
+    FindClose $R2
+  ${EndIf}
+  ; Only when everything was moved is the installer's own data tree removed. A failed move
+  ; leaves it in place: the first start reads the factory tree from <INSTDIR>\data instead.
+  ${If} $R7 == 0
+    RMDir /r "$INSTDIR\data"
+  ${EndIf}
+  dsbDataDone:
 !macroend

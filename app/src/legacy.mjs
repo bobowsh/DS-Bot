@@ -5,6 +5,10 @@ import { join } from 'node:path'
 // The name the app had before it was renamed. It names the folders an earlier install
 // left behind, so those are still found.
 export const PRODUCT_NAME = 'DS Bot'
+// The name the interface shows the user: windows, dialogs, copy. It stays a display
+// constant on purpose — the internal product name decides the userData folder, and
+// changing it would move every existing install's data to a fresh empty directory.
+export const DISPLAY_NAME = 'LinkBot'
 // The app id of this build: it names the Windows uninstall entry and the single-instance
 // lock, so it is the one electron-builder.yml carries. It is a technical identifier, not a
 // name the user sees, so it keeps the shape it had before the product was renamed.

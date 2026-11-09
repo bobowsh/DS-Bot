@@ -12,6 +12,13 @@ files:
   - assets/**
   # The LibreOffice engine goes beside the app instead (extraResources).
   - '!node_modules/@deepseek-ai/libreoffice-kit-*{,/**/*}'
+  # Cua 的原生库不能待在 asar 里，哪怕是解包过的那份：加载方用 createRequire().resolve()
+  # 拿到 asar 内路径，existsSync 又被 Electron 的 fs 补丁骗过（对 asar 内路径也返回 true），
+  # 最后 dlopen 走不通 → "Could not open library ... os error 126"。实测同一 DLL 从
+  # app.asar.unpacked 的真实路径加载只要 6 ms，从 asar 内路径直接失败。
+  # 整个 scope 移出 asar，改由 extraResources 落到 resources/node_modules/@trycua：
+  # Node 的 node_modules 向上查找会命中真实路径，dirname 出来就是真目录。
+  - '!node_modules/@trycua/**'
 # The Host runs pnpm as a separate Node process to install plugins, and the Office payload's
 # plain Node runs the LibreOffice Kit CLI: both must be plain files outside the asar.
 asarUnpack:
@@ -21,11 +28,9 @@ asarUnpack:
   - node_modules/ds-bot/office.js
   # Automatic unpacking misses versioned Linux libraries such as libvips-cpp.so.8.18.7.
   - node_modules/@img/sharp*/**
-  # The signed "DSH Computer Use" helper and the Cua Driver binaries are programs;
-  # inside the asar they would not run, and an ad-hoc re-sign would lose DeepSeek's
-  # Developer ID signature (mac.signIgnore below keeps it).
+  # The signed "DSH Computer Use" helper keeps its DeepSeek signature; an ad-hoc re-sign would
+  # lose it (mac.signIgnore below keeps it).
   - node_modules/@deepseek-ai/dsh-experimental-cua-macos/**
-  - node_modules/@trycua/cua-driver*/**
 # The Office payload that scripts/prepare-runtime.mjs writes in beforePack (see package.json's
 # `runtime` script). build/ is not in `files`, so nothing of it lands inside the asar.
 extraResources:
@@ -41,20 +46,25 @@ extraResources:
     to: node_modules/@deepseek-ai
     filter: ['libreoffice-kit-*/**']
 
-  # The factory seed team and the bundled skills repo travel as plain directories under the
-  # app's resources, which is where the running app reads them from (src/factory.mjs uses
-  # process.resourcesPath). Both stay outside the asar: the skills repo is a git repository,
-  # and nothing reads a git dir through the archive.
+  # Cua 的原生库（cua_driver_sdk.dll 与 .node）必须是真实文件：dlopen 不走 Electron 的
+  # asar 透明层，从 app.asar 内路径加载一律 "os error 126"。上面 files 里已把整个 scope
+  # 挡在 asar 之外，这里把它放到 resources/node_modules/@trycua，让 asar 内的加载方
+  # 靠 Node 的 node_modules 向上查找命中它。
+  - from: node_modules/@trycua
+    to: node_modules/@trycua
+
+  # The factory seed team travels as a plain directory under the app's resources, which is
+  # where the running app reads it from (src/factory.mjs uses process.resourcesPath). It stays
+  # outside the asar: nothing reads it through the archive.
   - from: resources/factory
     to: factory
-  - from: resources/skills-repo
-    to: skills-repo
-  # The import plugin is not a dependency of the app: it belongs to the profile, so the user may
-  # turn it off in the plugin manager. It still travels with the installer, as one archive the
-  # first start unpacks into the profile — the install never reaches the network.
-  # The archive is made by scripts/bundled-plugin.mjs in the beforePack hook.
-  - from: build/bundled-plugins
-    to: bundled-plugins
+# The factory plugins (a DSH home tree: profiles/ds-bot/node_modules), the factory skills and
+# the factory list travel in the data directory beside the program, as plain folders. The
+# installer moves profiles/, skills/ and factory/ to the data home beside the program
+# (build/installer.nsh); when that fails the first start reads the tree from here.
+extraFiles:
+  - from: build/data
+    to: data
 # node-pty, sharp and koffi ship prebuilt binaries for each platform. A rebuild would compile
 # node-pty from source and needs a C++ toolchain.
 npmRebuild: false

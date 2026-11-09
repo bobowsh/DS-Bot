@@ -2,16 +2,20 @@
 // back to it, and the tray's Quit is the one ordinary way out. The app itself decides when
 // a close really ends it: an update, a data move, a failed start and the end of the
 // operating system's session all close the window for good.
-import { BackgroundNotice } from './background-notice.mjs'
 import { createTray } from './tray.mjs'
+import { DISPLAY_NAME } from './legacy.mjs'
 
 export const SHELL_TEXT = {
   en: {
     tooltip: 'LinkBot',
     open: 'Open LinkBot',
     quit: 'Quit LinkBot',
-    notice: 'LinkBot keeps running in the system tray. Its Bots go on working while the window is closed.',
-    noticeConfirm: 'OK',
+    closeAsk: {
+      message: 'What should happen when the window closes?',
+      toTray: 'Minimize to the system tray',
+      quit: 'Quit LinkBot',
+      cancel: 'Cancel',
+    },
     fallback: 'The system tray is not available, so LinkBot cannot stay in the background. Do you want to end it?',
     cancel: 'Cancel',
     stopAll: 'Stop all',
@@ -20,8 +24,12 @@ export const SHELL_TEXT = {
     tooltip: 'LinkBot',
     open: '打开 LinkBot',
     quit: '退出 LinkBot',
-    notice: 'LinkBot 会留在系统托盘里继续运行，关掉窗口时 Bot 们照常工作。',
-    noticeConfirm: '好',
+    closeAsk: {
+      message: '关闭窗口后要做什么？',
+      toTray: '最小化到系统托盘',
+      quit: '退出 LinkBot',
+      cancel: '取消',
+    },
     fallback: '系统托盘不可用，LinkBot 不能留在后台。要结束它吗？',
     cancel: '取消',
     stopAll: '全部停止',
@@ -34,7 +42,7 @@ export const SHELL_TEXT = {
  * @param {{
  *   electron: { app: any, Menu: any, Tray: any, powerMonitor: any },
  *   platform: string,
- *   messages: () => { tooltip: string, open: string, quit: string, notice: string, noticeConfirm: string, fallback: string, cancel: string },
+ *   messages: () => { tooltip: string, open: string, quit: string, closeAsk: { message: string, toTray: string, quit: string, cancel: string }, fallback: string, cancel: string },
  *   trayImage: () => any,
  *   window: () => any,
  *   build: () => any,
@@ -42,7 +50,7 @@ export const SHELL_TEXT = {
  *   quit: () => void,
  *   busy: () => boolean,
  *   ready: () => boolean,
- *   notice: { marker: () => string, show: (options: object) => Promise<{ response: number }> },
+ *   closeAsk: { show: (options: object) => Promise<{ response: number }> },
  *   fallback?: { show: (options: object) => Promise<{ response: number }> },
  *   log?: Pick<Console, 'warn'>,
  * }} options the pieces of the app the shell drives
@@ -52,7 +60,6 @@ export function createShell(options) {
   const { app, powerMonitor } = electron
   // The tray is kept here, so that it stays alive as long as the app runs.
   let tray
-  let notice
   // The app is on its way out: the window may close for good.
   let quitting = false
   // A quit was asked for; the app may still refuse it (a first-run dialog, a copy).
@@ -153,7 +160,7 @@ export function createShell(options) {
     const t = text()
     try {
       const { response } = await options.fallback.show({
-        type: 'question', title: 'LinkBot', message: t.fallback,
+        type: 'question', title: DISPLAY_NAME, message: t.fallback,
         buttons: [t.quit, t.cancel], defaultId: 1, cancelId: 1, noLink: true,
       })
       if (response === 0) { quit(); return }
@@ -165,7 +172,8 @@ export function createShell(options) {
   }
 
   /**
-   * The window's close: it hides, unless the app is really leaving.
+   * The window's close: with a tray it asks every time what the close should do — minimize to
+   * the tray, end the app, or nothing. Without one it asks whether the app should end.
    * @param {{ preventDefault: () => void }} event the window's close event
    */
   const close = (event) => {
@@ -178,8 +186,29 @@ export function createShell(options) {
     // Without a tray there is no way back to a hidden window, and no Quit of its own: the
     // close asks whether the app should end.
     if (tray === undefined) { void askFallback(target); return }
-    if (notice === undefined) { hide(target); return }
-    notice.close(() => { hide(target) })
+    void askClose(target)
+  }
+
+  /**
+   * The close question, asked on every window close: end the app, minimize to the tray, or
+   * leave the window as it is. Quitting is the first answer and the default one, so a press
+   * that lands on it ends the app. The quit goes through the tray's own quit, so a first-run
+   * dialog or a running copy can still refuse it.
+   * @param {any} target the window the question is about
+   */
+  const askClose = async (target) => {
+    const t = text().closeAsk
+    try {
+      const { response } = await options.closeAsk.show({
+        type: 'question', title: DISPLAY_NAME, message: t.message,
+        buttons: [t.quit, t.toTray, t.cancel], defaultId: 0, cancelId: 2, noLink: true,
+      })
+      if (response === 0) { quit(); return }
+      if (response === 1) { hide(target); return }
+    } catch (error) {
+      log.warn(`LinkBot: the close question could not be asked: ${error instanceof Error ? error.message : String(error)}`)
+    }
+    // A cancelled or failed question leaves the window where it is.
   }
 
   /** The window's own listeners. */
@@ -206,15 +235,10 @@ export function createShell(options) {
       // another application can still call the shutdown off.
       powerMonitor.on('shutdown', () => { sessionEnding = true })
     }
-    notice = new BackgroundNotice({
-      marker: options.notice.marker(), show: options.notice.show, focus: options.notice.focus, message: text().notice, confirm: text().noticeConfirm, log,
-    })
     buildTray()
   }
 
   const dispose = () => {
-    notice?.dispose()
-    notice = undefined
     tray?.dispose()
     tray = undefined
   }

@@ -1,3 +1,4 @@
+import { createElement as h } from 'react'
 import { call } from './api.js'
 import { isHex, inkText, paintCss } from './inks.js'
 import { DEFAULT_MASK, SHAPES, markupCache, maskOf } from './characters.js'
@@ -5,9 +6,10 @@ import { createSource, EMPTY_ROSTER, indexRoster, isAgentSession } from './sourc
 import { teamActions } from './team-actions.js'
 import { themeCss, shellTokens, registry, registerShape, registerTheme, allThemes, layoutOf, widthOf, flatWidthOf } from './themes.js'
 import { MENTION_ORIGIN, currentPart } from './text.js'
-import { SHELL_CSS, CONVERSATION_CSS, installStyles, installCompiledStyles } from './styles.js'
+import { BASE_CSS, SHELL_CSS, CONVERSATION_CSS, installStyles, installCompiledStyles } from './styles.js'
 import { lookOf } from './mark.js'
-import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, BotReturn, SIDEBAR_CSS, RETURN_CSS, holdShellShortcuts, openHarnessOnboarding, openHarnessSettings, MODELS_STEP, MODELS_STEP_ORDER, OpenModelsStep } from './sidebar.js'
+import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, BotReturn, SIDEBAR_CSS, RETURN_CSS, FOOTER_CSS, holdShellShortcuts, openHarnessOnboarding, openHarnessSettings, MODELS_STEP, MODELS_STEP_ORDER, OpenModelsStep } from './sidebar.js'
+import { AideFooterButton } from './aide-button.js'
 import { frameLayout, readSidebar, writeSidebar, toggledPref, DSH_NARROW } from './frame-layout.js'
 import { installFrameWatch } from './frame-watch.js'
 import { HeaderPill } from './header.js'
@@ -22,7 +24,7 @@ import { AnsweredReply, WidgetDock, WIDGET_CSS } from './widget-cell.js'
 import { HandoffDock, HANDOFF_CSS } from './handoff-card.js'
 import { AppAccessDock, ComputerHandoffDock, ComputerIndicator, COMPUTER_CSS } from './computer.js'
 import { installHeaderNavigation } from './header-navigation.js'
-import { AssistantCell, TriggerCell, TurnProcessCell, Nothing, CellEmpty, TurnTailCell, ToolCell } from './cells.js'
+import { AssistantCell, TriggerCell, Nothing, CellEmpty, TurnTailCell, TEAM_TOOLS, TeamToolView } from './cells.js'
 import { Overlays } from './overlays.js'
 import { createBotBrowsers, serveBrowserReads } from './bot-browsers.js'
 import { BROWSER_CSS } from './browser-pane.js'
@@ -37,7 +39,6 @@ import { TURN_ERROR_CSS } from './turn-error.js'
 import { GOAL_CSS } from './goal.js'
 import { GROUP_SETTINGS_CSS } from './group-settings.js'
 import { FOLDER_CSS } from './folder-menu.js'
-import { USAGE_CSS } from './usage-page.js'
 import { SCHEDULE_CSS } from './schedules.js'
 import { STORAGE, migrateStorage } from './storage.js'
 import { noteLeft, setUnread, sharedMap, toggleReaction } from './shared-map.js'
@@ -53,8 +54,9 @@ import { USER_MESSAGE_CSS, UserMessageCell, canDrawUserMessages } from './user-m
 import { QueueDock, QUEUE_CSS } from './queue-dock.js'
 import { noticeApprovals } from './approval-notices.js'
 import { listedOpener } from './open-listed.js'
+import { workDetailsToApply, workDetailsToSave } from './work-details.js'
 
-export const inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout']
+export const inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout', 'configForms']
 
 export function apply(ctx) {
   ctx.effect(() => installLocale(ctx.get('locale')), 'ds-bot: interface copy')
@@ -103,6 +105,7 @@ export function apply(ctx) {
   const leaveVisits = (ids) => {
     seenAt = seenStore.update(seen => noteLeft(seen, ids.map(seenKey), Date.now()), seenAt)
   }
+
   ctx.effect(() => {
     const onPageHide = () => leaveVisits(Object.keys(ui.getSnapshot().visits ?? {}))
     window.addEventListener('pagehide', onPageHide)
@@ -355,7 +358,7 @@ export function apply(ctx) {
       releaseTokens = ctx.theme.overrideTokens('ds-bot', shellTokens(themes[id]))
       if (typeof release === 'function') release()
       if (snapshot.ready) {
-        try { localStorage.setItem(PREFS_KEY, JSON.stringify({ theme: prefs.theme, accent: prefs.accent, motion: prefs.motion, layout: prefs.layout, width: prefs.width, flatWidth: prefs.flatWidth, thinking: prefs.thinking })) } catch { /* storage unavailable */ }
+        try { localStorage.setItem(PREFS_KEY, JSON.stringify({ theme: prefs.theme, accent: prefs.accent, motion: prefs.motion, layout: prefs.layout, width: prefs.width, flatWidth: prefs.flatWidth })) } catch { /* storage unavailable */ }
       }
     }
     render()
@@ -417,6 +420,57 @@ export function apply(ctx) {
     return frameLayout({ viewport: f.viewport, sidebarWidth: f.sidebarWidth, pref: sidebarPref.getSnapshot(), drawer: state.leftDrawer, panel: { view: view ?? state.view, yielded: state.panelYield === true } }).panel === 'folded'
   }
   const yieldBrowser = state => state.panelYield === true || panelFolded('browser')
+  // The host owns the work-details setting: how much of a turn's thinking and
+  // tool calls shows. DS Bot reads it for its settings row and writes it there,
+  // so the chat and the row never disagree.
+  const workDetails = createSource(undefined)
+  // The host's own settings namespace for the chat. It is served only when the
+  // host exposes it, so the row waits for it.
+  const chatSettings = ctx.get('configForms')?.get('ui-chat')
+  // The team's own preferences hold the choice as well, as a second place it is
+  // written to: a start reads it back and hands it to the host when the host's own
+  // layer did not keep it.
+  const savedWorkDetails = createSource(undefined)
+  if (chatSettings !== undefined) {
+    const hostMode = () => chatSettings.getSnapshot().value?.transcriptView
+    // The team's mode reaches the host once the roster answers — and only when it
+    // has one. A profile that never chose a mode keeps the host's own value; the
+    // earlier builds wrote a default on every start, and that is what made the
+    // choice in the settings page impossible to keep.
+    ctx.effect(() => {
+      const off = roster.subscribe(() => {
+        const saved = roster.getSnapshot().prefs?.workDetails
+        if (saved === undefined) return
+        savedWorkDetails.set(saved)
+        const mode = workDetailsToApply(saved, hostMode())
+        if (mode === undefined) return
+        void chatSettings.set('transcriptView', mode).catch(() => {})
+      })
+      return off
+    }, 'ds-bot: the team work details')
+    ctx.effect(() => {
+      const adopt = () => {
+        const mode = hostMode()
+        workDetails.set(mode)
+        // A mode the user picks in the settings page is the team's mode too.
+        const save = workDetailsToSave(mode, savedWorkDetails.getSnapshot())
+        if (save === undefined) return
+        savedWorkDetails.set(save)
+        void actions.setPrefs({ workDetails: save }).catch(() => {})
+      }
+      adopt()
+      return chatSettings.subscribe(adopt)
+    }, 'ds-bot: the host work details')
+  }
+  const setWorkDetails = mode => {
+    workDetails.set(mode)
+    savedWorkDetails.set(mode)
+    // The host's own field is where the chat reads it from; the team's preferences
+    // are a second place it is written to, so a start can hand it back.
+    const saved = actions.setPrefs({ workDetails: mode })
+    void chatSettings?.set('transcriptView', mode).catch(() => {})
+    return saved
+  }
   // Bot mode's view must hold a team conversation; an outside Session wears the
   // Bot skin without one. Runs whenever the surface is (or stays) Bot mode —
   // including a cold start, where no setSurface call ever fires.
@@ -440,7 +494,10 @@ export function apply(ctx) {
   }
   const actions = {
     ...teamActions({ call, after, partFor, roster, ui, live, cards, heldCards, turnClock, panelFolded }),
-    learningAnswer: (id, approve) => after(call('learning-answer', { id, approve })),
+    // The work details of the host's own chat live in the host's settings, so
+    // the row in DS Bot's own settings writes the host's field.
+    workDetails: () => workDetails.getSnapshot(),
+    setWorkDetails: mode => setWorkDetails(mode),    learningAnswer: (id, approve) => after(call('learning-answer', { id, approve })),
     // The full-pane overlays sit above the conversation, so opening one must dismiss them
     // or the click appears to do nothing.
     isAgentSession: id => isAgentSessionId(id),
@@ -772,7 +829,26 @@ export function apply(ctx) {
       else if (kind === 'letgo') void actions.computerAllowForeground(botId)
     })
   }
+  // The host's own projection values for a session: its session statistics (turns, steps,
+  // the rate it measured) and its token usage. They come from the session list's own snapshot,
+  // which is the public way to read them.
+
   const face = () => ({ actions, hooks: { roster, ui, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, frame, sidebarPref } })
+  // The face a team tool view gets: the team's own state, plus the browser and
+  // computer hooks the handover cards read.
+  const teamToolFace = sessionId => ({
+    actions,
+    sessionId,
+    hooks: {
+      roster,
+      ui,
+      work,
+      heldCards,
+      browserPages,
+      browserTabs,
+      browserHolds,
+    },
+  })
   // The queue dock's per-session verbs, supplied the way the shell's own dock
   // injects them (the session facade and the conversation service).
   const queueFace = (sessionId) => ({
@@ -795,13 +871,16 @@ export function apply(ctx) {
       if (snapshot === undefined) throw new Error('ds-bot: Chat target is unavailable')
       return snapshot.nodes.turnDataSource(Number(turn), kind)
     }
-    return { ...face(), keyedHooks: {
+    // The face's own hooks come first: the cell reads the roster from them, and a
+    // face that carries only the work-details mode leaves it without one.
+    const own = face()
+    return { ...own, keyedHooks: {
       turnSteps: ofTurn('assistant-step'),
       turnContext: ofTurn('context'),
-      // The tools of a turn, and its own token accounting, so the chat can show
-      // what the Bot ran and how fast it wrote.
-      turnTools: ofTurn('tool-call'),
-      turnTail: ofTurn('turn-tail'),
+    }, hooks: {
+      ...own.hooks,
+      // The host's own work-details mode: how much of a turn's thought shows.
+      workDetails,
     } }
   }
 
@@ -960,6 +1039,21 @@ export function apply(ctx) {
     return () => { for (const off of offs) off() }
   }
 
+  // The team's own tools ride the host's tool view slot: the host draws every
+  // call as a folded row and dispatches it by wire name, so the team keeps its
+  // own rows while every other tool falls through to the host's.
+  //
+  // The priority is what lets the team shadow a plugin that already registered
+  // the same wire name: the host refuses a second entry for a key at the same
+  // priority, and that refusal takes the whole shell group down with it, so the
+  // team interface never comes up. A lower priority wins the key.
+  const installTeamTools = () => {
+    const disposers = TEAM_TOOLS.map(key => ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
+      name: 'tool.call.toolview', key, locale: 'conversation', priority: BOT_PRIORITY, inject: sessionId => teamToolFace(sessionId),
+    }, TeamToolView)))
+    return () => { for (const dispose of disposers) dispose() }
+  }
+
   // The shell group paints the team surface around the session; the conversation
   // group re-skins the session itself. Each step returns a disposer from slots.inject,
   // so a surface change withdraws the whole group and the outlets re-render.
@@ -969,10 +1063,10 @@ export function apply(ctx) {
     () => installCompiledStyles(SECRET_CSS + CONNECTOR_CSS + CONNECTORS_PAGE_CSS, 'secrets'),
     () => installCompiledStyles(LEARNING_CSS, 'learning'),
     () => installCompiledStyles(MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + GROUP_SETTINGS_CSS + AVATAR_LIBRARY_CSS, 'models'),
-    () => installCompiledStyles(USAGE_CSS, 'usage'),
     () => installCompiledStyles(SCHEDULE_CSS, 'schedules'),
     () => installCompiledStyles(FEEDBACK_CSS, 'feedback'),
     () => installCompiledStyles(ABOUT_CSS, 'about'),
+    installTeamTools,
     () => installCompiledStyles(MEMBER_CSS, 'members'),
     () => installCompiledStyles(IM_CSS, 'im'),
     () => installCompiledStyles(GOAL_CSS, 'goal'),
@@ -986,9 +1080,6 @@ export function apply(ctx) {
     () => installFrameSync(),
     () => installTheme(),
     () => shadow('sidebar.workspaces', { priority: BOT_PRIORITY, inject: face }, TeamSidebar),
-    () => shadow('sidebar.brand.mark', { priority: BOT_PRIORITY }, BrandMark),
-    () => shadow('sidebar.brand.name', { priority: BOT_PRIORITY }, BrandName),
-    () => shadow('sidebar.footer.action', { id: 'bot-account', order: -200, inject: face }, FooterAccount),
     () => shadow('settings.trigger', { priority: BOT_PRIORITY }, YouAvatar),
     // The whale wins the seat over a shell account plugin's own launcher (the
     // Desktop's "··· More"), which comes back in Agent mode.
@@ -1003,13 +1094,15 @@ export function apply(ctx) {
     () => installCompiledStyles(CONVERSATION_CSS, 'conversation'),
     () => installCompiledStyles(TURN_ERROR_CSS, 'turn-errors'),
     () => installCompiledStyles(QUEUE_CSS, 'queue'),
+    
     () => installMentions(),
     () => installAtMenu(),
     installHeader,
     () => shadow('conversation.chat.node', { key: 'assistant-step', priority: BOT_PRIORITY, locale: 'chat', inject: assistantFace }, AssistantCell),
     () => shadow('conversation.chat.node', { key: 'turn-trigger', priority: BOT_PRIORITY, locale: 'chat', inject: face }, TriggerCell),
-    () => shadow('conversation.chat.node', { key: 'tool-call', priority: BOT_PRIORITY, locale: 'chat', inject: face }, ToolCell),
-    () => shadow('conversation.chat.node', { key: 'turn-process', priority: BOT_PRIORITY, locale: 'chat', inject: face }, TurnProcessCell),
+    // The tool rows are the host's own: DSH's tool tree draws every call as a
+    // folded row with its arguments, its result and how long it took. The team's
+    // own tools keep their rows through the host's keyed tool view slot.
     // DSH's own turn tail stays, so what other plugins add there shows, such as the
     // cards of the files a turn delivered; its copy and branch row is hidden.
     () => shadow('conversation.chat.turnTail', { id: 'bot-turn-separators', order: 1000, inject: face }, TurnTailCell),
@@ -1030,8 +1123,8 @@ export function apply(ctx) {
     // The composer carries no model picker or run statistics; a Bot's model lives
     // in its details panel.
     () => shadow('conversation.input.model', { priority: BOT_PRIORITY }, Nothing),
-    () => shadow('conversation.composer.dock', { id: 'activity', order: 0, priority: BOT_PRIORITY }, Nothing),
-    () => shadow('conversation.composer.dock', { id: 'usage', order: 1, priority: BOT_PRIORITY }, Nothing),
+    // The host's own statistics and rate pills stay: the chat shows how fast the
+    // model wrote, and the host already counts it.
     () => shadow('conversation.composer.dock', { id: 'btw', order: 2, priority: BOT_PRIORITY, inject: face }, BtwDock),
     () => shadow('conversation.input.left', { id: 'bot-plus', order: -100, inject: face }, ComposerPlus),
     () => shadow('conversation.input.right', { id: 'bot-voice', order: 100, inject: face }, ComposerVoice),
@@ -1056,9 +1149,28 @@ export function apply(ctx) {
     () => shadow('conversation.input.dock', { id: 'queue', order: 20, priority: BOT_PRIORITY, inject: queueFace }, QueueDock),
   ]
   // The return button belongs to neither group: it renders only in Agent mode.
+  // The base rules belong to neither either: the classic Agent page shows our own
+  // icons (the AIDE button, the account gear, the brand), and the shell group is
+  // not mounted there, so these must be installed outside it.
+  ctx.effect(() => installCompiledStyles(BASE_CSS, 'base'), 'ds-bot: base styles')
   ctx.effect(() => installCompiledStyles(RETURN_CSS, 'return'), 'ds-bot: return styles')
+  ctx.effect(() => installCompiledStyles(FOOTER_CSS, 'footer'), 'ds-bot: footer styles')
   ctx.effect(() => installCompiledStyles(COMPUTER_CSS, 'computer'), 'ds-bot: computer styles')
   shadow('sidebar.footer.action', { id: 'bot-return', order: -300, inject: face }, BotReturn)
+
+  // The brand belongs to neither group either: the mark and the name are ours in
+  // both surfaces, so the Agent page carries the same mark as the Bot column.
+  shadow('sidebar.brand.mark', { priority: BOT_PRIORITY }, BrandMark)
+  shadow('sidebar.brand.name', { priority: BOT_PRIORITY }, BrandName)
+
+  // The AIDE workbench's entry in the foot of the host's own sidebar (the DSH page),
+  // beside the account button. It belongs to neither group for the same reason: the
+  // classic Agent page has no Bot column, so the button there is the only way in.
+  // The same button sits in the foot of our own Bot column.
+  shadow('sidebar.footer.action', { id: 'bot-aide', order: -190, inject: face }, AideFooterButton)
+  // The account menu stands in for the shell's own footer when no plugin holds the
+  // settings seat. It is the shell's footer, so it belongs to neither group.
+  shadow('sidebar.footer.action', { id: 'bot-account', order: -200, inject: face }, FooterAccount)
 
   // The main view decides `plain`: a DSH Agent Session keeps the Bot shell but
   // withdraws the conversation replacements, so the native dsh page shows. A jump
@@ -1157,6 +1269,12 @@ export function apply(ctx) {
       verifyTimer = setTimeout(verifySidebar, 250)
     }
     const reconcile = () => {
+      const mode = surface.getSnapshot().mode
+      // Our styles reach into the shell's own footer, and some of them only make sense while
+      // the Bot column is there (the account entry sits in the foot of that column). In the
+      // classic Agent page the shell owns the footer, so those rules must not apply: mark the
+      // surface on the document and let the styles say data-bt-surface=bot.
+      if (typeof document !== 'undefined') document.documentElement.dataset.btSurface = mode
       groups.reconcile(groupsFor(surface.getSnapshot()))
       clearTimeout(verifyTimer)
       verifyAttempts = 0

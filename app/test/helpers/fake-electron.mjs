@@ -197,6 +197,16 @@ class FakeApp extends EventEmitter {
   get isInstalled() { return state.installed === true }
 }
 
+// A packaged app reads its resources from the folder beside the program. The Host's runtime
+// folder lives there, and a test reads it from the build folder of the plugin.
+if (process.resourcesPath === undefined) {
+  Object.defineProperty(process, 'resourcesPath', {
+    value: join(root, 'resources'),
+    writable: true,
+    configurable: true,
+  })
+}
+
 export const app = new FakeApp()
 
 export const BrowserWindow = FakeWindow

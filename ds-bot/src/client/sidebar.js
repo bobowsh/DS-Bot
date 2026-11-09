@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom'
 import { FishLogo } from './dsh-primitives.js'
 import { isMainOf } from './sources.js'
 import { currentPart, previewOf, relativeShort } from './text.js'
-import { PlusIcon, SearchIcon, SidebarIcon, GaugeIcon, ClockIcon, GearIcon, PinMarkIcon, ConnectorIcon, CloudDownloadIcon, SignInIcon, SignOutIcon, SlidersIcon } from './icons.js'
+import { PlusIcon, SearchIcon, SidebarIcon, GaugeIcon, ClockIcon, GearIcon, PinMarkIcon, ConnectorIcon, CloudDownloadIcon, SignInIcon, SignOutIcon, SlidersIcon, SwitchIcon } from './icons.js'
+import { AideButton } from './aide-button.js'
+import { watchAideWorkbench } from './aide-bridge.js'
 import { lookOf, MAIN_LOOK } from './characters.js'
 import { botState, BotMark, BotAvatar, RoomAvatar } from './mark.js'
 import { AgentBadge } from './agent-badge.js'
@@ -331,9 +333,15 @@ export function TeamSidebar(props) {
   // A drag of the column's edge shows where it would land, live.
   const [drag, setDrag] = useState(null)
   const mode = drag?.left ?? layout.left
+  // The AIDE workbench stands in the host's main area. While it is up, our own
+  // column has no business beside it: the user is in the workbench, not in the
+  // conversation. The column slides out and comes back when the workbench goes.
+  const [workbenchUp, setWorkbenchUp] = useState(false)
+  useEffect(() => watchAideWorkbench(setWorkbenchUp), [])
+  const shownMode = workbenchUp ? 'hidden' : mode
   // A hidden column stays mounted for its slide out; `shown` is the mode it last had.
-  const [held, leaving] = useLinger(mode === 'hidden' ? null : mode, SPRING_SHAPE.duration)
-  const shown = held ?? mode
+  const [held, leaving] = useLinger(shownMode === 'hidden' ? null : shownMode, SPRING_SHAPE.duration)
+  const shown = held ?? shownMode
   const wideContent = shown !== 'rail'
   const updated = useSessions(list => {
     const stamps = {}
@@ -360,7 +368,7 @@ export function TeamSidebar(props) {
   // as the rail and the chat stays put when it opens or closes.
   const openWidth = drag?.width ?? frameSnap.sidebarWidth
   const ourWidth = shown === 'rail' ? RAIL_WIDTH : openWidth
-  const pushed = mode === 'open' ? openWidth : mode === 'hidden' ? 0 : RAIL_WIDTH
+  const pushed = shownMode === 'open' ? openWidth : shownMode === 'hidden' ? 0 : RAIL_WIDTH
   useLayoutEffect(() => {
     if (typeof document === 'undefined') return
     chatRoom.setLeft(Math.max(0, pushed - (frameSnap.collapsedWidth ?? 0)))
@@ -584,10 +592,24 @@ export function TeamSidebar(props) {
         h('span', { className: 'bt-rail-sep', 'aria-hidden': true }))
   // The foot stands in for the shell's hidden footer: the account avatar, and on
   // the rail the new-chat button above it.
+  // The way out of the Bot team: the classic Agent page, one icon in the foot of our own
+  // column, beside the account button. It lives here rather than in a host slot because this
+  // column is ours - the host's own footer belongs to the Agent page.
+  const toAgent = h('button', {
+    type: 'button', className: 'bt-round', 'aria-label': t('Switch to classic Agent mode'), title: t('Switch to classic Agent mode'),
+    onClick: () => actions.setSurface('agent'),
+  }, h(SwitchIcon))
+  // The AIDE workbench, opened from our own column. dsh-aide listens for this event
+  // and shows its workbench; the path through the host's panel list is deliberately
+  // not taken, because selecting a panel there replaces the main area and unloads
+  // the whole session view — opening the workbench would cost a full-screen rebuild.
+  const toAide = h(AideButton, { label: t('AIDE workbench') })
   const foot = wideContent
-    ? h('div', { className: 'bt-leftcol-foot' }, h(AccountLauncher, { seat: false, actions }))
+    ? h('div', { className: 'bt-leftcol-foot' }, toAgent, toAide, h(AccountLauncher, { seat: false, actions }))
     : h('div', { className: 'bt-leftcol-foot bt-leftcol-foot-rail' },
         h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: () => actions.openNewChat('new') }, h(PlusIcon)),
+        toAgent,
+        toAide,
         h(AccountLauncher, { seat: false, actions }))
   const content = h('div', { className: wideContent ? 'bt-side' : 'bt-side bt-rail', onKeyDown: typeToSearch },
     top,
@@ -601,7 +623,7 @@ export function TeamSidebar(props) {
           : h(AgentRow, { key: entry.item.id, ...rowProps, agent: entry.item, marked: markedUnread[entry.item.id] === true })))),
     foot)
   return h(Fragment, null,
-    h(TitleToggle, { hidden: mode === 'hidden', onToggle }),
+    h(TitleToggle, { hidden: shownMode === 'hidden', onToggle }),
     shown === 'hidden' ? null : h(LeftColumn, { mode: shown, width: ourWidth, onGrip: startDrag, leaving }, content))
 }
 
@@ -1056,17 +1078,20 @@ export function FooterAccount(props) {
 
 // The only entry registered in every mode: in Agent mode the whole Bot surface is
 // withdrawn, and this button in the shell's own footer is the way back.
-export function BotReturn({ wide, useSurface, useRoster, actions }) {
+export function BotReturn({ useSurface, useRoster, actions }) {
   const mode = useSurface(value => value.mode)
   const ready = useRoster(value => value.ready)
   // Agent mode draws no team sidebar; there this button is the team interface.
   useReportReady(mode === 'agent' && ready)
   if (mode !== 'agent') return null
+  // The foot of the column carries icons only: the word beside the mark would be the only
+  // text in a row of icons, and the mark is the same one the column's top carries.
   return h('button', { type: 'button', className: 'bt-return', 'aria-label': t('LinkBot'), title: t('LinkBot'), onClick: () => actions.setSurface('bot') },
-    h(BotMark, { look: MAIN_LOOK, size: 20 }),
-    wide ? h('span', { className: 'bt-return-name' }, t('LinkBot')) : null)
+    h(BotMark, { look: MAIN_LOOK, size: 20 }))
 }
 
+// The one switch between the two surfaces: the Bot team and the classic Agent page.
+// Bot mode offers the way in, Agent mode the way back — the same click, either way.
 // Agent mode has none of the shell-group styles, so the return button carries its own.
 export const RETURN_CSS = `
 .bt-return{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:0;border-radius:999px;background:none;color:inherit;font:inherit;font-size:14px;line-height:20px;cursor:pointer;transition:background-color .12s ease}
@@ -1076,14 +1101,24 @@ export const RETURN_CSS = `
 .bt-return .bt-mark svg{width:100%;height:100%;overflow:visible}
 /* Shell styles carry --bt-ink-deepseek and Agent mode withdraws them; pin it here. */
 .bt-return .bt-mark{--bt-ink-deepseek:#4D6BFE}
-.bt-return-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+`
+
+// The host's own footer holds a row of entries: the account button, the AIDE button, the
+// import button and the settings trigger. The user reads that row as a row of icons, so
+// the words beside them go: the font size of the row's buttons drops to zero, which
+// takes the text with it and leaves the icons — which carry their own size — alone.
+export const FOOTER_CSS = `
+[class*="_footArea"] button{font-size:0!important;gap:0!important}
+[class*="_footArea"] button svg{font-size:14px}
+[class*="_footArea"] button>span{font-size:0!important}
+[class*="_footArea"] button[class*="_trigger"]{padding:0 6px!important}
 `
 
 export function BrandMark({ size = 24 }) {
   return h('span', { className: 'bt-brand-whale' }, h(BotMark, { look: MAIN_LOOK, size }))
 }
 export function BrandName() {
-  return h('span', { style: { fontWeight: 600, fontSize: 14 } }, 'LinkBot')
+  return h('span', { className: 'bt-brand-name' }, 'LinkHarness 智能工作台')
 }
 
 // With the whale holding the settings seat, the Bot row is just the account menu;
@@ -1105,10 +1140,15 @@ export const SIDEBAR_CSS = `
 .bt-rail .bt-row{position:relative}
 .bt-rail .bt-pin{position:absolute;top:1px;left:calc(50% + 14px)}
 .bt-side .bt-read-only{margin:4px 8px 6px;padding:8px 10px;border-radius:10px;background:var(--bt-hover);font-size:12px;line-height:1.45;text-align:left}
-[class*="_footArea"]:has(.bt-foot-account){grid-template-columns:auto minmax(0,1fr) auto;column-gap:6px}
-[class*="_footArea"]>[class*="_footerActions"]>div>.bt-foot-account{grid-column:1;order:1;display:inline-flex}
-[class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{grid-column:3}
-[class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
+/* The account entry sits in the foot of our own column, whose three-column grid puts it first
+   and keeps the shell's settings trigger last. The classic Agent page has no Bot column, so
+   there the shell's own footer keeps its own layout: these rules only apply while the Bot
+   surface is up (data-bt-surface is set on the document root). The icon itself stays in both
+   surfaces — only the layout around it changes. */
+:root[data-bt-surface=bot] [class*="_footArea"]:has(.bt-foot-account){grid-template-columns:auto minmax(0,1fr) auto;column-gap:6px}
+:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_footerActions"]>div>.bt-foot-account{grid-column:1;order:1;display:inline-flex}
+:root[data-bt-surface=bot] [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{grid-column:3}
+:root[data-bt-surface=bot] [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
 
 /* The update cloud springs in when a newer LinkBot shows up; its arrow drops in a
    loop while the install runs. */

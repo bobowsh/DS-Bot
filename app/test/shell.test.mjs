@@ -31,18 +31,16 @@ class FakeWindow extends EventEmitter {
   minimize() { this.minimized = true }
 }
 
-// The notice answers in its own turn; the tests wait for it.
+// The close question answers in its own turn; the tests wait for it.
 const settle = () => new Promise(resolve => setImmediate(resolve))
 
-function harness({ platform = 'win32', trayFails = false, busy = false, ready = true, answer = 0, acknowledged = true, fallbackAnswer = 1 } = {}) {
+function harness({ platform = 'win32', trayFails = false, busy = false, ready = true, answer = 0, fallbackAnswer = 1 } = {}) {
   const app = new EventEmitter()
   const powerMonitor = new EventEmitter()
   const trays = []
   const menus = []
   const calls = { quit: 0, build: 0, reveal: 0 }
   const folder = mkdtempSync(join(tmpdir(), 'ds-bot-shell-'))
-  const marker = join(folder, 'acknowledged')
-  if (acknowledged) writeFileSync(marker, '')
   const asked = []
   const questions = []
   let window = new FakeWindow()
@@ -62,7 +60,8 @@ function harness({ platform = 'win32', trayFails = false, busy = false, ready = 
     },
     platform,
     messages: () => ({
-      tooltip: 'LinkBot', open: 'Open', quit: 'Quit', notice: 'The app goes on.', noticeConfirm: 'OK',
+      tooltip: 'LinkBot', open: 'Open', quit: 'Quit',
+      closeAsk: { message: 'What should happen when the window closes?', toTray: 'Minimize to the system tray', quit: 'Quit LinkBot', cancel: 'Cancel' },
       fallback: 'The system tray is not available, so the app cannot stay in the background. Do you want to end it?', cancel: 'Cancel',
     }),
     trayImage: () => {
@@ -80,10 +79,8 @@ function harness({ platform = 'win32', trayFails = false, busy = false, ready = 
     quit: () => { calls.quit += 1 },
     busy: () => busy,
     ready: () => ready,
-    notice: {
-      marker: () => marker,
-      show: async (options) => { asked.push(options); return { response: answer } },
-    },
+    // Every close asks: minimize to the tray, end the app, or leave the window as it is.
+    closeAsk: { show: async (options) => { asked.push(options); return { response: answer } } },
     // Without a tray the close asks whether the app should end.
     fallback: { show: async (options) => { questions.push(options); return { response: fallbackAnswer } } },
     log: { warn: () => {} },
@@ -99,7 +96,6 @@ function harness({ platform = 'win32', trayFails = false, busy = false, ready = 
     calls,
     asked,
     questions,
-    marker,
     cleanup: () => rmSync(folder, { recursive: true, force: true }),
     window: () => window,
     close: () => {
@@ -111,46 +107,46 @@ function harness({ platform = 'win32', trayFails = false, busy = false, ready = 
 }
 
 describe('the window and the tray', () => {
-  test('a normal close hides the window; the app goes on', (t) => {
-    const app = harness()
+  test('a close asks what to do, and the tray answer hides the window', async (t) => {
+    const app = harness({ answer: 1 })
     t.after(app.cleanup)
     assert.equal(app.close(), true, 'the close is held')
+    await settle()
+    assert.equal(app.asked.length, 1, 'the question is asked')
+    assert.equal(app.asked[0].buttons.length, 3, 'it offers three answers')
+    assert.equal(app.asked[0].defaultId, 0, 'quitting is the default')
     assert.equal(app.window().visible, false, 'the window is hidden')
     assert.equal(app.calls.quit, 0, 'the app is still running')
   })
 
-  test('the first close asks once, and a cancelled answer leaves the window visible', async (t) => {
-    const app = harness({ acknowledged: false, answer: -1 })
+  test('the quit answer ends the app', async (t) => {
+    const app = harness({ answer: 0 })
     t.after(app.cleanup)
     app.close()
     await settle()
-    assert.equal(app.asked.length, 1, 'the notice is shown')
-    assert.equal(app.asked[0].cancelId, -1, 'the notice can be called off')
+    assert.equal(app.calls.quit, 1, 'the app ends when the user says so')
+    assert.equal(app.window().visible, true, 'the window is not hidden')
+  })
+
+  test('a cancelled answer leaves the window visible', async (t) => {
+    const app = harness({ answer: 2 })
+    t.after(app.cleanup)
+    app.close()
+    await settle()
+    assert.equal(app.asked.length, 1, 'the question is shown')
     assert.equal(app.window().visible, true, 'the window stays where it is')
     assert.equal(app.calls.quit, 0, 'the app is still running')
   })
 
-  test('an answered notice hides the window and is remembered', async (t) => {
-    const app = harness({ acknowledged: false })
+  test('every close asks again; the answer is not remembered', async (t) => {
+    const app = harness({ answer: 1 })
     t.after(app.cleanup)
     app.close()
     await settle()
-    assert.equal(app.window().visible, false, 'the window is hidden')
-    assert.equal(existsSync(app.marker), true, 'the answer is kept')
-    // The next close hides the window without another box.
     app.close()
     await settle()
-    assert.equal(app.asked.length, 1, 'the notice is not shown again')
+    assert.equal(app.asked.length, 2, 'the question is asked on every close')
     assert.equal(app.window().visible, false)
-  })
-
-  test('two closes while the box is open ask once', async (t) => {
-    const app = harness({ acknowledged: false })
-    t.after(app.cleanup)
-    app.close()
-    app.close()
-    await settle()
-    assert.equal(app.asked.length, 1, 'the notice is shown once')
   })
 
   test('a close during an import or a data move ends the app instead of hiding', async (t) => {
@@ -158,14 +154,15 @@ describe('the window and the tray', () => {
     t.after(app.cleanup)
     app.close()
     assert.equal(app.calls.quit, 1, 'the copy is cancelled and the app ends')
-    assert.equal(app.asked.length, 0, 'the notice is not shown')
+    assert.equal(app.asked.length, 0, 'the question is not shown')
     assert.equal(app.window().visible, true, 'the window is not hidden')
   })
 
-  test('the tray opens the window again', (t) => {
-    const app = harness()
+  test('the tray opens the window again', async (t) => {
+    const app = harness({ answer: 1 })
     t.after(app.cleanup)
     app.close()
+    await settle()
     assert.equal(app.window().visible, false)
     app.trays[0].click()
     assert.equal(app.window().visible, true, 'the window is back')
@@ -255,21 +252,23 @@ describe('the window and the tray', () => {
     assert.equal(app.window().visible, true, 'the window is not hidden')
   })
 
-  test('a cancelled macOS shutdown leaves the app running', (t) => {
-    const app = harness({ platform: 'darwin' })
+  test('a cancelled macOS shutdown leaves the app running', async (t) => {
+    const app = harness({ platform: 'darwin', answer: 1 })
     t.after(app.cleanup)
     app.powerMonitor.emit('shutdown')
     assert.equal(app.close(), false, 'the window closes for good')
     // Another application called the shutdown off; the user comes back to the window.
     app.window().emit('focus')
     assert.equal(app.close(), true, 'the window hides again')
+    await settle()
     assert.equal(app.window().visible, false)
   })
 
-  test('on macOS the Dock icon opens the window, and a fullscreen window leaves fullscreen first', (t) => {
-    const app = harness({ platform: 'darwin' })
+  test('on macOS the Dock icon opens the window, and a fullscreen window leaves fullscreen first', async (t) => {
+    const app = harness({ platform: 'darwin', answer: 1 })
     t.after(app.cleanup)
     app.close()
+    await settle()
     assert.equal(app.window().visible, false)
     app.app.emit('activate')
     assert.equal(app.window().visible, true, 'the window is back')
@@ -277,6 +276,7 @@ describe('the window and the tray', () => {
     const window = app.window()
     window.fullScreen = true
     app.close()
+    await settle()
     assert.equal(window.fullScreen, false, 'the window left fullscreen')
     assert.equal(window.visible, false, 'the window is hidden after it')
   })
@@ -290,13 +290,14 @@ describe('the window and the tray', () => {
     assert.equal(app.calls.reveal, 1, 'the menu opens it')
   })
 
-  test('a window that is opened again while it leaves fullscreen stays', (t) => {
-    const app = harness({ platform: 'darwin' })
+  test('a window that is opened again while it leaves fullscreen stays', async (t) => {
+    const app = harness({ platform: 'darwin', answer: 1 })
     t.after(app.cleanup)
     const window = app.window()
     window.fullScreen = true
     window.deferFullScreen = true
     app.close()
+    await settle()
     assert.equal(window.visible, true, 'the window waits for the fullscreen to end')
     // The tray opens the window again before the fullscreen has ended.
     app.menus.at(-1)[0].click()

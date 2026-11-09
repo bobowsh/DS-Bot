@@ -338,7 +338,8 @@ const showing = rules.filter(rule => /display:inline-flex/.test(rule.body))
 function shell({ platform, collapsed }) {
   const darwin = platform === 'mac'
   const toggle = '<button class="x_iconButton x_toggle" aria-label="Toggle sidebar"></button>'
-  const html = `<!doctype html><html${platform === 'windows' ? ' data-windows-titlebar' : ''}${darwin ? ' data-platform="darwin"' : ''}><body>
+  // This is the Bot surface's shell: the footer rules that lay it out only apply there.
+  const html = `<!doctype html><html data-bt-surface="bot"${platform === 'windows' ? ' data-windows-titlebar' : ''}${darwin ? ' data-platform="darwin"' : ''}><body>
     <div${collapsed ? ' data-sidebar-collapsed="true"' : ''}>
       <div class="x_root${collapsed ? ' x_collapsed' : ''}">
         ${darwin ? `<div class="x_topStrip">${toggle}</div>` : ''}
@@ -488,7 +489,9 @@ test('the shell footer is a grid wherever the shell shows it', () => {
 // #452: the footer lost its Connect plugins button; the account menu and the
 // entries other plugins add keep the places they had.
 test('the Bot footer lays out the account, another plugin\'s entry and the settings trigger', () => {
-  const html = `<!doctype html><html><body><div class="x_root"><div class="x_footArea">
+  // The Bot column's footer rules only apply while the Bot surface is up: the classic Agent
+  // page has no Bot column, and there the shell keeps its own footer layout.
+  const html = `<!doctype html><html data-bt-surface="bot"><body><div class="x_root"><div class="x_footArea">
     <div class="x_footerActions">
       <div><span class="bt-foot-account"></span></div>
       <div><span class="x_other-plugin"></span></div>
@@ -523,11 +526,17 @@ test('the rail spaces its icons on the open column\'s rhythm', () => {
 })
 
 // #452: the Connect plugins button left the footer; what DS Bot puts there is
-// the account menu and the way back from Agent mode.
-test('the Bot footer holds the account and the return button only', () => {
+// the account menu, the AIDE workbench entry, and the way back from Agent mode.
+// The way out to the classic Agent page is an icon in the foot of our own column,
+// not a host slot.
+test('the Bot footer holds the account, the AIDE entry and the return button', () => {
   const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
   const ids = [...source.matchAll(/shadow\('sidebar\.footer\.action',\s*\{[^}]*?id:\s*['"]([^'"]+)['"]/g)].map(match => match[1])
-  assert.deepEqual(ids.sort(), ['bot-account', 'bot-return'])
+  assert.deepEqual(ids.sort(), ['bot-account', 'bot-aide', 'bot-return'])
+  // The way out of the Bot team sits in the column's own foot, beside the account.
+  const sidebar = readFileSync(new URL('../src/client/sidebar.js', import.meta.url), 'utf8')
+  assert.match(sidebar, /className: 'bt-leftcol-foot'[^]*?toAgent/u)
+  assert.match(sidebar, /t\('Switch to classic Agent mode'\)/u)
 })
 
 // The edge drag writes the column and the chat's margins straight into the page, so these

@@ -59,7 +59,6 @@ test('apply registers listeners and effects in a fixed order', (t) => {
     'on agent/created',
     'on system-prompt/assemble',
     'on session/event',
-    'on tools/execute',
     'effect ds-bot: chat index',
     'effect ds-bot: group step lines',
     'on llm/stream',
@@ -173,14 +172,11 @@ test('the client channel answers from the saved state', async (t) => {
   assert.equal((await call('set-prefs', { flatWidth: 70 })).value.flatWidth, 70)
   assert.equal('flatWidth' in (await call('set-prefs', { flatWidth: 100 })).value, false)
   assert.deepEqual((await call('set-prefs', { flatWidth: 40 })).error, { code: 'bot/invalid', message: 'Flat text width must be a whole percent from 50 to 100', details: {} })
-  // The thinking switch stores only true; false, null and unknown values leave nothing.
-  assert.equal('thinking' in (await call('set-prefs', { thinking: 'yes' })).value, false)
-  assert.equal('thinking' in (await call('set-prefs', { thinking: 1 })).value, false)
+  // The switch that shows a settled thought is the user's own again: unset, the
+  // work-details mode decides it, and a switch of their own wins over the mode.
   assert.equal((await call('set-prefs', { thinking: true })).value.thinking, true)
-  assert.equal((await call('set-prefs', { thinking: 'yes' })).value.thinking, true)
-  assert.equal('thinking' in (await call('set-prefs', { thinking: false })).value, false)
-  await call('set-prefs', { thinking: true })
-  assert.equal('thinking' in (await call('set-prefs', { thinking: null })).value, false)
+  assert.equal((await call('set-prefs', { thinking: false })).value.thinking, false)
+  assert.equal('thinking' in (await call('set-prefs', { thinking: null })).value, false, 'the switch is unset again')
   // Enter sends by default; false persists until the user turns it back on.
   assert.equal((await call('set-prefs', { enterToSend: false })).value.enterToSend, false)
   assert.equal((await call('set-prefs', { enterToSend: 'no' })).value.enterToSend, false)
