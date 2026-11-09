@@ -9,6 +9,7 @@ import { absoluteLinks } from './links.js'
 import { NAME_MAX } from './requests.js'
 import { unquote } from './text.js'
 import { mentionSpans } from '../shared/mentions.js'
+import { readTool } from './fs-read-tool.js'
 import { checkShownView, showViewDescription, showViewParameters } from 'deep-view/core'
 
 export const output = { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] }
@@ -70,6 +71,16 @@ export function install(rt) {
   }
   // Main Bots see every group; other Bots see the groups they are in.
   const visibleRooms = self => Object.values(state.rooms).filter(room => rt.isMain(self) || room.members.includes(self))
+
+  // The Bot's own read: it shadows the host's UTF-8 one inside the Bot's scope and
+  // serves the encodings the host cannot decode. It delegates to the host first,
+  // so a plain UTF-8 file keeps the host's behaviour exactly.
+  //
+  // It is not a team tool: it takes the name of a host tool on purpose, so it
+  // has to be scoped rather than pushed onto rt.teamTools — a team tool is
+  // listed by name in TEAM_TOOLS, and this one joins the Bot's scope beside
+  // them, shadowing the global read there.
+  rt.scopeShadows = [readTool(rt)]
 
   rt.teamTools.push(defineTool({
     name: 'list_bots',
@@ -820,8 +831,13 @@ export function install(rt) {
     const disposers = []
     const failed = []
     const registered = []
-    for (const def of [...rt.teamTools, ...(localBot ? (rt.localAgentTools ?? []) : [])]) {
-      if (relayOnly && def.name !== 'group_relay') continue
+    // The scope shadows join a Bot's own scope: they take the name of a host
+    // tool on purpose and shadow it there. A group's own Session gets the
+    // relay alone, so it gets no shadow either.
+    const scopeTools = relayOnly
+      ? rt.teamTools.filter(def => def.name === 'group_relay')
+      : [...rt.teamTools, ...(rt.scopeShadows ?? []), ...(localBot ? (rt.localAgentTools ?? []) : [])]
+    for (const def of scopeTools) {
       try {
         const dispose = agent.ctx.tools.register(def)
         if (typeof dispose === 'function') {
