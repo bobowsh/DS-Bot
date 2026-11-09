@@ -226,10 +226,12 @@ try {
   // Open a Bot's chat: the composer's dock only mounts with a session behind it.
   const opened = await cdp.call('Runtime.evaluate', {
     expression: `(() => {
-      const row = document.querySelector('[data-bot-id]') || document.querySelector('[data-room-id]')
+      const wanted = ${JSON.stringify(process.env.PROBE_OPEN ?? '')}
+      const rows = [...document.querySelectorAll('[data-bot-id]')]
+      const row = wanted ? rows.find(r => (r.getAttribute('aria-label') ?? '').includes(wanted)) : rows[0]
       if (!row) return 'no row'
       row.click()
-      return 'clicked ' + (row.getAttribute('data-bot-id') ?? row.getAttribute('data-room-id') ?? '')
+      return 'clicked ' + (row.getAttribute('aria-label') ?? row.getAttribute('data-bot-id') ?? '')
     })()`,
     returnByValue: true,
   })
@@ -263,6 +265,31 @@ try {
     })
     await sleep(wait * 1000)
   }
+  // The host's own session list: each row carries the projection hints the pills
+  // read. The page is already authenticated, so it can ask for them.
+  const hostSessions = await cdp.call('Runtime.evaluate', {
+    expression: `(async () => {
+      try {
+        const r = await fetch('/api/sessions')
+        const j = await r.json()
+        const items = j?.items ?? j?.sessions ?? []
+        return JSON.stringify({
+          status: r.status,
+          count: items.length,
+          rows: items.slice(0, 8).map(s => ({
+            id: s.sessionId ?? s.id,
+            title: String(s.title ?? '').slice(0, 24),
+            projectionKeys: s.projections?.values ? Object.keys(s.projections.values) : undefined,
+            tokenUsage: s.projections?.values?.tokenUsage,
+          })),
+        })
+      } catch (e) { return JSON.stringify({ error: String(e) }) }
+    })()`,
+    awaitPromise: true,
+    returnByValue: true,
+  })
+  console.log(`host sessions: ${String(hostSessions?.result?.value ?? '')}`)
+
   const { result } = await cdp.call('Runtime.evaluate', { expression: PROBE, returnByValue: true })
   console.log(`probe: ${String(result.value)}`)
   if (out !== undefined) {
