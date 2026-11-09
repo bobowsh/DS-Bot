@@ -16,12 +16,12 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { canonicalExecPath } from './canonical-path.mjs'
 import { disk } from './copy-tree.mjs'
-import { configureIdentity } from './legacy.mjs'
+import { configureIdentity, DISPLAY_NAME } from './legacy.mjs'
 import { hostPort } from './host-port.mjs'
 import { captureStdio, LogFile } from './logs.mjs'
 import { Pickers } from './picker-host.mjs'
 import { currentRootOf, driveOf, formatBytes, freeSpace, isEmptyTree, pickFrom, placeOf, rootOf, runningLow } from './place.mjs'
-import { bundledPlugins, findBundledPlugin } from './bundled-plugins.mjs'
+import { bundledPlugins, factoryDisabledPlugins, findBundledPlugin } from './bundled-plugins.mjs'
 import { createShell, SHELL_TEXT } from './shell.mjs'
 import { readStartFrame, writeStartFrame } from './start-frame.mjs'
 import { explainOf, StartWindow } from './start-window.mjs'
@@ -85,7 +85,7 @@ let BotBrowserGuests, partitionOf, BotViews, isBotId, importFromBrowser, listSou
 let downloadSaver, chooseLocations, defaultPlaces, lang, pickerLabels, pickRoot, programFolder, saveLocations, teamIn, teamsAt, tx, HostProcess
 let copySessions, findTeam, importTeam, restoreSessions, teamInUse, teamSizes, userDshHome, copyData, copyReason, moveProblem, CHECK_PROFILE, PROFILE, DSHM_REGISTRY_URL, ImportFlow
 let watchReleases, watchUpdates, RELEASE_PAGE, getDshRuntimeVersion, electronUpdater
-let installFactoryResources, pullSkillsRepo, removeDshHomeVariableWithNotice
+let installFactoryResources, removeDshHomeVariableWithNotice
 let installImportPlugin
 
 /**
@@ -189,10 +189,9 @@ const shell = createShell({
   // Before the first run has chosen its places there is no window to show, and before the
   // first load of the Host there is no address to load.
   ready: () => places !== undefined && origin !== undefined && bootstrap !== undefined,
-  // The one-time notice is a card in the team window; a page that cannot show it lets the window
-  // go to the tray, which is what the notice would have said.
-  // A second close while the card is up brings the window, and so the card, to the front.
-  notice: { marker: () => join(app.getPath('userData'), 'tray-close-acknowledged'), show: options => boxInWindow(options, 0), focus: () => { toFront(mainWindow) } },
+  // The close question is a card in the team window; a page that cannot show it lets the window
+  // stay, which is what a cancelled answer means.
+  closeAsk: { show: options => boxInWindow(options, options.cancelId) },
   // Without a tray the close asks whether the app should end; unasked, the window minimizes.
   fallback: { show: options => boxInWindow(options, options.cancelId) },
 })
@@ -212,7 +211,7 @@ if (canonical !== undefined) {
   logs = new LogFile({ dir: join(app.getPath('userData'), 'logs') })
   rawOutput = captureStdio(logs)
   app.once('will-quit', () => { logs.flush() })
-  console.log(`DS Bot ${app.getVersion()} (${process.platform} ${process.arch}), Electron ${process.versions.electron}`)
+  console.log(`LinkBot ${app.getVersion()} (${process.platform} ${process.arch}), Electron ${process.versions.electron}`)
   startWindow = new StartWindow({
     electron: { BrowserWindow, ipcMain, screen, shell: electronShell, clipboard, nativeTheme, systemPreferences },
     // 〔保存日志…〕 on the start window's failure cards.
@@ -352,7 +351,7 @@ async function loadModules() {
   ;({ CHECK_PROFILE, PROFILE, DSHM_REGISTRY_URL } = profile)
   ;({ watchReleases, watchUpdates, RELEASE_PAGE } = updatesModule)
   ;({ getDshRuntimeVersion } = boot)
-  ;({ installFactoryResources, pullSkillsRepo } = factory)
+  ;({ installFactoryResources } = factory)
   ;({ removeDshHomeVariableWithNotice } = autoImports)
   ;({ installImportPlugin } = importPlugin)
   electronUpdater = updater.default
@@ -472,23 +471,27 @@ async function boot(mine) {
   // bundle list. A plugin turned off stays off: installImportPlugin reads the profile's own
   // manifest and does not put a bundle back into a list the user removed it from.
   const factoryHome = bundledDataHome(places.dataDir)
+  // A plugin the factory ships turned off is put in place but not into the bundle list, so the
+  // Host does not load it until the user turns it on. The list comes from the build's manifest.
+  const turnedOff = new Set(factoryDisabledPlugins(factoryHome).map(entry => entry.name))
   for (const entry of bundledPlugins(factoryHome)) {
     await installImportPlugin({
       profileDir: profileDir(),
       folder: entry.folder,
       name: entry.name,
       version: entry.version,
+      disabledByDefault: turnedOff.has(entry.name),
     }).catch(error => { console.error(`LinkBot: the plugin ${entry.name} was not put in place:`, error) })
   }
-  // The factory seed and the bundled skills repo land before the Host starts: ds-bot builds
-  // the seeded team at its startup, and reads the seed file from the data location. It runs
-  // off the ready path so a slow disk or a shared folder can never hold the window back;
-  // ds-bot waits for the seed file itself (it retries on the first Bot start).
+  // The factory seed lands before the Host starts: ds-bot builds the seeded team at its
+  // startup, and reads the seed file from the data location. It runs off the ready path so a
+  // slow disk or a shared folder can never hold the window back; ds-bot waits for the seed
+  // file itself (it retries on the first Bot start). The factory skills and plugins need no
+  // first-start step: they travel inside the data tree the installer puts in place.
   setImmediate(() => {
     void installFactoryResources({ dataDir: places.dataDir, resourcesDir: resourcesDir() })
       .catch(error => { console.error('LinkBot: the factory resources were not put in place:', error) })
   })
-  setImmediate(() => { void pullSkillsRepo({ dataDir: places.dataDir, resourcesDir: resourcesDir() }) })
   // The factory plugins update themselves after 22:00: the app asks the intranet catalog what
   // they have become and puts the newer ones in place. The Host runs them, so the new copy
   // takes effect on the next start; the reader is told so.
@@ -502,7 +505,7 @@ async function boot(mine) {
   // version moved ahead of the last sync is downloaded over the local copy. It runs off the
   // ready path so a slow SkillHub can never hold the window back.
   setImmediate(() => {
-    watchFactorySkills({ dataDir: places.dataDir, repoDirOf: () => join(places.dataDir, 'skills-repo') })
+    watchFactorySkills({ dataDir: places.dataDir, repoDirOf: () => join(places.dataDir, 'skills') })
   })
   startWindow.done('data')
   const engine = await startEngine(mine)
@@ -587,7 +590,7 @@ async function pickAndPlace() {
     return
   }
   if (root.reason !== undefined) {
-    console.log(`DS Bot: the place ${root.at} cannot be used (${root.reason})`)
+    console.log(`LinkBot: the place ${root.at} cannot be used (${root.reason})`)
     proposed = undefined
     startWindow.card({ kind: 'rejected', reason: root.reason, path: root.at })
     return
@@ -630,7 +633,7 @@ async function startOver(root) {
     if (stopping || mine !== attempt) return
     setPlaces({ dataDir: root.dataDir, workspace: root.workspace })
     saveLocations(places)
-    console.log(`DS Bot: the data goes to ${places.dataDir}`)
+    console.log(`LinkBot: the data goes to ${places.dataDir}`)
   } finally {
     restarting = false
   }
@@ -652,6 +655,31 @@ async function removeMade() {
 const profileDir = () => join(places.dataDir, 'profiles', PROFILE)
 const pnpmEntry = () => join(app.getAppPath(), 'node_modules', 'pnpm', 'bin', 'pnpm.mjs')
 const runtimeDir = () => app.isPackaged ? process.resourcesPath : join(here, '..', 'build', 'runtime')
+
+// The language servers the app ships: the folders their executables live in. They are put on the
+// Host's PATH, so an editor plugin that looks for a server on the PATH finds the one that
+// travels with the app (a language server is a native program, so it cannot be imported).
+const languageServerDirs = () => {
+  const root = join(places.dataDir, 'lsp')
+  const dirs = []
+  for (const entry of existsSync(root) ? readdirSync(root, { withFileTypes: true }) : []) {
+    if (!entry.isDirectory()) continue
+    const bin = join(root, entry.name, 'bin')
+    if (existsSync(bin)) dirs.push(bin)
+  }
+  return dirs
+}
+
+// The PATH the Host runs with: the language servers the app ships come first, then the node
+// they may need (a server written in JavaScript is a script and needs a node to run it), then
+// the PATH the app itself was started with.
+function hostPath() {
+  const extra = [...languageServerDirs()]
+  const nodeBin = join(runtimeDir(), 'dependencies', 'node', 'bin')
+  if (existsSync(nodeBin)) extra.push(nodeBin)
+  return [...extra, process.env.PATH ?? ''].filter(part => part !== '').join(';')
+}
+
 const hostOutput = (stream, chunk) => {
   logs.write('engine', chunk)
   rawOutput[stream](chunk)
@@ -663,7 +691,7 @@ function newHost() {
   return new HostProcess({
     entry: join(here, 'host.mjs'),
     cwd: profileDir(),
-    env: { ...process.env, DSH_HOME: places.dataDir, DS_BOT_PORT: String(port), DS_BOT_APP: '1', DS_BOT_USER_DSH_HOME: userDshHome(), DS_BOT_FACTORY_RESOURCES: resourcesDir(), DS_BOT_RUNTIME_DIR: runtimeDir(), DSHM_REGISTRY_URL, ...(places.workspace ? { DS_BOT_WORKSPACE: places.workspace } : {}) },
+    env: { ...process.env, PATH: hostPath(), DSH_HOME: places.dataDir, DS_BOT_PORT: String(port), DS_BOT_APP: '1', DS_BOT_USER_DSH_HOME: userDshHome(), DS_BOT_FACTORY_RESOURCES: resourcesDir(), DS_BOT_RUNTIME_DIR: runtimeDir(), DSHM_REGISTRY_URL, ...(places.workspace ? { DS_BOT_WORKSPACE: places.workspace } : {}) },
     pnpm: pnpmEntry(),
     onFailure: (error) => { if (mine === attempt) void fail(error) },
     output: hostOutput,
@@ -700,9 +728,9 @@ async function startEngine(mine) {
   // taken has nothing left out.
   if (warm === undefined) {
     await restoreSessions(places.dataDir).then(({ copied, newer }) => {
-      if (copied.length > 0) console.log(`DS Bot: copied ${copied.join(', ')}, which the import left out`)
-      if (newer.length > 0) console.warn(`DS Bot: this DSH cannot read ${newer.join(', ')}, which the import left out`)
-    }, (error) => { console.error('DS Bot: the Sessions the import left out were not copied:', error) })
+      if (copied.length > 0) console.log(`LinkBot: copied ${copied.join(', ')}, which the import left out`)
+      if (newer.length > 0) console.warn(`LinkBot: this DSH cannot read ${newer.join(', ')}, which the import left out`)
+    }, (error) => { console.error('LinkBot: the Sessions the import left out were not copied:', error) })
   }
   host = warm?.host ?? newHost()
   host.onMessage(message => {
@@ -793,7 +821,7 @@ async function importStep(mine) {
   if (result.outcome === 'copied') {
     startWindow.done('import')
     const { summary } = result
-    console.log(`DS Bot: copied ${String(summary.bots)} Bots and ${String(summary.sessions)} Sessions from ${summary.from}`)
+    console.log(`LinkBot: copied ${String(summary.bots)} Bots and ${String(summary.sessions)} Sessions from ${summary.from}`)
     // The team lives here now; moving it is Settings' job (the data move).
     startWindow.place(undefined)
     return {}
@@ -815,7 +843,7 @@ async function importElsewhere(signal) {
     const root = rootOf(picked, { dshHome: userDshHome(), program: app.isPackaged ? programFolder() : undefined, current: places })
     if (root.same) return false
     if (root.reason !== undefined) {
-      console.log(`DS Bot: the place ${root.at} cannot be used (${root.reason})`)
+      console.log(`LinkBot: the place ${root.at} cannot be used (${root.reason})`)
       if (await askCard({ kind: 'rejected', reason: root.reason, path: root.at }, { signal }) === 'pick') continue
       return false
     }
@@ -925,7 +953,7 @@ function handleIpc() {
   ipcMain.handle(IPC.browserImportLive, async (event, sourceId, close) => {
     assertWindow(event)
     const source = (await listSources()).find((item) => item.id === sourceId)
-    if (!source) throw new Error('DS Bot: an unknown browser profile')
+    if (!source) throw new Error('LinkBot: an unknown browser profile')
     let outcome
     try {
       outcome = await importFromBrowser(source, { close: close === true })
@@ -942,9 +970,9 @@ function handleIpc() {
   })
   ipcMain.handle(IPC.browserImportApply, async (event, key, id) => {
     assertWindow(event)
-    if (typeof key !== 'string' || !key.startsWith('bot:')) throw new Error('DS Bot: a Bot storage key is required')
+    if (typeof key !== 'string' || !key.startsWith('bot:')) throw new Error('LinkBot: a Bot storage key is required')
     const pending = cookieImports.take(typeof id === 'string' ? id : '')
-    if (!pending) throw new Error('DS Bot: this import is no longer pending')
+    if (!pending) throw new Error('LinkBot: this import is no longer pending')
     const storage = session.fromPartition(partitionOf(key))
     return applyCookies(storage, pending.cookies)
   })
@@ -1014,14 +1042,14 @@ async function checkTeam(where, signal, onProgress) {
     try {
       signal.throwIfAborted()
       const { unreadable } = await check.start()
-      if (unreadable.length > 0) console.warn(`DS Bot: this DSH cannot read ${unreadable.join(', ')}`)
+      if (unreadable.length > 0) console.warn(`LinkBot: this DSH cannot read ${unreadable.join(', ')}`)
       return unreadable.length
     } finally {
       signal.removeEventListener('abort', stop)
       await check.stop()
     }
   } catch (error) {
-    if (!signal.aborted) console.error('DS Bot: the chats were not checked before the copy:', error)
+    if (!signal.aborted) console.error('LinkBot: the chats were not checked before the copy:', error)
     return 0
   } finally {
     await rm(home, { recursive: true, force: true, maxRetries: 5 }).catch((error) => { console.error(error) })
@@ -1067,7 +1095,7 @@ async function pickMove() {
 function moveCard(to) {
   const reason = moveReason(to)
   if (reason !== undefined) {
-    console.log(`DS Bot: the data cannot move to ${to} (${reason})`)
+    console.log(`LinkBot: the data cannot move to ${to} (${reason})`)
     startWindow.card({ kind: 'rejected', reason, path: to })
     return
   }
@@ -1385,7 +1413,7 @@ function createWindow() {
     // The window never squeezes the chat: RAIL_WIDTH + MIN_CHAT from ds-bot's
     // src/client/frame-layout.js is the avatar rail plus the smallest chat column.
     ...startWindow.mainBounds(), minWidth: 508, minHeight: 480,
-    title: 'DS Bot', show: false, icon: iconFile,
+    title: DISPLAY_NAME, show: false, icon: iconFile,
     backgroundColor: mica ? '#00000000' : dark ? '#1b1b1c' : '#ffffff',
     // Frameless as in DSH Desktop: the caption buttons overlay the page's band. They keep the
     // sidebar's colors until the page sends the colors of the surface under them.
@@ -1567,7 +1595,7 @@ function shellText() {
 function assertWindow(event) {
   const contents = mainWindow?.webContents
   if (contents === undefined || event.sender !== contents || event.senderFrame !== contents.mainFrame
-    || !event.senderFrame.url.startsWith(`${origin}/`)) throw new Error('DS Bot: rejected IPC from an unknown page')
+    || !event.senderFrame.url.startsWith(`${origin}/`)) throw new Error('LinkBot: rejected IPC from an unknown page')
 }
 
 function fromWindow(event) {

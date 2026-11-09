@@ -180,6 +180,23 @@ export function install(rt) {
       if (body.processShown === false) state.prefs.processShown = false
       else if (body.processShown === true || body.processShown === null) delete state.prefs.processShown
     }
+    // Whether a settled thought shows beside its answer. Unset: the work-details
+    // mode decides (only the compact one folds it away). Set: the user's own
+    // switch wins over the mode.
+    if (body.thinking !== undefined) {
+      if (body.thinking === true || body.thinking === false) state.prefs.thinking = body.thinking
+      else if (body.thinking === null) delete state.prefs.thinking
+    }
+    // How much of a turn's tool calls shows. The host owns the setting in its own
+    // settings namespace, but that layer does not survive a choice made in the
+    // settings page on every profile we ship. The team's own preferences hold the
+    // choice instead, and the client writes it into the host on every start.
+    if (body.workDetails !== undefined) {
+      const mode = body.workDetails
+      if (mode === null) delete state.prefs.workDetails
+      else if (typeof mode === 'string' && ['compact', 'standard', 'detailed', 'verbose'].includes(mode)) state.prefs.workDetails = mode
+      else throw invalid('Work details must be compact, standard, detailed or verbose')
+    }
     return rt.save()
   }
 

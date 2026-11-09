@@ -1,5 +1,5 @@
 // The data directory the installer ships is a DSH home: the factory plugins sit in the
-// profile's own node_modules, the skills repository and the factory list sit beside it, and the
+// profile's own node_modules, the factory skills and the factory list sit beside it, and the
 // installer moves only its whitelisted folders into the data home without touching user data.
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { PROFILE, bundledPluginDir, bundledDataDir, prepareBundledPlugins } from '../scripts/bundled-plugin.mjs'
-import { ensureSkillsRepoGit, SKILLS_SOURCE } from '../scripts/skills-repo-git.mjs'
+import { bundledSkillsDir, prepareFactorySkills } from '../scripts/factory-skills-pack.mjs'
 import { bundledPlugins, findBundledPlugin } from '../src/bundled-plugins.mjs'
 
 const write = (path, text) => {
@@ -36,21 +36,33 @@ const nodeModules = appDir => join(bundledDataDir(appDir), 'profiles', PROFILE, 
 describe('the plugins the build carries', () => {
   let root
   let appDir
+  let pluginsDev
+  let registrySaved
   before(() => {
     root = mkdtempSync(join(tmpdir(), 'ds-bot-data-pack-'))
     appDir = join(root, 'app')
-    // A plugin in the app's own node_modules: the import plugin is packed from there.
-    const plugin = join(appDir, 'node_modules', 'dsh-chat-import')
+    // The registry is pointed at a port that refuses, so the build falls back to the local
+    // folder at once instead of waiting out a network timeout.
+    registrySaved = process.env.DS_BOT_FACTORY_REGISTRY
+    process.env.DS_BOT_FACTORY_REGISTRY = 'http://127.0.0.1:1/'
+    // The plugin development folder: where every factory plugin is packed from offline.
+    pluginsDev = join(root, 'dsh-plugins-dev')
+    const plugin = join(pluginsDev, 'dsh-chat-import')
     write(join(plugin, 'package.json'), `${JSON.stringify({ name: 'dsh-chat-import', version: '0.26.3', dependencies: { 'a-helper': '^1.0.0' } }, undefined, 2)}\n`)
     write(join(plugin, 'lib', 'index.mjs'), "export const marker = 'ok'\n")
+    // The dependency the plugin does not carry itself is taken from the app's node_modules.
     const helper = join(appDir, 'node_modules', 'a-helper')
     write(join(helper, 'package.json'), `${JSON.stringify({ name: 'a-helper', version: '1.2.0' }, undefined, 2)}\n`)
     write(join(helper, 'index.js'), 'export default 1\n')
   })
-  after(() => { rmSync(root, { recursive: true, force: true }) })
+  after(() => {
+    if (registrySaved === undefined) delete process.env.DS_BOT_FACTORY_REGISTRY
+    else process.env.DS_BOT_FACTORY_REGISTRY = registrySaved
+    rmSync(root, { recursive: true, force: true })
+  })
 
   test('a plugin is a folder in the profile node_modules of the data home', async () => {
-    const made = await prepareBundledPlugins(appDir, ['dsh-chat-import'])
+    const made = await prepareBundledPlugins(appDir, [{ name: 'dsh-chat-import', version: '0.26.3' }], pluginsDev)
     assert.equal(made.length, 1)
     const folder = bundledPluginDir(appDir, 'dsh-chat-import')
     assert.equal(folder, join(nodeModules(appDir), 'dsh-chat-import'))
@@ -60,21 +72,35 @@ describe('the plugins the build carries', () => {
     assert.ok(existsSync(join(folder, 'node_modules', 'a-helper', 'package.json')), 'its dependency is in it')
   })
 
+  test('a version the manifest does not promise stops the build', async () => {
+    await assert.rejects(
+      () => prepareBundledPlugins(appDir, [{ name: 'dsh-chat-import', version: '9.9.9' }], pluginsDev),
+      /promises/u,
+    )
+  })
+
+  test('a plugin the manifest promises but nothing resolves stops the build', async () => {
+    await assert.rejects(
+      () => prepareBundledPlugins(appDir, [{ name: 'dsh-not-anywhere', version: '1.0.0' }], pluginsDev),
+      /resolved to nothing/u,
+    )
+  })
+
   test('no archive is written any more', async () => {
-    await prepareBundledPlugins(appDir, ['dsh-chat-import'])
+    await prepareBundledPlugins(appDir, [{ name: 'dsh-chat-import', version: '0.26.3' }], pluginsDev)
     assert.equal(existsSync(join(appDir, 'build', 'bundled-plugins')), false, 'the archive folder is gone')
     assert.equal(existsSync(join(bundledDataDir(appDir), 'plugins')), false, 'the old flat plugins folder is gone')
   })
 
   test('a scoped plugin keeps its scope in node_modules', async () => {
-    const scoped = join(appDir, 'node_modules', '@scope', 'dsh-demo')
+    const scoped = join(pluginsDev, '@scope', 'dsh-demo')
     write(join(scoped, 'package.json'), `${JSON.stringify({ name: '@scope/dsh-demo', version: '1.0.0' }, undefined, 2)}\n`)
-    await prepareBundledPlugins(appDir, ['@scope/dsh-demo'])
+    await prepareBundledPlugins(appDir, [{ name: '@scope/dsh-demo', version: '1.0.0' }], pluginsDev)
     assert.ok(existsSync(join(nodeModules(appDir), '@scope', 'dsh-demo', 'package.json')), 'the scope is a directory')
   })
 
   test('the factory list names the plugins and where they are', async () => {
-    await prepareBundledPlugins(appDir, ['dsh-chat-import', '@scope/dsh-demo'])
+    await prepareBundledPlugins(appDir, [{ name: 'dsh-chat-import', version: '0.26.3' }, { name: '@scope/dsh-demo', version: '1.0.0' }], pluginsDev)
     const list = JSON.parse(readFileSync(join(bundledDataDir(appDir), 'factory', 'plugins.json'), 'utf8'))
     assert.equal(list.plugins.length, 2)
     assert.equal(list.plugins[0].name, 'dsh-chat-import')
@@ -83,6 +109,44 @@ describe('the plugins the build carries', () => {
     const txt = readFileSync(join(bundledDataDir(appDir), 'factory', 'plugins.txt'), 'utf8')
     assert.match(txt, /dsh-chat-import/u)
     assert.match(txt, /@scope\\dsh-demo/u)
+  })
+})
+
+describe('the skills the build carries', () => {
+  let root
+  let appDir
+  let skillsSrc
+  before(() => {
+    root = mkdtempSync(join(tmpdir(), 'ds-bot-skills-pack-'))
+    appDir = join(root, 'app')
+    skillsSrc = join(root, 'skills')
+    write(join(skillsSrc, 'grilling', 'SKILL.md'), '---\nname: grilling\n---\n# grilling\n')
+    write(join(skillsSrc, 'cua-driver', 'SKILL.md'), '---\nname: cua-driver\n---\n# cua-driver\n')
+    write(join(skillsSrc, 'cua-driver', 'bin', 'tool.exe'), 'binary\n')
+    // The retired skills-repo layout must not survive into a new build.
+    write(join(appDir, 'build', 'data', 'skills-repo', 'old', 'SKILL.md'), '# old\n')
+  })
+  after(() => { rmSync(root, { recursive: true, force: true }) })
+
+  test('every slug the manifest names is copied with its files', async () => {
+    // The registry is pointed at a port that refuses, so no skill carries an installation
+    // record: the build does not wait for the intranet.
+    const made = await prepareFactorySkills(appDir, [{ slug: 'grilling' }, { slug: 'cua-driver' }], skillsSrc, { registry: 'http://127.0.0.1:1/' })
+    assert.equal(made.folders.length, 2)
+    assert.deepEqual(made.marked, [])
+    assert.ok(existsSync(join(bundledSkillsDir(appDir), 'grilling', 'SKILL.md')), 'the skill file is there')
+    assert.ok(existsSync(join(bundledSkillsDir(appDir), 'cua-driver', 'bin', 'tool.exe')), 'a skill carries its own files, bin/ included')
+  })
+
+  test('the retired skills-repo layout is gone from the build', async () => {
+    assert.equal(existsSync(join(appDir, 'build', 'data', 'skills-repo')), false)
+  })
+
+  test('a slug without a SKILL.md stops the build', async () => {
+    await assert.rejects(
+      () => prepareFactorySkills(appDir, [{ slug: 'grilling' }, { slug: 'not-there' }], skillsSrc),
+      /resolved to nothing/u,
+    )
   })
 })
 
@@ -142,12 +206,12 @@ describe('the data home of an install', () => {
   after(() => { rmSync(root, { recursive: true, force: true }) })
 
   test('the whitelisted folders are the only ones the installer adds', () => {
-    // What the installer does: copy a factory plugin into the profile and the skills repo.
+    // What the installer does: copy a factory plugin into the profile and the factory skills.
     write(join(dataDir, 'profiles', PROFILE, 'node_modules', 'dsh-chat-import', 'package.json'), '{"name":"dsh-chat-import","version":"0.26.3"}\n')
-    write(join(dataDir, 'skills-repo', 'review-skill', 'SKILL.md'), '# review-skill\n')
+    write(join(dataDir, 'skills', 'review-skill', 'SKILL.md'), '# review-skill\n')
     write(join(dataDir, 'factory', 'plugins.json'), '{"plugins":[]}\n')
     const folders = readdirSync(dataDir).sort()
-    assert.deepEqual(folders, ['bot', 'factory', 'profiles', 'sessions', 'skills-repo'])
+    assert.deepEqual(folders, ['bot', 'factory', 'profiles', 'sessions', 'skills'])
   })
 
   test("the user's own data is untouched by the install (SHA256)", () => {
@@ -164,46 +228,16 @@ describe('the data home of an install', () => {
       fingerprint(join(dataDir, 'profiles'))['profiles/ds-bot/node_modules/my-plugin/package.json'])
   })
 
-  test('a skills repository the user changed is kept, and the factory one is dropped', () => {
-    // The installer's rule: a repository with changes of its own is the user's, and it stays.
-    const repo = join(dataDir, 'skills-repo')
-    write(join(repo, '.git', 'HEAD'), 'ref: refs/heads/main\n')
-    write(join(repo, 'my-skill', 'SKILL.md'), '# mine\n')
-    const changed = fingerprint(repo)
-    // The install brings its own repository and finds the changed one there.
-    const incoming = join(root, 'incoming-skills-repo')
-    write(join(incoming, 'review-skill', 'SKILL.md'), '# factory\n')
-    write(join(incoming, '.git', 'HEAD'), 'ref: refs/heads/main\n')
-    const factory = fingerprint(incoming)
-    // The rule: the changed copy wins, so the factory one is not put in place.
-    const kept = changed
-    assert.notDeepEqual(kept, factory, 'the two repositories differ')
-    assert.ok(existsSync(join(repo, 'my-skill', 'SKILL.md')), 'the user\'s skill is still there')
-  })
-})
-
-// The skills repository is a git repository the installer ships: the build makes it a
-// repository, so the installed copy can pull.
-describe('the skills repository the build carries', () => {
-  let root
-  let source
-  let shipped
-  before(() => {
-    root = mkdtempSync(join(tmpdir(), 'ds-bot-skills-git-'))
-    source = join(root, 'source')
-    write(join(source, 'review-skill', 'SKILL.md'), '# review-skill\n')
-  })
-  after(() => { rmSync(root, { recursive: true, force: true }) })
-
-  test('the shipped folder is a repository with the skills in it', () => {
-    shipped = join(root, 'build', 'data', 'skills-repo')
-    const made = ensureSkillsRepoGit({ dir: shipped, source, env: {} })
-    assert.equal(made, true)
-    assert.ok(existsSync(join(shipped, 'review-skill', 'SKILL.md')), 'the skill is in it')
-    assert.ok(existsSync(join(shipped, '.git')), 'it is a repository')
-  })
-
-  test('the skills of the repository are the ones the build ships', () => {
-    assert.ok(existsSync(SKILLS_SOURCE), 'the source of the skills is in the repository')
+  test('a skill the package does not carry is the user\'s own and is left alone', () => {
+    // The installer's rule: the package replaces the skills it carries and never the others.
+    const mine = join(dataDir, 'skills', 'my-skill')
+    write(join(mine, 'SKILL.md'), '# mine\n')
+    const mineFingerprint = fingerprint(mine)
+    // The package carries grilling, not my-skill: only grilling lands.
+    const incoming = join(root, 'incoming-skills')
+    write(join(incoming, 'grilling', 'SKILL.md'), '# factory\n')
+    assert.equal(existsSync(join(dataDir, 'skills', 'grilling')), false, 'nothing has landed yet')
+    assert.deepEqual(fingerprint(mine), mineFingerprint, 'the user\'s skill is untouched')
+    assert.ok(existsSync(join(mine, 'SKILL.md')), 'the user\'s skill is still there')
   })
 })

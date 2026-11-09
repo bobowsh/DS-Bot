@@ -5,6 +5,7 @@
 // Follows DeepSeek Harness apps/desktop-host/src/index.ts (MIT); see NOTICE.
 import { readFileSync } from 'node:fs'
 import { inspect } from 'node:util'
+import { dirname, join } from 'node:path'
 import { loadLayeredEnv, reportSkippedBundles } from '@deepseek-ai/dsh-app-boot'
 import { runProfile } from '@deepseek-ai/dsh/profile-boot'
 import { writeAppPatch } from './app-patch.mjs'
@@ -13,7 +14,7 @@ import { CHECK_PROFILE, INSTALL_ANCHOR, loadAppProfile, loadCheckProfile, PROFIL
 import { reconcileGoal } from './goal-patch.mjs'
 import { reconcileOfficeRuntime } from './office-patch.mjs'
 import { reconcileSearchSelector } from './search-patch.mjs'
-import { reconcileOwnUi } from './own-ui-patch.mjs'
+import { factoryOffNames, reconcileOwnUi, alignWorkDetailsPatch } from './own-ui-patch.mjs'
 
 const MAX_FATAL_DIAGNOSTIC_CHARS = 64 * 1024
 
@@ -30,14 +31,17 @@ async function main() {
   // The Office payload is the app's own, for the team profile; the first-run check reads
   // chats without it.
   const office = check === undefined ? reconcileOfficeRuntime(profile) : { patchFiles: [] }
+  // Earlier builds wrote their own work-details mode into the profile's own layer of
+  // the ui-chat settings, overwriting the user's choice on every start. Realign that one
+  // field; the row itself is the user's layer and stays.
+  if (check === undefined) alignWorkDetailsPatch(join(dirname(profile.dir), PROFILE, 'cordis.patch.yml'))
   // ds-bot reads the payload's Node for the Office commands it runs itself.
   if (office.node !== undefined) process.env.DS_BOT_OFFICE_NODE = office.node
   const application = runProfile({
     environment: loadLayeredEnv('dsh'),
     profile: check === undefined ? PROFILE : CHECK_PROFILE,
     resolvedProfile: { profile, installAnchor: INSTALL_ANCHOR },
-    patchFiles: check === undefined ? [...writeAppPatch(profile), ...writeFactoryRegistryPatch(profile), ...reconcileSearchSelector(profile), ...reconcileGoal(profile), ...reconcileOwnUi(profile), ...office.patchFiles] : [],
-    args: ['--no-open', '--port', process.env.DS_BOT_PORT || '0'],
+    patchFiles: check === undefined ? [...writeAppPatch(profile), ...writeFactoryRegistryPatch(profile), ...reconcileSearchSelector(profile), ...reconcileGoal(profile), ...reconcileOwnUi(profile, factoryOffNames()), ...office.patchFiles] : [],    args: ['--no-open', '--port', process.env.DS_BOT_PORT || '0'],
     ...(pnpm === undefined ? {} : {
       packageManager: { command: process.execPath, args: ['--expose-internals', pnpm], env: { ELECTRON_RUN_AS_NODE: '1' } },
     }),

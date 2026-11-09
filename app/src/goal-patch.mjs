@@ -1,4 +1,4 @@
-// Reconcile C2 / #133: Bots run DS Bot's own group goal, and DSH's session
+// Reconcile C2 / #133: Bots run LinkBot's own group goal, and DSH's session
 // goal does not survive conversation parts — in the app the `/goal` command,
 // and its tool are dead weight. Removing them needs
 // new rows in the bundled presets, which the app must not rewrite, so the

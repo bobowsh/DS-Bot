@@ -327,7 +327,7 @@ test('a button that opens the system picker ends with …', () => {
 
 // docs/plans/2026-10-26-windows-onboarding.md, 用词: proper names and units only.
 test('the zh copy shows no English but the allowed names and units', () => {
-  const NAMES = ['DS Bot', 'DSH Desktop', 'DSH Web']
+  const NAMES = ['LinkBot', 'DSH Desktop', 'DSH Web']
   const WORDS = new Set(['DeepSeek', 'Bot', 'API', 'Key', 'Harness', 'DSH', 'Agent', 'MCP', 'Windows', 'PowerShell', 'GitHub', 'SmartScreen', 'OneDrive', 'cookie', 'HTTP', 'SOCKS', 'KB', 'MB', 'GB'])
   const english = []
   for (const [key, value] of Object.entries(TEXT.zh)) {
