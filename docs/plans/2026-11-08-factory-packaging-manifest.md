@@ -28,14 +28,45 @@
 `dsh-chat-import`、`dsh-xdpool`、`dshmarket`、`@linxin666/dsh-client-ui-git-graph`、`dsh-rule-manager`、`dsh-tool-activator`、`skillhub-dsh`、`dsh-aide`、`dsh-better-sidebar`、`dsh-screenshot-native`、`ds-harness-remote`、`dsh-plugin-guide`
 
 > **变更**：`dsh-computer-use-win` 用户 2026-11-08 明确**不要了**，清单从 13 个减为 12 个。
+>
+> **变更（2026-11-08 晚）**：`dsh-tool-activator` **移出出厂清单，现为 11 个**。原因：它要修的报错需要升到 0.5.0，而 0.5.0 只在外网 npm 上、**内网 Gitea registry 最高只有 0.4.3**，而**内网当前不通**（192.168.1.10 的 3000/8081/22/80/443 端口全部不可达，ping 通但无服务），推不上去。用户 2026-11-08 指示「内网现在不通，先把这个插件不放进出厂插件」。等内网恢复并把 0.5.0 推上内网 registry 后，再加回清单。
 
 ### 出厂技能清单（3 个，用户定）
 
 `grilling`、`ub-mode`、`cua-driver`
 
 > **变更**：用户 2026-11-08 追加 `cua-driver`。该技能来源是本机已装的 `D:\Users\bobowsh\.dsh\skills\cua-driver`（9 个文件 / 约 164 KB，frontmatter `name: cua-driver`、`version: 0.36.0`）。
->
-> **依赖提示**：`cua-driver` 的 frontmatter 声明 `metadata.openclaw.requires.bins: [cua-driver]`——技能本身能用，但需要目标机器上有 `cua-driver` 可执行文件。本次**只预置技能文件，不预置该二进制**；装机端若没有这个命令，技能会加载但调用会失败。这一条要写进验收说明，由用户决定后续是否连二进制一起分发。
+
+### cua-driver 二进制（用户 2026-11-08 定：技能文件与二进制都要预置）
+
+`cua-driver` 技能的 frontmatter 声明 `metadata.openclaw.requires.bins: [cua-driver]`，只有技能文件不够用，二进制一并预置。
+
+**来源**：`D:\Users\bobowsh\AppData\Local\Programs\Cua\cua-driver\bin\`（v0.36.0，与技能版本一致）
+
+| 文件 | 大小 | 用途 |
+|---|---|---|
+| `cua-driver.exe` | 37.1 MB | 主驱动 |
+| `cua-driver-uia.exe` | 24.3 MB | UIA 后端 |
+| `cua-cursor-theme.exe` | 2.9 MB | 光标主题 |
+| **合计** | **62.8 MB** | 计入安装包体积 |
+
+**落位（用户 2026-11-08 定：放进技能目录里面）**：`<data>\skills\cua-driver\bin\`，二进制跟 `SKILL.md` 放在同一个技能目录下。
+
+```
+<data>/skills/cua-driver/
+├── SKILL.md
+├── BROWSER.md / WINDOWS.md / ...（技能文档）
+└── bin/
+    ├── cua-driver.exe
+    ├── cua-driver-uia.exe
+    └── cua-cursor-theme.exe
+```
+
+这样做的理由（用户原话「这样技能才方便引用」）：技能文件与它依赖的程序在同一个目录里，技能正文按**自身位置的相对路径**就能找到 `./bin/cua-driver.exe`，不依赖安装盘符、不依赖 `%LOCALAPPDATA%`、也不依赖 PATH。
+
+**已知限制**：`cua-driver-uia.exe` 实测需要管理员权限（直接运行报 "requires elevation"）。**记录在案，不作为阻塞项**：装机端若非管理员运行，UIA 后端可能不可用，其它后端不受影响。
+
+**升级语义**：与技能文件一致——新版安装包按清单覆盖 `<data>\skills\cua-driver\` 整个目录（含 `bin/`）。这是出厂组件，用户自己替换会被覆盖。
 
 ## 现状盘点（2026-11-08 实测）
 
@@ -111,12 +142,19 @@ app/dist-pack/data/
 │   ├── plugins.json          ← 运行时清单（C3/C4 读，格式不变）
 │   └── plugins.txt           ← NSIS 安装器用（纯名字）
 ├── profiles/ds-bot/node_modules/
-│   ├── dsh-chat-import/      ← 13 个，解包后的目录
+│   ├── dsh-chat-import/      ← 12 个，解包后的目录
 │   ├── @linxin666/dsh-client-ui-git-graph/
 │   └── ...
 └── skills/
-    ├── grilling/SKILL.md     ← 2 个
-    └── ub-mode/SKILL.md
+    ├── grilling/SKILL.md
+    ├── ub-mode/SKILL.md
+    └── cua-driver/
+        ├── SKILL.md
+        ├── （技能文档 8 个 .md）
+        └── bin/
+            ├── cua-driver.exe
+            ├── cua-driver-uia.exe
+            └── cua-cursor-theme.exe
 ```
 
 ### 5. 打包脚本改动
@@ -132,6 +170,7 @@ app/dist-pack/data/
 |---|---|---|
 | 1 | 清单 12 个插件全部进包 | `dist-pack/data/profiles/ds-bot/node_modules/` 下有 12 个对应目录，版本与 manifest 一致 |
 | 2 | 清单 3 个技能全部进包 | `dist-pack/data/skills/{grilling,ub-mode,cua-driver}/SKILL.md` 存在 |
+| 2b | cua-driver 二进制与技能同目录 | `dist-pack/data/skills/cua-driver/bin/` 下有三个 exe；实装后 `<data>\skills\cua-driver\bin\cua-driver.exe --version` 返回 0.36.0 |
 | 3 | 运行时清单正确 | `dist-pack/data/factory/plugins.json` 的 `plugins[].name` = 12 个 |
 | 4 | 不多不少 | 不出现 `dsh-session-manager`、`@copylee/dsh-computer-use`、`@jayyuen66/dsh-ocr-review`、`dsh-computer-use-win` |
 | 5 | **实际安装可用** | 打安装包 → 装到 `D:\LinkBot` → 启动程序 → 插件与技能**正常加载**，界面/日志可见 |

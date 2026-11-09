@@ -101,6 +101,14 @@ export const MonitorIcon = lineIcon(['M3.5 4.5h13A1.5 1.5 0 0 1 18 6v7a1.5 1.5 0
 export const SideIcon = lineIcon(['M4.5 4h11A1.5 1.5 0 0 1 17 5.5v6a1.5 1.5 0 0 1-1.5 1.5H9L5.5 16v-3h-1A1.5 1.5 0 0 1 3 11.5v-6A1.5 1.5 0 0 1 4.5 4z', 'M6.5 7h7', 'M6.5 10h4.5'])
 // An arrow stuck in a target: a group's goal.
 export const GoalIcon = lineIcon(['M15.1 8.8A6.5 6.5 0 1 1 11.2 4.9', 'M9 8a3 3 0 1 0 0 6 3 3 0 1 0 0-6', 'M9 11l7.5-7.5', 'M14.6 2.8v2.6h2.6'])
+// The AIDE workbench's entry: the mark of Visual Studio Code, the editor AIDE is built
+// after, redrawn as vectors in the editor's blue (--bt-vscode). The same shape dsh-aide ships as
+// its own icon, so the plugin list and the foot button name the same thing. The mark belongs
+// to Microsoft Corporation (see NOTICE).
+export const AideIcon = () => h('svg', { width: 16, height: 16, viewBox: '0 0 512 512', 'aria-hidden': true },
+  h('path', { d: 'M74.6 268.6 213.4 160.7v24.7L104.6 268.6l108.8 83.2v24.7L74.6 268.6z', fill: 'var(--bt-vscode)', opacity: 1 }),
+  h('path', { d: 'M184.1 268.6 322.9 160.7v190.6L184.1 268.6z', fill: 'var(--bt-vscode)', opacity: .9 }),
+  h('path', { d: 'M389.6 236.9 251.5 130.7v30.1l95.9 71.9v36.6l-95.9 71.9v30.1l138.1-106.2z', fill: 'var(--bt-vscode)', opacity: .8 }))
 // Defined here, after the icons: SettingsDialog only reads them at render time.
 // Two speech bubbles, the back one peeking out: a group chat.
 export const ChatsIcon = lineIcon(['M3.5 5.5A1.5 1.5 0 0 1 5 4h7a1.5 1.5 0 0 1 1.5 1.5V10A1.5 1.5 0 0 1 12 11.5H8L5 14v-2.5A1.5 1.5 0 0 1 3.5 10z', 'M13.5 7.5H15A1.5 1.5 0 0 1 16.5 9v4.5A1.5 1.5 0 0 1 15 15v2l-2.5-2h-3A1.5 1.5 0 0 1 8 13.5V13'])

@@ -1,8 +1,8 @@
-// The first close of the team window tells, once, that the app stays in the tray: on a card in
-// the window's page, not in a message box. Only the card's answer lets the window go, and the
-// answer is kept. The Electron parts are test doubles: no display, no DSH, no data of the user.
+// Every close of the team window asks what should happen, on a card in the window's page, not
+// in a message box: minimize to the system tray, end the app, or leave the window as it is.
+// The answer is not remembered — the next close asks again. The Electron parts are test
+// doubles: no display, no DSH, no data of the user.
 import assert from 'node:assert/strict'
-import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { before, test } from 'node:test'
 import { paths, state } from './helpers/fake-electron.mjs'
@@ -12,27 +12,13 @@ import { installHooks } from './helpers/register.mjs'
 
 await installHooks()
 
-before(async () => { await startApp({ acknowledged: false, later: true }) })
+before(async () => { await startApp({ later: true }) })
 
-test('a page that does not show the card does not hold the close', async () => {
+test('the close asks on a card in the window and hides it once the tray is chosen', async () => {
   await waitFor(() => window() !== undefined, 'open the window')
   await waitFor(() => state.tray !== undefined, 'build the tray')
   hostState.release()
   await handOff()
-  const win = window()
-  const silent = win.webContents.send
-  win.webContents.send = () => {}
-  try {
-    win.close()
-    await waitFor(() => win.visible === false, 'hide the window once the card is not shown in time', 5000)
-  } finally {
-    win.webContents.send = silent
-  }
-  assert.ok(!existsSync(join(paths.userData, 'tray-close-acknowledged')), 'the next close tells again')
-  assert.deepEqual(messageBoxes(), [], 'no message box')
-})
-
-test('the close asks on a card in the window and hides it once the card is answered', async () => {
   const win = window()
   trayMenu()[0].click()
   await waitFor(() => win.visible === true, 'show the window')
@@ -40,35 +26,37 @@ test('the close asks on a card in the window and hides it once the card is answe
   win.minimize()
   const focused = win.focused
   win.close()
-  await waitFor(() => windowCards(win).length === 1, 'tell about the tray on a card')
+  await waitFor(() => windowCards(win).length === 1, 'ask what the close should do')
   assert.equal(win.minimized, false, 'the window comes back up with its card')
   assert.ok(win.focused > focused, 'the window with the card is brought to the front')
   const card = windowCards(win)[0]
-  assert.match(card.message, /system tray/u)
-  assert.deepEqual(card.buttons, [{ label: 'OK', primary: true }])
-  assert.equal(card.cancel, undefined, 'only the answer lets the window go')
+  assert.equal(card.buttons.length, 3, 'the card offers three answers')
+  // The quit comes first and is the default answer; the tray answer is the second.
+  assert.match(card.buttons[0], /退出|Quit/u)
+  assert.match(card.buttons[1], /托盘|tray/u)
+  assert.match(card.message, /window closes|关闭窗口/u)
   assert.equal(win.visible, true, 'the window stays until the answer')
-  // A second close while the card is up asks nothing more; it brings the card to the front.
-  const again = win.focused
-  win.close()
-  assert.equal(windowCards(win).length, 1)
-  assert.ok(win.focused > again, 'the second close brings the card forward')
-  answerCard(0, win)
+  answerCard(1, win)
   await waitFor(() => win.visible === false, 'hide the window')
-  assert.ok(existsSync(join(paths.userData, 'tray-close-acknowledged')), 'the answer is kept')
   assert.deepEqual(messageBoxes(), [], 'no message box')
 })
 
-test('later closes hide the window without asking', async () => {
+test('the quit answer ends the app', async () => {
   const win = window()
   trayMenu()[0].click()
   await waitFor(() => win.visible === true, 'show the window')
   win.close()
-  await waitFor(() => win.visible === false, 'hide the window')
-  assert.equal(windowCards(win).length, 1, 'no second card')
+  await waitFor(() => windowCards(win).length >= 1, 'ask what the close should do')
+  answerCard(1, win)
+  await waitFor(() => state.tray.destroyed === true, 'the app ends')
 })
 
-test('the tray quit ends the app', async () => {
-  trayMenu().at(-1).click()
-  await waitFor(() => state.tray.destroyed === true, 'take the tray away')
+test('the next close asks again; the answer is not remembered', async () => {
+  const win = window()
+  trayMenu()[0].click()
+  await waitFor(() => win.visible === true, 'show the window')
+  win.close()
+  await waitFor(() => windowCards(win).length >= 2, 'the second close asks again')
+  assert.ok(windowCards(win).length >= 2, 'the question is asked on every close')
+  answerCard(2, win)
 })

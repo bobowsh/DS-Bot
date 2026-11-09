@@ -15,8 +15,14 @@
 ; that keeps the path as it is. The check for a writable folder runs between the
 ; directory page and the install (#626).
 ;
-; An earlier installation's folder is the default the page starts at, so an
-; upgrade lands where the copy already is.
+; The directory page starts at <drive>\LinkBot\app, which customInit works out and writes
+; back to the registry: NSIS's InstallDir page reads the previous install's registered
+; location as its starting value, so without the write-back it would start at wherever an
+; old copy once lived. The path is used exactly as it is chosen: electron-builder appends a
+; product-name sub-folder to any path that lacks it (assistedInstaller.nsh,
+; instFilesPre), but customPageAfterChangeDir replaces that function with one
+; that keeps the path as it is. The check for a writable folder runs between the
+; directory page and the install (#626).
 !macro customInit
   ; The /D= switch wins over everything else: that is how a silent install in
   ; the acceptance run aims the app at a throwaway folder.
@@ -27,10 +33,11 @@
     ; The folder is fixed: <drive>\LinkBot\app, with the data at
     ; <drive>\LinkBot\data beside it.
     ;
-    ; The registered location of an earlier installation is deliberately NOT read.
-    ; It was the one thing that kept an install from ever reaching this folder: a
-    ; copy that once landed elsewhere (in a drive's root, or under another
-    ; product name) left its path behind, and every later install followed it.
+    ; The registered location of an earlier installation is deliberately NOT read: a copy
+    ; that once landed elsewhere (in a drive's root, or under another product name) left
+    ; its path behind, and every later install followed it. But the InstallDir page does
+    ; read that registry value as its starting point, so the folder worked out here is
+    ; written back over it — the page then starts where this installer means to install.
     ; A drive is detected with a wildcard: "D:\" and "D:\." both fail, because a
     ; backslash at the end of the string is an escape and the path never resolves.
     IfFileExists "D:\*" 0 useE
@@ -45,6 +52,7 @@
     ; Neither drive: the program folder of the current user is the last resort.
     StrCpy $INSTDIR "$LocalAppData\Programs\LinkBot\app"
     done:
+    WriteRegStr HKCU "Software\32c46dfc-ed78-5d41-85a4-a3c7f083f2e0" "InstallLocation" "$INSTDIR"
   ${EndIf}
 
   ; The installer never asks for administrator rights, so a folder the user cannot
@@ -221,9 +229,9 @@
 ; factory list: the data home holds the user's own data (bot/, profiles/, sessions/ ...), and
 ; a plugin the user installed themselves must not be replaced or removed by an upgrade.
 ;
-; The skills repository is a git repository the user may have pulled new skills into. A copy
-; that was changed is kept, and the factory one is dropped: an upgrade must not take the
-; user's work away.
+; The factory skills are the package's own copies: an installed one is replaced, but one backup
+; of the replaced content is kept (<data>\skills\<slug>.bak, the most recent previous content
+; only). A skill the package does not carry is the user's own and is left alone.
 ;
 ; A move that fails (the parent folder cannot be written, as under Program Files) does not stop
 ; the install: the first start reads the tree from <INSTDIR>\data and copies it into the profile
@@ -280,43 +288,51 @@
     CreateDirectory "$R1\factory"
     CopyFiles /SILENT "$INSTDIR\data\factory\*.*" "$R1\factory"
   ${EndIf}
-  ; The skills repository: a copy the user changed is kept.
-  ${If} ${FileExists} "$INSTDIR\data\skills-repo\.git\*.*"
-    ${If} ${FileExists} "$R1\skills-repo\.git\*.*"
-      ; The installed repository is there. Whether the user changed it is asked of git, which
-      ; may not be there; without git the copy is kept, because a user who pulled skills in
-      ; has a repository git can read.
-      nsExec::ExecToLog 'cmd /c cd /d "%R1\skills-repo" && git status --porcelain > "%TEMP%\dsb-skills-dirty.txt" 2>nul'
-      ${If} $0 == 0
-        ClearErrors
-        FileOpen $R2 "$TEMP%\dsb-skills-dirty.txt" r
-        ${If} ${Errors}
-          ; The file could not be read: the copy is kept.
-        ${Else}
-          FileRead $R2 $3
-          FileClose $R2
-          Delete "$TEMP%\dsb-skills-dirty.txt"
-          ${If} $3 != ""
-            ; The user changed the repository: it is kept, and the factory one is dropped.
-            DetailPrint "LinkBot: the skills repository was changed and is kept."
-            RMDir /r "$INSTDIR\data\skills-repo"
-            Goto dsbDataDone
-          ${EndIf}
-        ${EndIf}
-      ${Else}
-        ; No git: the copy is kept.
-        DetailPrint "LinkBot: the skills repository was kept."
-        RMDir /r "$INSTDIR\data\skills-repo"
-        Goto dsbDataDone
-      ${EndIf}
-    ${EndIf}
+  ; The language servers travel as plain files: they are native programs the Host finds on its
+  ; PATH, so the whole folder is moved beside the data.
+  ${If} ${FileExists} "$INSTDIR\data\lsp\*.*"
     ClearErrors
-    RMDir /r "$R1\skills-repo"
-    CopyFiles /SILENT "$INSTDIR\data\skills-repo" "$R1\skills-repo"
+    RMDir /r "$R1\lsp"
+    CreateDirectory "$R1\lsp"
+    CopyFiles /SILENT "$INSTDIR\data\lsp\*.*" "$R1\lsp"
     ${If} ${Errors}
-      DetailPrint "LinkBot: the skills repository could not be moved to the data folder."
+      DetailPrint "LinkBot: the language servers could not be moved to the data folder."
       StrCpy $R7 1
     ${EndIf}
+  ${EndIf}
+  ; The factory skills: replace the installed copies, keeping one .bak of each replaced skill,
+  ; and leave the skills the package does not carry alone. The sync state file is dropped when
+  ; the package carries skills, so the next start re-records versions instead of downloading
+  ; what the package just put in place.
+  ${If} ${FileExists} "$INSTDIR\data\skills\*.*"
+    Delete "$R1\skills-sync.json"
+    FindFirst $R2 $3 "$INSTDIR\data\skills\*.*"
+    dsbSkillsLoop:
+      StrCmp $3 "" dsbSkillsEnd
+      StrCmp $3 "." dsbSkillsNext
+      StrCmp $3 ".." dsbSkillsNext
+      ${If} ${FileExists} "$INSTDIR\data\skills\$3\*.*"
+        StrCpy $5 "$INSTDIR\data\skills\$3"
+        StrCpy $6 "$R1\skills\$3"
+        ${If} ${FileExists} "$6\*.*"
+          RMDir /r "$R1\skills\$3.bak"
+          CreateDirectory "$R1\skills\$3.bak"
+          CopyFiles /SILENT "$6\*.*" "$R1\skills\$3.bak"
+        ${EndIf}
+        ClearErrors
+        RMDir /r "$6"
+        CreateDirectory "$6"
+        CopyFiles /SILENT "$5\*.*" "$6"
+        ${If} ${Errors}
+          DetailPrint "LinkBot: the skill $3 could not be moved to the data folder."
+          StrCpy $R7 1
+        ${EndIf}
+      ${EndIf}
+      dsbSkillsNext:
+      FindNext $R2 $3
+      Goto dsbSkillsLoop
+    dsbSkillsEnd:
+    FindClose $R2
   ${EndIf}
   ; Only when everything was moved is the installer's own data tree removed. A failed move
   ; leaves it in place: the first start reads the factory tree from <INSTDIR>\data instead.

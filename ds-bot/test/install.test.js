@@ -173,9 +173,11 @@ test('the client channel answers from the saved state', async (t) => {
   assert.equal((await call('set-prefs', { flatWidth: 70 })).value.flatWidth, 70)
   assert.equal('flatWidth' in (await call('set-prefs', { flatWidth: 100 })).value, false)
   assert.deepEqual((await call('set-prefs', { flatWidth: 40 })).error, { code: 'bot/invalid', message: 'Flat text width must be a whole percent from 50 to 100', details: {} })
-  // The work-details switch is the host's own setting now, and the client reads it through the
-  // host's config form: the Bot prefs keep no copy of it.
-  assert.equal('thinking' in (await call('set-prefs', { thinking: true })).value, false, 'the prefs keep no thinking switch')
+  // The switch that shows a settled thought is the user's own again: unset, the
+  // work-details mode decides it, and a switch of their own wins over the mode.
+  assert.equal((await call('set-prefs', { thinking: true })).value.thinking, true)
+  assert.equal((await call('set-prefs', { thinking: false })).value.thinking, false)
+  assert.equal('thinking' in (await call('set-prefs', { thinking: null })).value, false, 'the switch is unset again')
   // Enter sends by default; false persists until the user turns it back on.
   assert.equal((await call('set-prefs', { enterToSend: false })).value.enterToSend, false)
   assert.equal((await call('set-prefs', { enterToSend: 'no' })).value.enterToSend, false)

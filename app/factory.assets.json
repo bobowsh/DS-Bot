@@ -1,0 +1,16 @@
+{
+  "comment": "出厂插件的运行时资产声明：runtimeAssets 里的包必须在插件目录的 node_modules 中（它们被 lib 运行时 require.resolve 定位真实文件，不是可 bundle 的代码）。打包后由 scripts/check-runtime-assets.mjs 校验，缺一个即失败。",
+  "plugins": {
+    "dsh-aide": {
+      "runtimeAssets": [
+        "@vscode/codicons",
+        "monaco-editor",
+        "material-icon-theme",
+        "@shikijs/langs",
+        "pdfjs-dist",
+        "vscode-oniguruma",
+        "katex"
+      ]
+    }
+  }
+}

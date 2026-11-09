@@ -5,8 +5,9 @@ import { Arch } from 'electron-builder'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { preparePrimaryRuntime, runtimeTarget } from './prepare-runtime.mjs'
-import { ensureSkillsRepoGit } from './skills-repo-git.mjs'
+import { prepareFactorySkills } from './factory-skills-pack.mjs'
 import { prepareBundledPlugins } from './bundled-plugin.mjs'
+import { prepareLanguageServers } from './factory-lsp-pack.mjs'
 
 const WHERE = {
   darwin: { x64: 'on an Intel Mac, or under Rosetta with an x64 Node', arm64: 'on a Mac with Apple silicon' },
@@ -43,35 +44,33 @@ export function officeRuntimeRequest(context) {
   }
 }
 
-// The plugins the installer carries into the profile. The import plugin is the one this project
-// owns; the rest are the environment the team was built and verified with. Each is packed from
-// its `pack/` in the plugin development folder (DS_BOT_PLUGINS_DEV), falling back to the app's
-// own node_modules, so what ships is the npm-published version that is known to install.
-export const BUNDLED_PLUGINS = [
-  'dsh-chat-import',
-  'dsh-rule-manager',
-  'dsh-session-manager',
-  // dsh-tool-activator is left out on the user's order: it made every turn fail with
-  // an unreadable error, and the team works without it.
-  '@copylee/dsh-computer-use',
-  '@jayyuen66/dsh-ocr-review',
-  '@j62268781-alt/dsh-skills-mcp-manager',
-  '@linxin666/dsh-client-ui-git-graph',
-  'deepseek-harness-intelligent-ui',
-  'dsh-xdpool',
-]
+/**
+ * The factory manifest: the list of plugins and skills the build carries, kept by people in
+ * app/factory.manifest.json. Every entry carries the version the package must ship.
+ * @param {string} appDir - the app directory
+ */
+export function factoryManifest(appDir) {
+  return JSON.parse(readFileSync(join(appDir, 'factory.manifest.json'), 'utf8'))
+}
 
-export async function beforePack(context, prepare = preparePrimaryRuntime, prepareSkills = ensureSkillsRepoGit, preparePlugins = prepareBundledPlugins) {
+export async function beforePack(context, prepare = preparePrimaryRuntime, prepareSkills = prepareFactorySkills, preparePlugins = prepareBundledPlugins, prepareServers = prepareLanguageServers) {
   const targets = []
   for (const archToNames of context.packager?.packagerOptions?.targets?.values() ?? [])
     for (const arch of archToNames.keys()) targets.push(Arch[arch])
   const problem = archProblem({ target: Arch[context.arch], platform: context.electronPlatformName, targets })
   if (problem !== undefined) throw new Error(problem)
   await prepare(officeRuntimeRequest(context))
-  // The bundled skills repo must be a repository before extraResources copies it; a machine
-  // without git, or without the upstream to reach, still ships the skills themselves.
-  await prepareSkills()
-  // The plugins the app carries travel as archives; extraResources copies them as they are.
   const appDir = context.packager.appDir ?? context.packager.projectDir
-  await preparePlugins(appDir, BUNDLED_PLUGINS)
+  const manifest = factoryManifest(appDir)
+  // The factory skills travel as plain folders in the data tree; each slug the manifest names
+  // must be in the skills source folder with its SKILL.md, or the build stops.
+  await prepareSkills(appDir, manifest.skills)
+  // The plugins the app carries are resolved from the factory manifest: the intranet registry
+  // first, the local development folder when it cannot be reached, the build stops on neither.
+  // The plugins the manifest marks as shipped turned off travel as well, but the first start
+  // keeps them out of the bundle list.
+  await preparePlugins(appDir, manifest.plugins, undefined, manifest.disabledByDefault ?? [])
+  // The language servers travel as plain files too: they are native programs, so they go on
+  // the Host's PATH rather than into a plugin.
+  await prepareServers(appDir, manifest.languageServers ?? [])
 }

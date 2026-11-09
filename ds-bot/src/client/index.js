@@ -8,7 +8,8 @@ import { themeCss, shellTokens, registry, registerShape, registerTheme, allTheme
 import { MENTION_ORIGIN, currentPart } from './text.js'
 import { SHELL_CSS, CONVERSATION_CSS, installStyles, installCompiledStyles } from './styles.js'
 import { lookOf } from './mark.js'
-import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, BotReturn, SIDEBAR_CSS, RETURN_CSS, holdShellShortcuts, openHarnessOnboarding, openHarnessSettings, MODELS_STEP, MODELS_STEP_ORDER, OpenModelsStep } from './sidebar.js'
+import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, BotReturn, SIDEBAR_CSS, RETURN_CSS, FOOTER_CSS, holdShellShortcuts, openHarnessOnboarding, openHarnessSettings, MODELS_STEP, MODELS_STEP_ORDER, OpenModelsStep } from './sidebar.js'
+import { AideFooterButton } from './aide-button.js'
 import { frameLayout, readSidebar, writeSidebar, toggledPref, DSH_NARROW } from './frame-layout.js'
 import { installFrameWatch } from './frame-watch.js'
 import { HeaderPill } from './header.js'
@@ -51,9 +52,9 @@ import { MEMBER_CSS, MemberDock } from './member-status.js'
 import { IM_CSS } from './im-page.js'
 import { USER_MESSAGE_CSS, UserMessageCell, canDrawUserMessages } from './user-message.js'
 import { QueueDock, QUEUE_CSS } from './queue-dock.js'
-import { UsageLine, USAGE_LINE_CSS } from './usage-line.js'
 import { noticeApprovals } from './approval-notices.js'
 import { listedOpener } from './open-listed.js'
+import { workDetailsToApply, workDetailsToSave } from './work-details.js'
 
 export const inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout', 'configForms']
 
@@ -426,28 +427,49 @@ export function apply(ctx) {
   // The host's own settings namespace for the chat. It is served only when the
   // host exposes it, so the row waits for it.
   const chatSettings = ctx.get('configForms')?.get('ui-chat')
+  // The team's own preferences hold the choice as well, as a second place it is
+  // written to: a start reads it back and hands it to the host when the host's own
+  // layer did not keep it.
+  const savedWorkDetails = createSource(undefined)
   if (chatSettings !== undefined) {
-    // A profile that never chose a work-details mode opens on the host's default, which
-    // folds a settled turn's process rows away. The team's point is showing what the Bots
-    // ran, so an unchosen mode is put on the one that keeps those rows; a mode the user
-    // picked is never overwritten.
-    const ensureMode = () => {
-      const value = chatSettings.getSnapshot().value
-      if (value?.transcriptView === undefined) void chatSettings.set('transcriptView', 'verbose').catch(() => {})
-    }
-    const adopt = () => {
-      const value = chatSettings.getSnapshot().value
-      workDetails.set(value?.transcriptView)
-    }
+    const hostMode = () => chatSettings.getSnapshot().value?.transcriptView
+    // The team's mode reaches the host once the roster answers — and only when it
+    // has one. A profile that never chose a mode keeps the host's own value; the
+    // earlier builds wrote a default on every start, and that is what made the
+    // choice in the settings page impossible to keep.
     ctx.effect(() => {
-      ensureMode()
+      const off = roster.subscribe(() => {
+        const saved = roster.getSnapshot().prefs?.workDetails
+        if (saved === undefined) return
+        savedWorkDetails.set(saved)
+        const mode = workDetailsToApply(saved, hostMode())
+        if (mode === undefined) return
+        void chatSettings.set('transcriptView', mode).catch(() => {})
+      })
+      return off
+    }, 'ds-bot: the team work details')
+    ctx.effect(() => {
+      const adopt = () => {
+        const mode = hostMode()
+        workDetails.set(mode)
+        // A mode the user picks in the settings page is the team's mode too.
+        const save = workDetailsToSave(mode, savedWorkDetails.getSnapshot())
+        if (save === undefined) return
+        savedWorkDetails.set(save)
+        void actions.setPrefs({ workDetails: save }).catch(() => {})
+      }
       adopt()
       return chatSettings.subscribe(adopt)
     }, 'ds-bot: the host work details')
   }
   const setWorkDetails = mode => {
     workDetails.set(mode)
+    savedWorkDetails.set(mode)
+    // The host's own field is where the chat reads it from; the team's preferences
+    // are a second place it is written to, so a start can hand it back.
+    const saved = actions.setPrefs({ workDetails: mode })
     void chatSettings?.set('transcriptView', mode).catch(() => {})
+    return saved
   }
   // Bot mode's view must hold a team conversation; an outside Session wears the
   // Bot skin without one. Runs whenever the surface is (or stays) Bot mode —
@@ -811,17 +833,6 @@ export function apply(ctx) {
   // the rate it measured) and its token usage. They come from the session list's own snapshot,
   // which is the public way to read them.
 
-// The usage line under the input: the host's own readings of the session.
-const UsageDock = ({ sessionId }) => {
-  const values = ctx.sessions.list.getSnapshot().projectionsBySession?.[sessionId]?.values ?? {}
-  return h(UsageLine, {
-    stats: values.sessionStats,
-    usage: values.tokenUsage,
-    pressure: values.contextPressure,
-    breakdown: values.contextBreakdown,
-  })
-}
-
   const face = () => ({ actions, hooks: { roster, ui, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, frame, sidebarPref } })
   // The face a team tool view gets: the team's own state, plus the browser and
   // computer hooks the handover cards read.
@@ -1052,7 +1063,6 @@ const UsageDock = ({ sessionId }) => {
     () => installCompiledStyles(SECRET_CSS + CONNECTOR_CSS + CONNECTORS_PAGE_CSS, 'secrets'),
     () => installCompiledStyles(LEARNING_CSS, 'learning'),
     () => installCompiledStyles(MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + GROUP_SETTINGS_CSS + AVATAR_LIBRARY_CSS, 'models'),
-    () => installCompiledStyles(USAGE_LINE_CSS, 'usage'),
     () => installCompiledStyles(SCHEDULE_CSS, 'schedules'),
     () => installCompiledStyles(FEEDBACK_CSS, 'feedback'),
     () => installCompiledStyles(ABOUT_CSS, 'about'),
@@ -1070,9 +1080,6 @@ const UsageDock = ({ sessionId }) => {
     () => installFrameSync(),
     () => installTheme(),
     () => shadow('sidebar.workspaces', { priority: BOT_PRIORITY, inject: face }, TeamSidebar),
-    () => shadow('sidebar.brand.mark', { priority: BOT_PRIORITY }, BrandMark),
-    () => shadow('sidebar.brand.name', { priority: BOT_PRIORITY }, BrandName),
-    () => shadow('sidebar.footer.action', { id: 'bot-account', order: -200, inject: face }, FooterAccount),
     () => shadow('settings.trigger', { priority: BOT_PRIORITY }, YouAvatar),
     // The whale wins the seat over a shell account plugin's own launcher (the
     // Desktop's "··· More"), which comes back in Agent mode.
@@ -1125,7 +1132,6 @@ const UsageDock = ({ sessionId }) => {
       priority: BOT_PRIORITY,
       select: owner => (owner.pendingInteraction?.kind === 'question' ? owner.pendingInteraction : null),
     }, QuestionCard),
-    () => shadow('conversation.input.dock', { id: 'bot-usage', order: -125, inject: face }, UsageDock),
     () => shadow('conversation.input.dock', { id: 'bot-members', order: -120, inject: face }, MemberDock),
     () => shadow('conversation.input.dock', { id: 'bot-model', order: -110, inject: face }, ModelChoiceDock),
     () => shadow('conversation.input.dock', { id: 'bot-question', order: -100, inject: face }, QuestionDock),
@@ -1144,8 +1150,23 @@ const UsageDock = ({ sessionId }) => {
   ]
   // The return button belongs to neither group: it renders only in Agent mode.
   ctx.effect(() => installCompiledStyles(RETURN_CSS, 'return'), 'ds-bot: return styles')
+  ctx.effect(() => installCompiledStyles(FOOTER_CSS, 'footer'), 'ds-bot: footer styles')
   ctx.effect(() => installCompiledStyles(COMPUTER_CSS, 'computer'), 'ds-bot: computer styles')
   shadow('sidebar.footer.action', { id: 'bot-return', order: -300, inject: face }, BotReturn)
+
+  // The brand belongs to neither group either: the mark and the name are ours in
+  // both surfaces, so the Agent page carries the same mark as the Bot column.
+  shadow('sidebar.brand.mark', { priority: BOT_PRIORITY }, BrandMark)
+  shadow('sidebar.brand.name', { priority: BOT_PRIORITY }, BrandName)
+
+  // The AIDE workbench's entry in the foot of the host's own sidebar (the DSH page),
+  // beside the account button. It belongs to neither group for the same reason: the
+  // classic Agent page has no Bot column, so the button there is the only way in.
+  // The same button sits in the foot of our own Bot column.
+  shadow('sidebar.footer.action', { id: 'bot-aide', order: -190, inject: face }, AideFooterButton)
+  // The account menu stands in for the shell's own footer when no plugin holds the
+  // settings seat. It is the shell's footer, so it belongs to neither group.
+  shadow('sidebar.footer.action', { id: 'bot-account', order: -200, inject: face }, FooterAccount)
 
   // The main view decides `plain`: a DSH Agent Session keeps the Bot shell but
   // withdraws the conversation replacements, so the native dsh page shows. A jump

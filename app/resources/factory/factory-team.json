@@ -112,17 +112,17 @@
       "dsh-profile-plugin-ops": {
         "kind": "skill",
         "description": "用于在 DSH profile 中安装、升级插件，或将 MCP 工具改为按 Bot 挂载，并验证依赖、patch 与运行状态。",
-        "locator": "skills-repo/dsh-profile-plugin-ops"
+        "locator": "skills/dsh-profile-plugin-ops"
       },
       "ub-mode": {
         "kind": "skill",
         "description": "精简工程准则：写代码或改代码时按「先跑通 → 再做对 → 按实践收尾」三段执行。",
-        "locator": "skills-repo/ub-mode"
+        "locator": "skills/ub-mode"
       },
       "grilling": {
         "kind": "skill",
         "description": "需求澄清拷问：在动手前把需求问透，逐个逼出隐含假设与边界条件。",
-        "locator": "skills-repo/grilling"
+        "locator": "skills/grilling"
       }
     }
   }

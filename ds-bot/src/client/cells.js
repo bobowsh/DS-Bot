@@ -26,7 +26,7 @@ import { BtwCardView } from './btw.js'
 import { partIndexOf, withBtwRows } from './btw-model.js'
 import { ViaTag } from './user-message.js'
 import { layoutOf } from './themes.js'
-import { reasoningShown } from './work-details.js'
+import { thinkingShown } from './work-details.js'
 
 export { clockLabel }
 
@@ -265,8 +265,9 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   const members = steps.length ? steps : [data]
   // The host's own work-details mode decides whether a settled thought shows:
   // compact folds it away, the rest show its first line. The team follows it, so
-  // the chat and the host's settings never disagree.
-  const shown = reasoningShown(useWorkDetails?.(value => value))
+  // the chat and the host's settings never disagree. The user's own switch wins
+  // over the mode when they have made one.
+  const shown = thinkingShown(roster.prefs, useWorkDetails?.(value => value))
   // The host draws the header of a folded turn and keeps the state of the fold: its own
   // toggle turns it, and the answer comes back here. The team draws the rows themselves,
   // so they follow the same state: while the host says the turn is folded, they are not
