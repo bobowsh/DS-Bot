@@ -96,6 +96,12 @@ export function fakeContext({ services = {} } = {}) {
         registeredTools.set(tool.name, tool)
         return () => {}
       },
+      // The global registrations, the way the host's ToolsService answers a
+      // lookup without a scope. A Bot-scoped tool shadows a global one, so the
+      // global view still names the host's own implementation.
+      get(name) {
+        return registeredTools.get(name)
+      },
       guard(guard) {
         calls.push('tools guard')
         guards.push(guard)
