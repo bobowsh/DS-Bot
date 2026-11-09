@@ -68,7 +68,7 @@ export function createComputerCursor({ BrowserWindow, screen, platform, ownPid =
       if (!seen) { destroy(botId); return }
       const held = overlay(botId)
       const page = cursorHtml({ color: event.color, avatar: event.avatar, ripple: event.ripple === true })
-      try { held.win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`) } catch (error) { log.warn(`LinkBot: the cursor did not load: ${error instanceof Error ? error.message : String(error)}`) }
+      try { held.win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(page)}`) } catch (error) { log.warn(`LinkHarness: the cursor did not load: ${error instanceof Error ? error.message : String(error)}`) }
       try { held.win.setBounds({ x: Math.round(event.x - TIP.x), y: Math.round(event.y - TIP.y), width: SIZE, height: SIZE }) } catch {}
       try { if (!held.win.isVisible?.()) held.win.showInactive?.() } catch {}
       clearTimeout(held.fadeAt)
@@ -136,9 +136,9 @@ export function createPointChecker({ platform, ownPid = process.pid, spawn = rea
           if (line === 'y' || line === 'n') { pending?.resolve(line === 'y'); pending = null }
         }
       })
-      child.on('error', (error) => { log.warn(`LinkBot: the point checker failed: ${error instanceof Error ? error.message : String(error)}`); pending?.resolve(false); pending = null })
+      child.on('error', (error) => { log.warn(`LinkHarness: the point checker failed: ${error instanceof Error ? error.message : String(error)}`); pending?.resolve(false); pending = null })
       child.on('exit', () => { child = null; pending?.resolve(false); pending = null })
-    } catch (error) { log.warn(`LinkBot: the point checker did not start: ${error instanceof Error ? error.message : String(error)}`); child = null }
+    } catch (error) { log.warn(`LinkHarness: the point checker did not start: ${error instanceof Error ? error.message : String(error)}`); child = null }
     return child
   }
   const check = (x, y, pid) => {

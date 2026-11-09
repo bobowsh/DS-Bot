@@ -60,8 +60,8 @@ function harness({ platform = 'win32', trayFails = false, busy = false, ready = 
     },
     platform,
     messages: () => ({
-      tooltip: 'LinkBot', open: 'Open', quit: 'Quit',
-      closeAsk: { message: 'What should happen when the window closes?', toTray: 'Minimize to the system tray', quit: 'Quit LinkBot', cancel: 'Cancel' },
+      tooltip: 'LinkHarness', open: 'Open', quit: 'Quit',
+      closeAsk: { message: 'What should happen when the window closes?', toTray: 'Minimize to the system tray', quit: 'Quit LinkHarness', cancel: 'Cancel' },
       fallback: 'The system tray is not available, so the app cannot stay in the background. Do you want to end it?', cancel: 'Cancel',
     }),
     trayImage: () => {

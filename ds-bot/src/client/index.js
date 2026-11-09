@@ -263,7 +263,7 @@ export function apply(ctx) {
     }, 'ds-bot: app update status')
   }
 
-  // The LinkBot app's own updater; its state goes beside the host's answer as ownApp,
+  // The LinkHarness app's own updater; its state goes beside the host's answer as ownApp,
   // which the About row turns into the app's update state and buttons.
   const ownAppUpdates = globalThis.dsBotApp?.updates ?? null
   if (ownAppUpdates?.state && ownAppUpdates.subscribe) {
@@ -710,7 +710,7 @@ export function apply(ctx) {
   // DSH's own settings: models, providers, keys and its plugins.
   actions.openHarnessSettings = openHarnessSettings
   actions.openHarnessOnboarding = openHarnessOnboarding
-  // DSH's Models page, through LinkBot's own onboarding step while it is registered.
+  // DSH's Models page, through LinkHarness's own onboarding step while it is registered.
   actions.openHarnessModels = () => {
     const step = (ctx.slots.entries?.('settings.onboarding') ?? []).some(entry => entry.options?.id === MODELS_STEP)
     if (step) openHarnessOnboarding(MODELS_STEP)
@@ -727,7 +727,7 @@ export function apply(ctx) {
     update.set(previous => ({ ...previous, ...value }))
     wakeUpdate()
   }
-  // The DSH the newest released LinkBot verified installs the same way.
+  // The DSH the newest released LinkHarness verified installs the same way.
   actions.installDshUpdate = async () => {
     const dsh = await call('dsh-update-install')
     update.set(previous => ({ ...previous, dsh }))

@@ -7,30 +7,30 @@ import { DISPLAY_NAME } from './legacy.mjs'
 
 export const SHELL_TEXT = {
   en: {
-    tooltip: 'LinkBot',
-    open: 'Open LinkBot',
-    quit: 'Quit LinkBot',
+    tooltip: 'LinkHarness',
+    open: 'Open LinkHarness',
+    quit: 'Quit LinkHarness',
     closeAsk: {
       message: 'What should happen when the window closes?',
       toTray: 'Minimize to the system tray',
-      quit: 'Quit LinkBot',
+      quit: 'Quit LinkHarness',
       cancel: 'Cancel',
     },
-    fallback: 'The system tray is not available, so LinkBot cannot stay in the background. Do you want to end it?',
+    fallback: 'The system tray is not available, so LinkHarness cannot stay in the background. Do you want to end it?',
     cancel: 'Cancel',
     stopAll: 'Stop all',
   },
   zh: {
-    tooltip: 'LinkBot',
-    open: '打开 LinkBot',
-    quit: '退出 LinkBot',
+    tooltip: 'LinkHarness',
+    open: '打开 LinkHarness',
+    quit: '退出 LinkHarness',
     closeAsk: {
       message: '关闭窗口后要做什么？',
       toTray: '最小化到系统托盘',
-      quit: '退出 LinkBot',
+      quit: '退出 LinkHarness',
       cancel: '取消',
     },
-    fallback: '系统托盘不可用，LinkBot 不能留在后台。要结束它吗？',
+    fallback: '系统托盘不可用，LinkHarness 不能留在后台。要结束它吗？',
     cancel: '取消',
     stopAll: '全部停止',
   },
@@ -148,7 +148,7 @@ export function createShell(options) {
     } catch (error) {
       // Without a tray the window stays where the user can reach it; the app never vanishes.
       tray = undefined
-      log.warn(`LinkBot: the system tray is not available: ${error instanceof Error ? error.message : String(error)}`)
+      log.warn(`LinkHarness: the system tray is not available: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
@@ -165,7 +165,7 @@ export function createShell(options) {
       })
       if (response === 0) { quit(); return }
     } catch (error) {
-      log.warn(`LinkBot: the fallback quit could not be asked: ${error instanceof Error ? error.message : String(error)}`)
+      log.warn(`LinkHarness: the fallback quit could not be asked: ${error instanceof Error ? error.message : String(error)}`)
     }
     // The window stays in the task bar, where the user can reach it.
     target.minimize()
@@ -206,7 +206,7 @@ export function createShell(options) {
       if (response === 0) { quit(); return }
       if (response === 1) { hide(target); return }
     } catch (error) {
-      log.warn(`LinkBot: the close question could not be asked: ${error instanceof Error ? error.message : String(error)}`)
+      log.warn(`LinkHarness: the close question could not be asked: ${error instanceof Error ? error.message : String(error)}`)
     }
     // A cancelled or failed question leaves the window where it is.
   }

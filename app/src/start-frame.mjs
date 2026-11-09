@@ -36,7 +36,7 @@ export function writeStartFrame(file, change) {
     renameSync(`${file}.tmp`, file)
     return true
   } catch (error) {
-    console.error('LinkBot: the start window\'s theme was not saved:', error)
+    console.error('LinkHarness: the start window\'s theme was not saved:', error)
     return false
   }
 }

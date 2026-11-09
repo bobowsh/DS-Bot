@@ -48,7 +48,7 @@ describe('the packaged Windows install', () => {
     delete process.env.DS_BOT_HOME
     // A packaged layout of its own: <install>\app holds the exe.
     const install = mkdtempSync(join(tmpdir(), 'ds-bot-fr-install-'))
-    paths.exe = join(install, 'app', 'LinkBot.exe')
+    paths.exe = join(install, 'app', 'LinkHarness.exe')
   })
 
   test('the folders are the ones beside the program folder and nothing is asked', { skip: process.platform !== 'win32' && 'the fixed places are a Windows install rule' }, async () => {
@@ -93,7 +93,7 @@ describe('the packaged Windows install', () => {
     const root = mkdtempSync(join(tmpdir(), 'ds-bot-fr-nowrite-'))
     const parent = join(root, 'not-a-folder')
     writeFileSync(parent, 'this is a file')
-    paths.exe = join(parent, 'app', 'LinkBot.exe')
+    paths.exe = join(parent, 'app', 'LinkHarness.exe')
     const warnings = []
     const warn = console.warn
     console.warn = (...args) => { warnings.push(args.join(' ')) }
