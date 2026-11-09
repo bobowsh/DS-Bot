@@ -650,15 +650,18 @@ html[data-windows-titlebar] .bt-title-toggle:hover{background:var(--bt-hover)}
 html:not([data-windows-titlebar]) .bt-title-toggle{position:fixed;left:12px;top:calc(var(--dsh-frame-top-clearance,0px) + 6px);z-index:30}
 /* The footer ends in the Bot row: the whale's settings seat, then the account menu
    when no plugin holds that seat. Every other plugin's entry takes a whole row above
-   it, in the shell's order, so none of them squeezes the Bot row. */
-[class*="_footArea"]{grid-template-columns:auto minmax(0,1fr);grid-auto-flow:row dense;align-items:center;gap:4px 9px;padding:8px 6px 6px!important}
+   it, in the shell's order, so none of them squeezes the Bot row.
+   These are the Bot column's rules. The classic Agent page has no Bot column, and there
+   the shell lays out its own footer: a second grid over it is what stacked the account
+   gear on top of the shell's settings button, so the rules stop at the surface. */
+:root[data-bt-surface=bot] [class*="_footArea"]{grid-template-columns:auto minmax(0,1fr);grid-auto-flow:row dense;align-items:center;gap:4px 9px;padding:8px 6px 6px!important}
 /* DSH hides the footer of a collapsed sidebar under a Windows title bar; the grid
    stays out of that one place. */
-html:not([data-windows-titlebar]) [class*="_footArea"],:not([class*="_collapsed"])>[class*="_footArea"]{display:grid!important}
-[class*="_footArea"]>[class*="_footerActions"],[class*="_footArea"]>[class*="_footerActions"]>div{display:contents!important}
-[class*="_footArea"]>[class*="_footerActions"]>div>*{grid-column:1/-1}
-[class*="_footArea"]>[class*="_settingsArea"]{grid-column:1;order:1;width:auto!important}
-[class*="_footArea"] button[aria-label="Settings"]{width:auto!important;padding:0!important;background:none!important;border-radius:50%!important;height:auto!important}
+:root[data-bt-surface=bot]:not([data-windows-titlebar]) [class*="_footArea"],:root[data-bt-surface=bot] :not([class*="_collapsed"])>[class*="_footArea"]{display:grid!important}
+:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_footerActions"],:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_footerActions"]>div{display:contents!important}
+:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_footerActions"]>div>*{grid-column:1/-1}
+:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_settingsArea"]{grid-column:1;order:1;width:auto!important}
+:root[data-bt-surface=bot] [class*="_footArea"] button[aria-label="Settings"]{width:auto!important;padding:0!important;background:none!important;border-radius:50%!important;height:auto!important}
 [class*="_widthHandle"]{display:none!important}
 
 .bt-voice-pane{flex-direction:column;align-items:center;justify-content:center;animation:bt-fade .2s ease-out}
@@ -738,6 +741,12 @@ body[data-bt-layout=flat] .bt-tools::after{display:none}
 .bt-you{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bt-ink) 5%,var(--bt-sidebar));color:var(--bt-ink-2);box-shadow:inset 0 0 0 1px var(--bt-line);transition:background-color .12s ease}
 button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
 .bt-you-wrap{display:inline-flex;padding:0}
+/* In the classic Agent page this gear fills the shell's own settings button, which is a 42px
+   tall row that spans the column. A 36px circle with its own ring inside it reads as a second
+   button on top of the first, so there it takes the shell's own shape and size — the icon
+   stays, only its frame follows the host. */
+:root[data-bt-surface=agent] [class*="_settingsArea"] button[class*="_trigger"] .bt-you{width:100%;height:100%;border-radius:inherit;box-shadow:none;background:none}
+:root[data-bt-surface=agent] [class*="_settingsArea"] button[class*="_trigger"]:hover .bt-you{background:none}
 
 .bt-menu{position:fixed;pointer-events:auto;z-index:60;min-width:200px;padding:6px;border-radius:12px;background:var(--bt-glass-bg);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);border:.5px solid var(--bt-glass-rim);box-shadow:var(--bt-glass-shadow),0 0 0 1px rgba(228,228,228,.04);display:flex;flex-direction:column;gap:2px;transform-origin:var(--bt-origin,top left);animation:bt-pop-drop ${SPRING_TAP.duration}ms ${SPRING_TAP.easing},bt-veil-in .14s ease-out;font-family:var(--bt-font);box-sizing:border-box}
 .bt-menu button{display:flex;align-items:center;gap:4px;width:100%;min-height:30px;text-align:left;border:0;background:none;border-radius:6px;padding:6px 8px;font:inherit;font-size:13px;line-height:18px;color:var(--bt-ink);cursor:pointer;box-sizing:border-box}

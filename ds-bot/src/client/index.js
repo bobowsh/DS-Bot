@@ -1244,6 +1244,12 @@ const UsageDock = ({ sessionId }) => {
       verifyTimer = setTimeout(verifySidebar, 250)
     }
     const reconcile = () => {
+      const mode = surface.getSnapshot().mode
+      // Our styles reach into the shell's own footer, and some of them only make sense while
+      // the Bot column is there (the account entry sits in the foot of that column). In the
+      // classic Agent page the shell owns the footer, so those rules must not apply: mark the
+      // surface on the document and let the styles say data-bt-surface=bot.
+      if (typeof document !== 'undefined') document.documentElement.dataset.btSurface = mode
       groups.reconcile(groupsFor(surface.getSnapshot()))
       clearTimeout(verifyTimer)
       verifyAttempts = 0
