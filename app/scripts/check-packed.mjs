@@ -13,6 +13,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { crc32 } from 'node:zlib'
 import { hostExecutable } from '../src/host-process.mjs'
+import { checkSourceOwnership } from './check-asar-sources.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const [given, shotFile] = process.argv.slice(2)
@@ -20,16 +21,35 @@ const executable = given || packedExecutable()
 
 function packedExecutable() {
   const out = join(root, 'dist-pack')
-  if (process.platform === 'win32') return join(out, 'win-unpacked', 'LinkBot.exe')
+  if (process.platform === 'win32') return join(out, 'win-unpacked', 'LinkHarness.exe')
   // executableName in electron-builder.yml.
   if (process.platform === 'linux') return join(out, 'linux-unpacked', 'linkbot')
   const dir = ['mac-arm64', 'mac'].find(name => existsSync(join(out, name))) ?? 'mac'
-  return join(out, dir, 'LinkBot.app', 'Contents', 'MacOS', 'LinkBot')
+  return join(out, dir, 'LinkHarness.app', 'Contents', 'MacOS', 'LinkHarness')
 }
 
 if (!existsSync(executable)) {
   console.error(`check-packed: no app at ${executable}. Run npm run pack first.`)
   process.exit(2)
+}
+
+// The asar holds the main process's own files: every one of them must be the file it says it is.
+// A build made while the source tree was being rewritten once shipped 17 entries holding another
+// file's bytes, and the app died on SyntaxError before the window came up. This check is static and
+// cheap, so it runs before the app is started at all.
+{
+  const resources = process.platform === 'darwin' ? join(dirname(executable), '..', 'Resources') : join(dirname(executable), 'resources')
+  const archive = join(resources, process.platform === 'linux' ? 'app' : 'app.asar')
+  if (existsSync(archive)) {
+    const { checked, wrong } = checkSourceOwnership(archive, join(root, 'src'))
+    if (wrong.length > 0) {
+      console.error(`check-packed: ${wrong.length}/${checked} 个源码条目在 asar 里装的是别的文件的内容：`)
+      for (const row of wrong) console.error(`  ${row.name}  asar=${row.packed} 源=${row.source}  实际开头: ${row.head}`)
+      console.error('check-packed: 这通常是打包时源目录正被改写。等写入结束后重打包。')
+      process.exit(1)
+    }
+    console.log(`check-packed: asar 里 ${checked} 个源码条目内容全部正确`)
+  }
 }
 
 // The Office payload sits next to the asar as extraResources, and the LibreOffice Kit CLI is a
