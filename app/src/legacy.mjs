@@ -17,7 +17,11 @@ export const LEGACY_PRODUCT_NAME = 'DeepSeek Bot'
 // 产品改名后内部 product name 也跟着变了，userData 目录随之从 LinkBot 换成 LinkHarness。
 // 这份列表让它按从新到旧的顺序找回已有安装的数据目录，改名不会把用户的设置和 locations
 // 丢在一个新空目录里。清单里第一个存在的目录会被复用。
-export const LEGACY_USER_DATA_NAMES = ['LinkBot', 'DeepSeek Bot']
+//
+// 顺序是从新到旧：`LinkBot` 是上一代，`DS Bot` 是再上一代（还是内部 product name 时的
+// 目录名，装机机器上大量存在），`DeepSeek Bot` 是最老的兜底。少了 `DS Bot` 会让只装过
+// 那一代的用户升级后落进空目录——这台机器上 `DS Bot` 目录正带着 locations.json。
+export const LEGACY_USER_DATA_NAMES = ['LinkBot', 'DS Bot', 'DeepSeek Bot']
 export const LEGACY_ENGINE = 'deepseek-bot-engine'
 export const LEGACY_ARTIFACT_PREFIX = 'DeepSeek-Bot'
 
