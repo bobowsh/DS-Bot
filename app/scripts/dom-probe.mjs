@@ -118,19 +118,60 @@ const PROBE = `(() => {
   const ownSheets = [...document.querySelectorAll('style[data-dsh-bot]')].map(el => ({
     tag: el.dataset.dshBot,
     len: el.textContent.length,
+    connected: el.isConnected,
+    parent: el.parentElement?.tagName,
     hasBtYou: el.textContent.includes('.bt-you'),
     hasAgentRule: el.textContent.includes('data-bt-surface=agent'),
-    // The compiled fragment selectors: what the foot area rule turned into.
+    hasTheme: el.textContent.includes('--bt-ink:'),
+    // The foot area rule: what the compiled text turned into.
     footRule: (el.textContent.match(/[^{}]*_footArea[^{}]*\{[^}]*\}/g) ?? []).slice(0, 2),
     youRule: (el.textContent.match(/[^{}]*bt-you[^{}]*\{[^}]*\}/g) ?? []).slice(0, 3),
   }))
+  // Every style element in the head, so a table that never landed is visible.
+  const headStyles = [...document.querySelectorAll('head style')].map(el => ({
+    plugin: el.dataset.plugin ?? undefined,
+    dshBot: el.dataset.dshBot ?? undefined,
+    len: el.textContent.length,
+  }))
+  // Is our module loaded at all, and what did it install?
   const areaStyle = area ? (() => {
     const s = getComputedStyle(area)
     return { display: s.display, gridTemplateColumns: s.gridTemplateColumns }
   })() : undefined
+  // Which of our own classes are on the page but have no rule in any loaded sheet:
+  // those are the styles the classic page lost with the shell group.
+  const ourClasses = new Set()
+  for (const el of document.querySelectorAll('[class*="bt-"]')) {
+    for (const name of (el.className || '').toString().split(/\s+/)) {
+      if (name.startsWith('bt-')) ourClasses.add(name)
+    }
+  }
+  const allRules = []
+  for (const sheet of document.styleSheets) {
+    try {
+      const visit = (rules) => {
+        for (const rule of rules) {
+          if (rule.selectorText) allRules.push(rule.selectorText)
+          if (rule.cssRules) visit(rule.cssRules)
+        }
+      }
+      visit(sheet.cssRules)
+    } catch { /* cross-origin sheet */ }
+  }
+  const styled = (cls) => allRules.some(sel => sel.includes('.' + cls))
+  const unstyled = [...ourClasses].filter(cls => !styled(cls)).sort()
+  // The theme variables our rules read: are they set? They live on the body element.
+  const bodyStyle = getComputedStyle(document.body)
+  const vars = {}
+  for (const name of ['--bt-ink', '--bt-ink-2', '--bt-line', '--bt-main', '--bt-hover', '--bt-sidebar', '--bt-accent', '--bt-glass-bg']) {
+    vars[name] = bodyStyle.getPropertyValue(name).trim()
+  }
+
   return JSON.stringify({
     title: document.title,
     surface: root.dataset.btSurface,
+    unstyled,
+    vars,
     footAreaFound: area !== null,
     footAreaBox: areaBox,
     footAreaStyle: areaStyle,
@@ -146,6 +187,7 @@ const PROBE = `(() => {
     gearRules,
     matchesAgent,
     ownSheets,
+    headStyles,
     gearBox,
     gearInsideFoot: inside(gearBox),
     // The gear and the shell's own settings trigger are the same spot in the classic
@@ -172,6 +214,103 @@ try {
     await cdp.call('Page.reload')
     await sleep(wait * 1000)
   }
+  // The experiment: put the base rules of our own icons on the classic page and
+  // see whether the icons take their own shape again.
+  if (process.env.PROBE_INJECT === '1') {
+    await cdp.call('Runtime.evaluate', {
+      expression: `(() => {
+        const style = document.createElement('style')
+        style.textContent = [
+          '.bt-round{width:36px;height:36px;border-radius:50%;border:1px solid var(--bt-line);background:var(--bt-main);color:var(--bt-ink);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}',
+          '.bt-you{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bt-ink) 5%,var(--bt-sidebar));color:var(--bt-ink-2);box-shadow:inset 0 0 0 1px var(--bt-line)}',
+          '.bt-you-wrap{display:inline-flex;padding:0}',
+          '.bt-account{flex:none;width:36px;height:36px;border:0;padding:0;background:none;border-radius:50%;cursor:pointer;display:inline-flex}',
+          '.bt-brand-whale{display:inline-flex;color:var(--bt-accent)}',
+          '.bt-brand-name{font-weight:600;font-size:14px;white-space:nowrap}',
+        ].join('')
+        document.head.appendChild(style)
+        return 'injected'
+      })()`,
+    })
+    await sleep(1500)
+  }
+  // The console the page printed: a failed install says so.
+  const { result: logs } = await cdp.call('Runtime.evaluate', {
+    expression: `(window.__dsbLogs ?? []).slice(0, 20)`,
+    returnByValue: true,
+  })
+  console.log(`page logs: ${JSON.stringify(logs?.value ?? [])}`)
+  // What our module installed, and whether those tables are still in the document.
+  const { result: moduleInfo } = await cdp.call('Runtime.evaluate', {
+    expression: `(() => {
+      const sheets = [...document.querySelectorAll('style')]
+      return JSON.stringify({
+        total: sheets.length,
+        dsBot: sheets.filter(s => s.dataset.plugin === 'ds-bot').map(s => [s.dataset.dshBot, s.textContent.length, s.isConnected]),
+      })
+    })()`,
+    returnByValue: true,
+  })
+  console.log(`module: ${String(moduleInfo?.value ?? '')}`)
+  // Does the module's own code carry the base table? The bundled client keeps the
+  // stylesheet text in its own source, so look for it there.
+  const { result: bundle } = await cdp.call('Runtime.evaluate', {
+    expression: `(() => {
+      const src = [...document.querySelectorAll('script')].map(s => s.textContent).join('')
+      const at = src.indexOf('installCompiledStyles(BASE_CSS')
+      return JSON.stringify({ found: at !== -1, around: at === -1 ? '' : src.slice(at - 60, at + 90) })
+    })()`,
+    returnByValue: true,
+  })
+  console.log(`bundle: ${String(bundle?.value ?? '')}`)
+  // Call the same install the module calls, and report what it throws.
+  const { result: installTry } = await cdp.call('Runtime.evaluate', {
+    expression: `(() => {
+      try {
+        const style = document.createElement('style')
+        style.dataset.dshBot = 'probe'
+        style.dataset.plugin = 'ds-bot'
+        style.textContent = ''
+        document.head.appendChild(style)
+        const names = new Set()
+        for (const sheet of document.styleSheets) {
+          if (sheet.ownerNode?.dataset?.dshBot) continue
+          let list = []
+          try {
+            const visit = (rules) => {
+              for (const rule of rules) {
+                if (rule.selectorText) for (const m of rule.selectorText.matchAll(/\\.((?:\\\\.|[\\w-])+)/g)) list.push(m[1])
+                if (rule.cssRules) visit(rule.cssRules)
+              }
+            }
+            visit(sheet.cssRules)
+          } catch { /* cross-origin */ }
+          for (const n of list) names.add(n)
+        }
+        return JSON.stringify({ ok: true, names: names.size })
+      } catch (error) {
+        return JSON.stringify({ ok: false, message: error?.message ?? String(error), stack: String(error?.stack ?? '').slice(0, 300) })
+      }
+    })()`,
+    returnByValue: true,
+  })
+  console.log(`install try: ${String(installTry?.value ?? '')}`)
+  // Which script did the page load? The module loader's source shows the file.
+  const { result: sources } = await cdp.call('Runtime.evaluate', {
+    expression: `(() => {
+      const mods = window.__ModuleLoader__?.modules ?? window.__ModuleLoader__?.registry
+      const out = []
+      try {
+        for (const key of Object.keys(mods ?? {})) {
+          const m = mods[key]
+          out.push([key, typeof m === 'function' ? 'fn' : typeof m, String(m?.url ?? m?.source ?? '').slice(0, 120)])
+        }
+      } catch (e) { out.push(['err', e.message]) }
+      return JSON.stringify({ keys: Object.keys(window.__ModuleLoader__ ?? {}), mods: out.slice(0, 10) })
+    })()`,
+    returnByValue: true,
+  })
+  console.log(`loader: ${String(sources?.value ?? '')}`)
   const { result } = await cdp.call('Runtime.evaluate', { expression: PROBE, returnByValue: true })
   console.log(`probe: ${String(result.value)}`)
   if (out !== undefined) {
