@@ -496,7 +496,27 @@ try {
   if (chatError) throw chatError
   // Close the native window: a renderer-initiated close can stop page CDP evaluations even
   // when Electron prevents the close. Read visibility from the main process as well.
+  //
+  // Every close asks what to do (the one-time notice is gone), so the card in the window has
+  // to be answered the way the user answers it: 「最小化到系统托盘」. The card's buttons are
+  // labelled by the shell's own text, so this matches either language.
   await windowState('win.close()')
+  const pageEval = async expression => (await cdp.call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })).result.value
+  const answered = await (async () => {
+    const end = Date.now() + 15_000
+    while (Date.now() < end) {
+      const clicked = await pageEval(`(() => {
+        const button = [...document.querySelectorAll('button')].find(node => /Minimize to the system tray|最小化到系统托盘/u.test(node.textContent))
+        if (button === undefined) return false
+        button.click()
+        return true
+      })()`)
+      if (clicked) return true
+      await sleep(250)
+    }
+    return false
+  })()
+  if (!answered) console.log('check-packed: the close asked nothing, as when the tray is not available')
   await sleep(4000)
   if (app.exitCode !== null) throw new Error('the app ended with its window')
   if (await windowState('win !== undefined && !win.isDestroyed() && !win.isVisible()') !== true) throw new Error('the window is not hidden')
