@@ -6,7 +6,7 @@ import { createSource, EMPTY_ROSTER, indexRoster, isAgentSession } from './sourc
 import { teamActions } from './team-actions.js'
 import { themeCss, shellTokens, registry, registerShape, registerTheme, allThemes, layoutOf, widthOf, flatWidthOf } from './themes.js'
 import { MENTION_ORIGIN, currentPart } from './text.js'
-import { SHELL_CSS, CONVERSATION_CSS, installStyles, installCompiledStyles } from './styles.js'
+import { BASE_CSS, SHELL_CSS, CONVERSATION_CSS, installStyles, installCompiledStyles } from './styles.js'
 import { lookOf } from './mark.js'
 import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, BotReturn, SIDEBAR_CSS, RETURN_CSS, FOOTER_CSS, holdShellShortcuts, openHarnessOnboarding, openHarnessSettings, MODELS_STEP, MODELS_STEP_ORDER, OpenModelsStep } from './sidebar.js'
 import { AideFooterButton } from './aide-button.js'
@@ -1149,6 +1149,10 @@ export function apply(ctx) {
     () => shadow('conversation.input.dock', { id: 'queue', order: 20, priority: BOT_PRIORITY, inject: queueFace }, QueueDock),
   ]
   // The return button belongs to neither group: it renders only in Agent mode.
+  // The base rules belong to neither either: the classic Agent page shows our own
+  // icons (the AIDE button, the account gear, the brand), and the shell group is
+  // not mounted there, so these must be installed outside it.
+  ctx.effect(() => installCompiledStyles(BASE_CSS, 'base'), 'ds-bot: base styles')
   ctx.effect(() => installCompiledStyles(RETURN_CSS, 'return'), 'ds-bot: return styles')
   ctx.effect(() => installCompiledStyles(FOOTER_CSS, 'footer'), 'ds-bot: footer styles')
   ctx.effect(() => installCompiledStyles(COMPUTER_CSS, 'computer'), 'ds-bot: computer styles')
@@ -1265,6 +1269,12 @@ export function apply(ctx) {
       verifyTimer = setTimeout(verifySidebar, 250)
     }
     const reconcile = () => {
+      const mode = surface.getSnapshot().mode
+      // Our styles reach into the shell's own footer, and some of them only make sense while
+      // the Bot column is there (the account entry sits in the foot of that column). In the
+      // classic Agent page the shell owns the footer, so those rules must not apply: mark the
+      // surface on the document and let the styles say data-bt-surface=bot.
+      if (typeof document !== 'undefined') document.documentElement.dataset.btSurface = mode
       groups.reconcile(groupsFor(surface.getSnapshot()))
       clearTimeout(verifyTimer)
       verifyAttempts = 0

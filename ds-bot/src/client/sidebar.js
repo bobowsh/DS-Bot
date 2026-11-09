@@ -1140,10 +1140,15 @@ export const SIDEBAR_CSS = `
 .bt-rail .bt-row{position:relative}
 .bt-rail .bt-pin{position:absolute;top:1px;left:calc(50% + 14px)}
 .bt-side .bt-read-only{margin:4px 8px 6px;padding:8px 10px;border-radius:10px;background:var(--bt-hover);font-size:12px;line-height:1.45;text-align:left}
-[class*="_footArea"]:has(.bt-foot-account){grid-template-columns:auto minmax(0,1fr) auto;column-gap:6px}
-[class*="_footArea"]>[class*="_footerActions"]>div>.bt-foot-account{grid-column:1;order:1;display:inline-flex}
-[class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{grid-column:3}
-[class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
+/* The account entry sits in the foot of our own column, whose three-column grid puts it first
+   and keeps the shell's settings trigger last. The classic Agent page has no Bot column, so
+   there the shell's own footer keeps its own layout: these rules only apply while the Bot
+   surface is up (data-bt-surface is set on the document root). The icon itself stays in both
+   surfaces — only the layout around it changes. */
+:root[data-bt-surface=bot] [class*="_footArea"]:has(.bt-foot-account){grid-template-columns:auto minmax(0,1fr) auto;column-gap:6px}
+:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_footerActions"]>div>.bt-foot-account{grid-column:1;order:1;display:inline-flex}
+:root[data-bt-surface=bot] [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{grid-column:3}
+:root[data-bt-surface=bot] [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
 
 /* The update cloud springs in when a newer LinkBot shows up; its arrow drops in a
    loop while the install runs. */

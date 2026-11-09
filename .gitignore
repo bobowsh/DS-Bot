@@ -46,3 +46,7 @@ node_modules/
 
 # Bytecode from the record-browser-gif encoder's local media tests.
 __pycache__/
+
+# The scratch directory for this workspace's temporary scripts and output.
+tmp/
+app/tmp/

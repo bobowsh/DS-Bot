@@ -9,6 +9,7 @@
 // Environment:
 //   PROBE_SURFACE  'bot' (the team interface, the default) or 'agent' (the classic page)
 //   PROBE_SEND     '1' to type a message and send it before reading
+//   PROBE_OPEN     the name of the Bot to open; without it the first Bot is opened
 //   PROBE_WAIT     seconds to wait for the app to settle (default 20)
 //
 // It reads, never writes: the folders it is given are throwaway ones.
@@ -228,10 +229,12 @@ try {
     expression: `(() => {
       const wanted = ${JSON.stringify(process.env.PROBE_OPEN ?? '')}
       const rows = [...document.querySelectorAll('[data-bot-id]')]
-      const row = wanted ? rows.find(r => (r.getAttribute('aria-label') ?? '').includes(wanted)) : rows[0]
+      const row = wanted
+        ? rows.find(r => (r.getAttribute('aria-label') ?? '').includes(wanted))
+        : rows[0] ?? document.querySelector('[data-room-id]')
       if (!row) return 'no row'
       row.click()
-      return 'clicked ' + (row.getAttribute('aria-label') ?? row.getAttribute('data-bot-id') ?? '')
+      return 'clicked ' + (row.getAttribute('aria-label') ?? row.getAttribute('data-bot-id') ?? row.getAttribute('data-room-id') ?? '')
     })()`,
     returnByValue: true,
   })
