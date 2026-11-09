@@ -18238,7 +18238,7 @@ function UsagePage({ roster, actions, focusId }) {
     body
   );
 }
-var USAGE_CSS2 = `
+var USAGE_CSS = `
 .bt-us{--bt-us-ease:cubic-bezier(.22,1,.36,1);--bt-us-rest:color-mix(in srgb,var(--bt-ink) 30%,var(--bt-card));--bt-us-more:color-mix(in srgb,var(--bt-ink) 16%,var(--bt-card));display:flex;flex-direction:column;gap:14px;padding-bottom:4px}
 .bt-us-top{position:relative;z-index:4;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 /* Scrolls instead of running past the page when the column is narrower than the tabs. */
@@ -29590,7 +29590,7 @@ function apply(ctx) {
   actions.accountT = () => ctx.get("locale").bind("settings.account");
   actions.speech = () => ctx.get("remote.speech") ?? void 0;
   actions.openHarnessOnboarding = (id) => settingsShell?.openOnboarding(id);
-  actions.voiceSetup = (providerId) => {
+  actions.voiceSetup = () => {
     const navigation = ctx.get("pluginNavigation");
     return navigation ? () => navigation.openBundle(VOICE_BUNDLE) : null;
   };
@@ -29917,7 +29917,6 @@ function apply(ctx) {
     [SECRET_CSS + CONNECTOR_CSS + CONNECTORS_PAGE_CSS, "secrets"],
     [LEARNING_CSS, "learning"],
     [MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + AGENT_CARDS_CSS + GROUP_SETTINGS_CSS + AVATAR_LIBRARY_CSS, "models"],
-    [USAGE_CSS, "usage"],
     [SCHEDULE_CSS, "schedules"],
     [FEEDBACK_CSS, "feedback"],
     [ABOUT_CSS, "about"],

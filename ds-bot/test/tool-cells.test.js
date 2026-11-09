@@ -70,7 +70,7 @@ runInNewContext(outputFiles[0].text, {
     throw new Error(`Unexpected platform module ${name}`)
   },
 })
-const { TeamToolView, ToolCell, TriggerCell, callTree, stackReplies, CellEmpty, Bubbles, QuestionDock, SettledQuestion, SecretDock, countCards, ViewMenuList, WidgetView, WidgetDock } = module.exports
+const { TeamToolView, TriggerCell, callTree, stackReplies, CellEmpty, Bubbles, QuestionDock, SettledQuestion, SecretDock, countCards, ViewMenuList, WidgetView, WidgetDock } = module.exports
 
 // Runs the effects collected since the last render; returns the cleanups.
 const mount = () => {

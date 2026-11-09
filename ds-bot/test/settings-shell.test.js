@@ -167,7 +167,8 @@ const navLabels = tree => walk(walk(tree, node => node.type === 'nav')[0], node 
 test('one Settings: DS Bot\'s pages, then DSH\'s, then Feedback and About; no Harness settings', () => {
   const labels = navLabels(dialog().tree)
   assert.ok(!labels.includes('Harness settings'))
-  assert.deepEqual(labels.slice(-5), ['Account', 'Plugins', 'Agent presets', 'Feedback', 'About DS Bot'])
+  // The last page carries our product name (the rename to LinkHarness).
+  assert.deepEqual(labels.slice(-5), ['Account', 'Plugins', 'Agent presets', 'Feedback', 'About LinkBot'])
   assert.equal(labels.filter(label => label === 'General').length, 1)
   assert.equal(labels.filter(label => label === 'Models').length, 1)
 })

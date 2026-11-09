@@ -8,7 +8,7 @@ import { themeCss, shellTokens, registry, registerShape, registerTheme, allTheme
 import { MENTION_ORIGIN, currentPart } from './text.js'
 import { SHELL_CSS, CONVERSATION_CSS, botOwnCss, installStyles, installCompiledStyles } from './styles.js'
 import { lookOf } from './mark.js'
-import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, BotReturn, SIDEBAR_CSS, RETURN_CSS, FOOTER_CSS, holdShellShortcuts, MODELS_STEP, MODELS_STEP_ORDER, OpenModelsStep } from './sidebar.js'
+import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, BotReturn, SIDEBAR_CSS, RETURN_CSS, FOOTER_CSS, holdShellShortcuts } from './sidebar.js'
 import { AideFooterButton } from './aide-button.js'
 import { installSettingsShell, SETTINGS_SHELL_CSS } from './settings-shell.js'
 import { frameLayout, readSidebar, writeSidebar, toggledPref, DSH_NARROW } from './frame-layout.js'
@@ -720,7 +720,7 @@ export function apply(ctx) {
   // and download notes live there). Where it is not mounted — the desktop app's
   // profile has no plugin manager — the speech Remote prepares the provider
   // itself, and the voice pane follows its progress.
-  actions.voiceSetup = (providerId) => {
+  actions.voiceSetup = () => {
     const navigation = ctx.get('pluginNavigation')
     return navigation ? () => navigation.openBundle(VOICE_BUNDLE) : null
   }
@@ -1075,7 +1075,6 @@ export function apply(ctx) {
     [SECRET_CSS + CONNECTOR_CSS + CONNECTORS_PAGE_CSS, 'secrets'],
     [LEARNING_CSS, 'learning'],
     [MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + AGENT_CARDS_CSS + GROUP_SETTINGS_CSS + AVATAR_LIBRARY_CSS, 'models'],
-    [USAGE_CSS, 'usage'],
     [SCHEDULE_CSS, 'schedules'],
     [FEEDBACK_CSS, 'feedback'],
     [ABOUT_CSS, 'about'],

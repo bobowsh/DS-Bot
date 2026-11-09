@@ -195,7 +195,11 @@ test('env sanitization drops agent and key variables', () => {
   assert.equal(env.OPENAI_API_KEY, undefined)
   assert.equal(env.DS_BOT_HOME, undefined)
   assert.equal(env.EXTRA, '1')
-  assert.ok(env.PATH.startsWith(process.env.PATH))
+  // The PATH a CLI sees carries the folders the CLIs live in, then the inherited one.
+  // Windows spells the variable `Path`, and a plain object does not read either spelling.
+  const pathKey = Object.keys(env).find(key => key.toUpperCase() === 'PATH')
+  assert.notEqual(pathKey, undefined, 'the env carries a PATH')
+  assert.ok(env[pathKey].includes(process.env.PATH ?? process.env.Path), 'the inherited PATH stays reachable')
 })
 
 // A Dock-launched app has PATH=/usr/bin:/bin:…; a CLI found in ~/.local/bin or
