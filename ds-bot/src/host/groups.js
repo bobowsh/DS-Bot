@@ -1258,6 +1258,25 @@ export function install(rt) {
   }
   rt.postToRoom = postToRoom
 
+  // The user's answer to a card asked in a group chat. It goes into the group's own
+  // Session as the user's own message, addressed to the Bot that asked: the group
+  // hears it like any other line the user wrote there, the round it opens calls that
+  // Bot, and the parked-call counter resets as it does for any user message.
+  async function answerRoomQuestion(question, reply) {
+    const room = rt.roomOf(question.roomId)
+    if (room === undefined) throw Object.assign(new Error('This group chat is gone'), { code: 'bot/stale' })
+    const sessionId = rt.sessionOfRoom(room)
+    if (sessionId === undefined) throw Object.assign(new Error('This group chat is gone'), { code: 'bot/stale' })
+    await rt.ensureCapabilities(sessionId)
+    await ctx.sessionController.prompt({
+      requestId: randomUUID(),
+      sessionId,
+      mode: 'queue',
+      content: [{ type: 'text', text: reply.text }],
+    })
+  }
+  rt.answerRoomQuestion = answerRoomQuestion
+
   // A member the round moved on from (it went on working, went quiet or waited for an
   // approval) posts what its turn ended with. The member that asked for it and anyone
   // it names answer. When multiple members were called in one batch, each result posts

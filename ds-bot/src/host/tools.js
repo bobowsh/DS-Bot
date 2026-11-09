@@ -679,8 +679,8 @@ export function install(rt) {
     async execute(args, exec) {
       await rt.load()
       const id = exec.agent?.id
-      if (rt.groupOwners.has(id)) return 'Question cards only work in your own chat. In a group, ask in your message instead.'
-      if (!rt.chatOwners.has(id)) return `Only Bots on the team can use ask_user. Use ${BLOCKING_QUESTION_TOOL} if it is available in this session, or ask the user in your reply.`
+      const group = rt.groupOwners.get(id)
+      if (group === undefined && !rt.chatOwners.has(id)) return `Only Bots on the team can use ask_user. Use ${BLOCKING_QUESTION_TOOL} if it is available in this session, or ask the user in your reply.`
       const options = (Array.isArray(args.options) ? args.options : [])
         .map(option => (typeof option === 'string' ? { label: option } : option ?? {}))
         .map(option => ({
@@ -690,6 +690,31 @@ export function install(rt) {
         .filter(option => option.label !== '')
         .slice(0, 6)
       if (options.length === 0) return 'Give at least one option.'
+      const question = String(args.question ?? '').trim()
+      if (group !== undefined) {
+        // A group chat has no Bot of its own to hold the card: the group Session
+        // does, because that is the chat the user reads and answers in. The card
+        // names the member that asked, so the answer can go back to it.
+        const room = rt.roomOf(group.roomId)
+        const roomSessionId = rt.sessionOfRoom(room)
+        if (room === undefined || roomSessionId === undefined) return 'This group chat is gone; ask the user in your message instead.'
+        if (state.questions[roomSessionId] !== undefined) return 'This group chat already has a question card waiting for the user. Wait for the answer before asking another.'
+        state.questions[roomSessionId] = {
+          id: randomUUID(),
+          roomId: room.id,
+          askerBotId: group.botId,
+          askerSessionId: id,
+          question,
+          ...(args.detail ? { detail: String(args.detail).trim() } : {}),
+          options,
+          multiSelect: args.multiSelect === true,
+          ...(args.allowCustom === true ? { allowCustom: true } : {}),
+          askedAt: Date.now(),
+        }
+        await rt.save()
+        exec.concludeTurn?.()
+        return 'The card is on screen in the group chat; the user\'s answer comes back there as their next message, addressed to you.'
+      }
       // A hidden Bot-to-Bot turn shows none of its calls, so its card goes to the
       // composer dock, which takes questions without a call.
       const turn = rt.live.get(id)?.turn
@@ -697,7 +722,7 @@ export function install(rt) {
       state.questions[id] = {
         id: randomUUID(),
         ...(exec.callId && !hidden ? { callId: exec.callId } : {}),
-        question: String(args.question ?? '').trim(),
+        question,
         ...(args.detail ? { detail: String(args.detail).trim() } : {}),
         options,
         multiSelect: args.multiSelect === true,

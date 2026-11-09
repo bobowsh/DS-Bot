@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { install as installBtw } from './btw.js'
 import { install as installSide } from './side.js'
-import { handoffReply, questionReply, viewReply } from './parts.js'
+import { handoffReply, questionReply, viewReply, groupQuestionReply } from './parts.js'
 import { validateViewAnswer } from 'deep-view/core'
 import { COLORS, EXTRA_COLORS, ROUTE } from './constants.js'
 
@@ -707,6 +707,23 @@ export function install(rt) {
     const sessionId = rt.botOf(sessionRef) ? rt.chatOf(sessionRef) : past && past.roomId === undefined ? rt.chatOf(past.botId) : sessionRef
     const question = rt.own(state.questions, sessionId)
     if (question === undefined || question.id !== questionId) throw Object.assign(new Error('This question is no longer open'), { code: 'bot/stale' })
+    // A card asked in a group chat belongs to the group's own Session; its answer
+    // goes back into the group, addressed to the Bot that asked.
+    if (question.roomId !== undefined) {
+      const asker = rt.botOf(question.askerBotId)
+      const reply = groupQuestionReply(question, answer, asker?.name ?? 'the member that asked')
+      if (reply === undefined) throw Object.assign(new Error('Nothing to send'), { code: 'bot/invalid' })
+      // Claim the question before queueing so a second answer is refused.
+      delete state.questions[sessionId]
+      try {
+        await rt.answerRoomQuestion(question, reply)
+      } catch (error) {
+        state.questions[sessionId] ??= question
+        throw error
+      }
+      await rt.save()
+      return true
+    }
     const reply = questionReply(question, answer)
     if (reply === undefined) throw Object.assign(new Error('Nothing to send'), { code: 'bot/invalid' })
     // Claim the question before queueing so a second answer is refused.

@@ -74,6 +74,25 @@ export function questionReply(question, answer) {
   }
 }
 
+// The user's answer to a card asked in a group chat. The answer goes back as the
+// user's own line in the group, addressed to the Bot that asked, so the group
+// hears it like any other message the user wrote there and the round goes on.
+// The chosen labels are only those the card offered.
+export function groupQuestionReply(question, answer, askerName) {
+  const labels = new Set((question?.options ?? []).map(option => option.label))
+  const picked = (Array.isArray(answer?.selected) ? answer.selected : []).filter(label => typeof label === 'string' && labels.has(label))
+  const selected = question?.multiSelect === true ? [...new Set(picked)] : picked.slice(0, 1)
+  const custom = typeof answer?.custom === 'string' ? answer.custom.trim() : ''
+  if (selected.length === 0 && custom === '') return undefined
+  const values = [...selected, ...(custom !== '' ? [custom] : [])]
+  const ask = question.question ?? ''
+  return {
+    text: `@${askerName} the user answered your question${ask === '' ? '' : ` "${ask}"`}: ${values.join(', ')}`,
+    selected,
+    ...(custom !== '' ? { custom } : {}),
+  }
+}
+
 
 // The user's answer to a browser_handoff card: they finished the step, skipped it,
 // or only gave the browser back from its panel. The message carries the reason with
@@ -1072,6 +1091,14 @@ export function install(rt) {
     if (bot === undefined) {
       ;(room.parts ??= []).push(segment)
       room.sessionId = freshId
+      // A group chat's question card lives on the group's own Session; when that
+      // Session moves on to a fresh part, the card moves with it, so the user
+      // still sees it in the group chat.
+      if (state.questions[agent.id] !== undefined) {
+        const { callId: _call, ...question } = state.questions[agent.id]
+        state.questions[freshId] = question
+        delete state.questions[agent.id]
+      }
     } else if (room !== undefined) {
       room.segments ??= {}
       ;(room.segments[bot.id] ??= []).push(segment)

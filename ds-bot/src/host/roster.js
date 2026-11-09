@@ -663,6 +663,10 @@ export function install(rt) {
     delete state.rooms[id]
     rt.roomInbox.delete(id)
     rt.dropGroupLines(id)
+    // The group's question card lived on its own Session; it goes with the group.
+    delete state.questions[rt.sessionOfRoom(room)]
+    for (const segment of room.parts ?? []) delete state.questions[segment.sessionId]
+    for (const sessions of Object.values(room.sessions ?? {})) delete state.questions[sessions]
     await archived
     const failed = await saveForDelete()
     // Armed scheduled tasks refuse a plain archive and would keep delivering into
