@@ -9,6 +9,7 @@
 // Environment:
 //   PROBE_SURFACE  'bot' (the team interface, the default) or 'agent' (the classic page)
 //   PROBE_SEND     '1' to type a message and send it before reading
+//   PROBE_OPEN     the name of the Bot to open; without it the first Bot is opened
 //   PROBE_WAIT     seconds to wait for the app to settle (default 20)
 //
 // It reads, never writes: the folders it is given are throwaway ones.
@@ -18,12 +19,21 @@ import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { unsafeFolders } from './dom-probe-guard.mjs'
 
 const out = process.argv[2]
 const wait = Number(process.env.PROBE_WAIT ?? 20)
 const surface = process.env.PROBE_SURFACE ?? 'bot'
-if (!process.env.DS_BOT_HOME || !process.env.DS_BOT_SHELL_DATA) {
-  console.error('dom-probe: set DS_BOT_HOME and DS_BOT_SHELL_DATA to throwaway folders')
+// The probe starts the real application, so the folders have to be throwaway
+// ones. The guard lives in dom-probe-guard.mjs so a test can reach it.
+const unsafe = unsafeFolders({
+  home: process.env.DS_BOT_HOME,
+  shellData: process.env.DS_BOT_SHELL_DATA,
+  userProfile: process.env.USERPROFILE,
+  dshHome: process.env.DSH_HOME,
+})
+if (unsafe !== '') {
+  console.error(`dom-probe: ${unsafe}`)
   process.exit(2)
 }
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -140,6 +150,39 @@ const PROBE = `(() => {
   const input = document.querySelector('textarea, [contenteditable="true"]')
   const inputBox = box(input)
   const composerDock = document.querySelector('[data-composer-dock]')
+  // The host's own dock: what it holds.
+  const dockChildren = composerDock ? [...composerDock.children].map(el => ({
+    cls: cls(el).slice(0, 50),
+    text: (el.textContent || '').trim().slice(0, 60),
+    box: box(el),
+  })) : []
+  // Every session the page knows about: the pills read each session's own
+  // projections, so a session that ran a turn carries tokenUsage.
+  const sessionRows = [...document.querySelectorAll('[data-session-id], [data-session]')].map(el => ({
+    id: el.getAttribute('data-session-id') ?? el.getAttribute('data-session'),
+    cls: cls(el).slice(0, 40),
+    text: (el.textContent || '').trim().slice(0, 50),
+  })).slice(0, 12)
+  // The page's own session store: every session it knows, with the projections
+  // the Host sent for it. This is where the pills' numbers come from.
+  const store = window.__dsbSessionStore
+  const storeInfo = store === undefined ? undefined : (() => {
+    try {
+      const byId = store.getSnapshot?.().byId ?? {}
+      const out = []
+      for (const [id, s] of Object.entries(byId)) {
+        out.push({
+          id,
+          title: (s?.title ?? '').slice(0, 30),
+          hasTokenUsage: s?.projections?.values?.tokenUsage !== undefined,
+          hasSessionStats: s?.projections?.values?.sessionStats !== undefined,
+          hasContextPressure: s?.projections?.values?.contextPressure !== undefined,
+          projectionKeys: Object.keys(s?.projections?.values ?? {}),
+        })
+      }
+      return out.slice(0, 8)
+    } catch (error) { return { error: String(error) } }
+  })()
 
   return JSON.stringify({
     title: document.title,
@@ -174,6 +217,9 @@ const PROBE = `(() => {
       hostStats,
       inputBox,
       composerDockFound: composerDock !== null,
+      dockChildren,
+      sessionRows,
+      storeInfo,
     },
   })
 })()`
@@ -190,10 +236,14 @@ try {
   // Open a Bot's chat: the composer's dock only mounts with a session behind it.
   const opened = await cdp.call('Runtime.evaluate', {
     expression: `(() => {
-      const row = document.querySelector('[data-bot-id]') || document.querySelector('[data-room-id]')
+      const wanted = ${JSON.stringify(process.env.PROBE_OPEN ?? '')}
+      const rows = [...document.querySelectorAll('[data-bot-id]')]
+      const row = wanted
+        ? rows.find(r => (r.getAttribute('aria-label') ?? '').includes(wanted))
+        : rows[0] ?? document.querySelector('[data-room-id]')
       if (!row) return 'no row'
       row.click()
-      return 'clicked ' + (row.getAttribute('data-bot-id') ?? row.getAttribute('data-room-id') ?? '')
+      return 'clicked ' + (row.getAttribute('aria-label') ?? row.getAttribute('data-bot-id') ?? row.getAttribute('data-room-id') ?? '')
     })()`,
     returnByValue: true,
   })
@@ -227,6 +277,31 @@ try {
     })
     await sleep(wait * 1000)
   }
+  // The host's own session list: each row carries the projection hints the pills
+  // read. The page is already authenticated, so it can ask for them.
+  const hostSessions = await cdp.call('Runtime.evaluate', {
+    expression: `(async () => {
+      try {
+        const r = await fetch('/api/sessions')
+        const j = await r.json()
+        const items = j?.items ?? j?.sessions ?? []
+        return JSON.stringify({
+          status: r.status,
+          count: items.length,
+          rows: items.slice(0, 8).map(s => ({
+            id: s.sessionId ?? s.id,
+            title: String(s.title ?? '').slice(0, 24),
+            projectionKeys: s.projections?.values ? Object.keys(s.projections.values) : undefined,
+            tokenUsage: s.projections?.values?.tokenUsage,
+          })),
+        })
+      } catch (e) { return JSON.stringify({ error: String(e) }) }
+    })()`,
+    awaitPromise: true,
+    returnByValue: true,
+  })
+  console.log(`host sessions: ${String(hostSessions?.result?.value ?? '')}`)
+
   const { result } = await cdp.call('Runtime.evaluate', { expression: PROBE, returnByValue: true })
   console.log(`probe: ${String(result.value)}`)
   if (out !== undefined) {
