@@ -89,7 +89,7 @@ export function watchReleases({ current, arch, fetch = globalThis.fetch, ask, op
     latest = (async () => {
       try {
         const response = await fetch(feed, {
-          headers: { accept: 'application/vnd.github+json', 'user-agent': `LinkBot/${current}` },
+          headers: { accept: 'application/vnd.github+json', 'user-agent': `LinkHarness/${current}` },
         })
         if (!response.ok) {
           log.error(`LinkHarness: update check failed: HTTP ${String(response.status)}`)

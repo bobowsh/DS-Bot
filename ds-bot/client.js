@@ -3047,17 +3047,34 @@ function writeSidebar(value, storage = globalThis.localStorage) {
 }
 
 // src/client/styles.js
-var SHELL_CSS = `
-body{--bt-im-telegram:#229ed9;--bt-im-weixin:#07c160;--bt-im-feishu:#3370ff;--bt-im-dingtalk:#1e88e5;--bt-im-wecom:#0082ef;--bt-im-qq:#e03e3e;--bt-im-discord:#5865f2;--bt-im-slack:#4a154b;--bt-im-mark-ink:#ffffff;--bt-vscode:#0098ff;--bt-qr-paper:#ffffff;--bt-qr-ink:#141414;--bt-ink:#141414;--bt-danger:#e02135;--bt-ink-2:rgba(20,20,20,.6);--bt-ink-3:rgba(20,20,20,.36);--bt-bubble:#eeeeee;--bt-sidebar:#f7f7f7;--bt-main:#fcfcfc;--bt-line:rgba(20,20,20,.08);--bt-line-2:rgba(20,20,20,.15);--bt-line-weak:rgba(20,20,20,.1);--bt-hover:rgba(119,119,119,.09);--bt-active:rgba(119,119,119,.17);--bt-card:#ffffff;--bt-accent:#4d6bfe;--bt-green:#00c972;--bt-star:#ff9800;--bt-user:#070707;--bt-user-ink:#fcfcfc;--bt-tag-bg:rgba(20,20,20,.06);--bt-tag-ink:rgba(20,20,20,.56);--bt-knob:#ffffff;--bt-glass-bg:color-mix(in srgb,var(--bt-main) 78%,transparent);--bt-glass-border:rgba(255,255,255,.72);--bt-glass-rim:rgba(20,20,20,.09);--bt-glass-shadow:0 8px 28px -6px rgba(0,0,0,.08),0 2px 6px -1px rgba(0,0,0,.04),inset 0 1px 0 rgba(255,255,255,.82);--bt-accent-soft:color-mix(in srgb,var(--bt-accent) 14%,transparent);--bt-danger-soft:color-mix(in srgb,var(--bt-danger) 14%,transparent);--bt-danger-glow:color-mix(in srgb,var(--bt-danger) 24%,transparent);-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;--bt-font:var(--dsw-font-family,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif)}
-/* iOS waits out a double-tap zoom on buttons; the plugin's own controls never zoom. */
-:is(.bt-tool,.bt-uaction,.bt-menu button,.bt-menu-item,.bt-icon-btn,.bt-round,.bt-pill,.bt-account,.bt-set-row,.bt-settings-item,.bt-react-strip button,.bt-palette-row,.bt-palette-clear,.bt-tab,.bt-ptab,.bt-ptab-x,.bt-bcard-x,.bt-plus,.bt-q-btn,.bt-q-x,.bt-x,.bt-nc-send,.bt-send,.bt-soft,.bt-mini,.bt-side-send,.bt-shape,.bt-swatch,.bt-color,.bt-newchat,.bt-task-day,.bt-task-remove,.bt-fb-btn){touch-action:manipulation}
-:is(.bt-round,.bt-you,.bt-account,.bt-color,.bt-color span,.bt-swatch,.bt-icon-btn,.bt-avatar-trigger,.bt-avatar-pencil,.bt-plus,.bt-mic,.bt-voice){corner-shape:round}
+var BASE_CSS = `body{--bt-im-telegram:#229ed9;--bt-im-weixin:#07c160;--bt-im-feishu:#3370ff;--bt-im-dingtalk:#1e88e5;--bt-im-wecom:#0082ef;--bt-im-qq:#e03e3e;--bt-im-discord:#5865f2;--bt-im-slack:#4a154b;--bt-im-mark-ink:#ffffff;--bt-vscode:#0098ff;--bt-qr-paper:#ffffff;--bt-qr-ink:#141414;--bt-ink:#141414;--bt-danger:#e02135;--bt-ink-2:rgba(20,20,20,.6);--bt-ink-3:rgba(20,20,20,.36);--bt-bubble:#eeeeee;--bt-sidebar:#f7f7f7;--bt-main:#fcfcfc;--bt-line:rgba(20,20,20,.08);--bt-line-2:rgba(20,20,20,.15);--bt-line-weak:rgba(20,20,20,.1);--bt-hover:rgba(119,119,119,.09);--bt-active:rgba(119,119,119,.17);--bt-card:#ffffff;--bt-accent:#4d6bfe;--bt-green:#00c972;--bt-star:#ff9800;--bt-user:#070707;--bt-user-ink:#fcfcfc;--bt-tag-bg:rgba(20,20,20,.06);--bt-tag-ink:rgba(20,20,20,.56);--bt-knob:#ffffff;--bt-glass-bg:color-mix(in srgb,var(--bt-main) 78%,transparent);--bt-glass-border:rgba(255,255,255,.72);--bt-glass-rim:rgba(20,20,20,.09);--bt-glass-shadow:0 8px 28px -6px rgba(0,0,0,.08),0 2px 6px -1px rgba(0,0,0,.04),inset 0 1px 0 rgba(255,255,255,.82);--bt-accent-soft:color-mix(in srgb,var(--bt-accent) 14%,transparent);--bt-danger-soft:color-mix(in srgb,var(--bt-danger) 14%,transparent);--bt-danger-glow:color-mix(in srgb,var(--bt-danger) 24%,transparent);-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;--bt-font:var(--dsw-font-family,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif)}
 body[data-ds-dark-theme]{--bt-im-telegram:#2ea8de;--bt-im-weixin:#17c96a;--bt-im-feishu:#4d84ff;--bt-im-dingtalk:#3d99ed;--bt-im-wecom:#2898f2;--bt-im-qq:#e85555;--bt-im-discord:#6e7bf2;--bt-im-slack:#7c4380;--bt-im-mark-ink:#ffffff;--bt-ink:#f2f2f2;--bt-ink-2:rgba(242,242,242,.6);--bt-ink-3:rgba(242,242,242,.36);--bt-bubble:#262626;--bt-sidebar:#1b1b1b;--bt-main:#141414;--bt-line:rgba(255,255,255,.08);--bt-line-2:rgba(255,255,255,.15);--bt-line-weak:rgba(255,255,255,.1);--bt-hover:rgba(160,160,160,.12);--bt-active:rgba(160,160,160,.2);--bt-card:#1f1f1f;--bt-user:#f2f2f2;--bt-user-ink:#141414;--bt-tag-bg:rgba(255,255,255,.09);--bt-tag-ink:rgba(242,242,242,.62);--bt-glass-bg:color-mix(in srgb,var(--bt-main) 74%,transparent);--bt-glass-border:rgba(255,255,255,.13);--bt-glass-rim:rgba(255,255,255,.11);--bt-glass-shadow:0 12px 32px -6px rgba(0,0,0,.42),0 2px 8px -1px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.12);--bt-accent-soft:color-mix(in srgb,var(--bt-accent) 18%,transparent);--bt-danger-soft:color-mix(in srgb,var(--bt-danger) 18%,transparent);--bt-danger-glow:color-mix(in srgb,var(--bt-danger) 28%,transparent)}
 ${Object.entries(INKS).map(([name, [light]]) => `body{--bt-ink-${name}:${light}}`).join("")}
 ${Object.entries(INKS).map(([name, [, dark]]) => `body[data-ds-dark-theme]{--bt-ink-${name}:${dark}}`).join("")}
 .bt-mark{display:inline-block;flex:none;position:relative;line-height:0}
 .bt-mark svg{width:100%;height:100%;overflow:visible}
 .bt-mark-img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;box-shadow:inset 0 0 0 1px var(--bt-line)}
+.bt-brand-whale{display:inline-flex;color:var(--bt-accent)}
+.bt-brand-name{font-weight:600;font-size:14px;white-space:nowrap}
+.bt-round{width:36px;height:36px;border-radius:50%;border:1px solid var(--bt-line);background:var(--bt-main);color:var(--bt-ink);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:background-color .12s ease,transform .12s ease}
+.bt-round:hover{background:var(--bt-hover)}
+.bt-round:active{transform:scale(.94)}
+.bt-you{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bt-ink) 5%,var(--bt-sidebar));color:var(--bt-ink-2);box-shadow:inset 0 0 0 1px var(--bt-line);transition:background-color .12s ease}
+button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
+.bt-you-wrap{display:inline-flex;padding:0}
+.bt-account{flex:none;width:36px;height:36px;border:0;padding:0;background:none;border-radius:50%;cursor:pointer;display:inline-flex}
+.bt-account:hover .bt-you,.bt-account[aria-expanded=true] .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
+/* In the classic Agent page this gear fills the shell's own settings button, which is a 42px
+   tall row that spans the column. A 36px circle with its own ring inside it reads as a second
+   button on top of the first, so there it takes the shell's own shape and size — the icon
+   stays, only its frame follows the host. */
+:root[data-bt-surface=agent] [class*="_settingsArea"] button[class*="_trigger"] .bt-you{width:100%;height:100%;border-radius:inherit;box-shadow:none;background:none}
+:root[data-bt-surface=agent] [class*="_settingsArea"] button[class*="_trigger"]:hover .bt-you{background:none}
+`;
+var SHELL_CSS = `
+/* iOS waits out a double-tap zoom on buttons; the plugin's own controls never zoom. */
+:is(.bt-tool,.bt-uaction,.bt-menu button,.bt-menu-item,.bt-icon-btn,.bt-round,.bt-pill,.bt-account,.bt-set-row,.bt-settings-item,.bt-react-strip button,.bt-palette-row,.bt-palette-clear,.bt-tab,.bt-ptab,.bt-ptab-x,.bt-bcard-x,.bt-plus,.bt-q-btn,.bt-q-x,.bt-x,.bt-nc-send,.bt-send,.bt-soft,.bt-mini,.bt-side-send,.bt-shape,.bt-swatch,.bt-color,.bt-newchat,.bt-task-day,.bt-task-remove,.bt-fb-btn){touch-action:manipulation}
+:is(.bt-round,.bt-you,.bt-account,.bt-color,.bt-color span,.bt-swatch,.bt-icon-btn,.bt-avatar-trigger,.bt-avatar-pencil,.bt-plus,.bt-mic,.bt-voice){corner-shape:round}
 .bt-mark .bt-b,.bt-mark .bt-eye,.bt-mark .bt-eyes,.bt-mark .bt-gaze{transform-box:fill-box}
 .bt-mark .bt-b{transform-origin:50% 100%}
 .bt-mark .bt-eye,.bt-mark .bt-eyes{transform-origin:center}
@@ -3154,11 +3171,6 @@ body[data-bt-motion=quiet] .bt-mark[data-poke]{cursor:default}
 .bt-side{display:flex;flex-direction:column;min-height:0;flex:1 1 auto;gap:2px;padding:0 12px 8px 0;color:var(--bt-ink);font-family:var(--bt-font)}
 .bt-side-top{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:6px 5px 0 0}
 .bt-brand{display:inline-flex;align-items:center;gap:6px;margin-right:auto;padding:4px 8px 4px 4px;border:0;border-radius:8px;background:none;cursor:pointer;font-family:inherit;font-size:15px;line-height:20px;font-weight:600;letter-spacing:-.01em;color:var(--bt-ink);white-space:nowrap}
-.bt-brand-whale{display:inline-flex;color:var(--bt-accent)}
-.bt-brand-name{font-weight:600;font-size:14px;white-space:nowrap}
-.bt-round{width:36px;height:36px;border-radius:50%;border:1px solid var(--bt-line);background:var(--bt-main);color:var(--bt-ink);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:background-color .12s ease,transform .12s ease}
-.bt-round:hover{background:var(--bt-hover)}
-.bt-round:active{transform:scale(.94)}
 .bt-list{display:flex;flex-direction:column;gap:3px;overflow-y:auto;min-height:0;flex:1 1 auto}
 /* Chromium ignores ::-webkit-scrollbar when scrollbar-width or scrollbar-color (inherited) is non-auto. */
 .bt-side:not(.bt-rail)>.bt-list{margin-right:-12px;scrollbar-gutter:stable;scrollbar-width:auto;scrollbar-color:auto}
@@ -3691,15 +3703,18 @@ html[data-windows-titlebar] .bt-title-toggle:hover{background:var(--bt-hover)}
 html:not([data-windows-titlebar]) .bt-title-toggle{position:fixed;left:12px;top:calc(var(--dsh-frame-top-clearance,0px) + 6px);z-index:30}
 /* The footer ends in the Bot row: the whale's settings seat, then the account menu
    when no plugin holds that seat. Every other plugin's entry takes a whole row above
-   it, in the shell's order, so none of them squeezes the Bot row. */
-[class*="_footArea"]{grid-template-columns:auto minmax(0,1fr);grid-auto-flow:row dense;align-items:center;gap:4px 9px;padding:8px 6px 6px!important}
+   it, in the shell's order, so none of them squeezes the Bot row.
+   These are the Bot column's rules. The classic Agent page has no Bot column, and there
+   the shell lays out its own footer: a second grid over it is what stacked the account
+   gear on top of the shell's settings button, so the rules stop at the surface. */
+:root[data-bt-surface=bot] [class*="_footArea"]{grid-template-columns:auto minmax(0,1fr);grid-auto-flow:row dense;align-items:center;gap:4px 9px;padding:8px 6px 6px!important}
 /* DSH hides the footer of a collapsed sidebar under a Windows title bar; the grid
    stays out of that one place. */
-html:not([data-windows-titlebar]) [class*="_footArea"],:not([class*="_collapsed"])>[class*="_footArea"]{display:grid!important}
-[class*="_footArea"]>[class*="_footerActions"],[class*="_footArea"]>[class*="_footerActions"]>div{display:contents!important}
-[class*="_footArea"]>[class*="_footerActions"]>div>*{grid-column:1/-1}
-[class*="_footArea"]>[class*="_settingsArea"]{grid-column:1;order:1;width:auto!important}
-[class*="_footArea"] button[aria-label="Settings"]{width:auto!important;padding:0!important;background:none!important;border-radius:50%!important;height:auto!important}
+:root[data-bt-surface=bot]:not([data-windows-titlebar]) [class*="_footArea"],:root[data-bt-surface=bot] :not([class*="_collapsed"])>[class*="_footArea"]{display:grid!important}
+:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_footerActions"],:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_footerActions"]>div{display:contents!important}
+:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_footerActions"]>div>*{grid-column:1/-1}
+:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_settingsArea"]{grid-column:1;order:1;width:auto!important}
+:root[data-bt-surface=bot] [class*="_footArea"] button[aria-label="Settings"]{width:auto!important;padding:0!important;background:none!important;border-radius:50%!important;height:auto!important}
 [class*="_widthHandle"]{display:none!important}
 
 .bt-voice-pane{flex-direction:column;align-items:center;justify-content:center;animation:bt-fade .2s ease-out}
@@ -3776,9 +3791,6 @@ body[data-bt-layout=flat] .bt-tools::after{display:none}
 .bt-react:active{scale:.92}
 @keyframes bt-react-pop{from{transform:scale(.6);opacity:0}}
 .bt-bubble a[href^="${MENTION_ORIGIN}"] svg{display:none}
-.bt-you{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bt-ink) 5%,var(--bt-sidebar));color:var(--bt-ink-2);box-shadow:inset 0 0 0 1px var(--bt-line);transition:background-color .12s ease}
-button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
-.bt-you-wrap{display:inline-flex;padding:0}
 
 .bt-menu{position:fixed;pointer-events:auto;z-index:60;min-width:200px;padding:6px;border-radius:12px;background:var(--bt-glass-bg);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);border:.5px solid var(--bt-glass-rim);box-shadow:var(--bt-glass-shadow),0 0 0 1px rgba(228,228,228,.04);display:flex;flex-direction:column;gap:2px;transform-origin:var(--bt-origin,top left);animation:bt-pop-drop ${SPRING_TAP.duration}ms ${SPRING_TAP.easing},bt-veil-in .14s ease-out;font-family:var(--bt-font);box-sizing:border-box}
 .bt-menu button{display:flex;align-items:center;gap:4px;width:100%;min-height:30px;text-align:left;border:0;background:none;border-radius:6px;padding:6px 8px;font:inherit;font-size:13px;line-height:18px;color:var(--bt-ink);cursor:pointer;box-sizing:border-box}
@@ -3828,8 +3840,6 @@ button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-side
 .bt-palette-empty-hint{font-size:13px;line-height:16px;color:var(--bt-ink-3)}
 @media (prefers-reduced-motion:reduce){.bt-palette{animation:bt-fade .1s ease-out}}
 .bt-account-menu{width:224px}
-.bt-account{flex:none;width:36px;height:36px;border:0;padding:0;background:none;border-radius:50%;cursor:pointer;display:inline-flex}
-.bt-account:hover .bt-you,.bt-account[aria-expanded=true] .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
 /* Popover keyframes move translate and scale, which compose with a transform the popover
    already has. */
 @keyframes bt-pop-drop{from{translate:0 -4px;scale:.96}}
@@ -15369,13 +15379,13 @@ function TeamSidebar(props) {
     onClick: () => actions.setSurface("agent")
   }, (0, import_react34.createElement)(SwitchIcon));
   const toAide = (0, import_react34.createElement)(AideButton, { label: t("AIDE workbench") });
-  const foot = wideContent ? (0, import_react34.createElement)("div", { className: "bt-leftcol-foot" }, toAgent, toAide, (0, import_react34.createElement)(AccountLauncher, { seat: false, actions })) : (0, import_react34.createElement)(
+  const foot = wideContent ? (0, import_react34.createElement)("div", { className: "bt-leftcol-foot" }, toAgent, toAide, (0, import_react34.createElement)(AccountLauncher, { place: "column", useSurface: props.useSurface, actions })) : (0, import_react34.createElement)(
     "div",
     { className: "bt-leftcol-foot bt-leftcol-foot-rail" },
     (0, import_react34.createElement)("button", { type: "button", className: "bt-round", "aria-label": t("New…"), title: t("New…"), onClick: () => actions.openNewChat("new") }, (0, import_react34.createElement)(PlusIcon)),
     toAgent,
     toAide,
-    (0, import_react34.createElement)(AccountLauncher, { seat: false, actions })
+    (0, import_react34.createElement)(AccountLauncher, { place: "column", useSurface: props.useSurface, actions })
   );
   const content = (0, import_react34.createElement)(
     "div",
@@ -15589,13 +15599,10 @@ function pressesShellShortcut(event, id) {
 var NO_SUBSCRIBE = () => () => {
 };
 var NO_SNAPSHOT = () => null;
-function AccountLauncher({ seat = true, settingsOpen, openSettings, openOnboarding, actions }) {
+function AccountLauncher({ place = "column", settingsOpen, openSettings, openOnboarding, actions, useSurface }) {
   const [open, setOpen] = (0, import_react34.useState)(false);
-  (0, import_react34.useLayoutEffect)(() => {
-    if (!seat) return void 0;
-    actions.seatAccount(true);
-    return () => actions.seatAccount(false);
-  }, [seat]);
+  const mode = useSurface ? useSurface((value) => value.mode) : "bot";
+  const shown = place === "column" ? mode === "bot" : mode === "agent";
   const [box, setBox] = (0, import_react34.useState)(null);
   const button = (0, import_react34.useRef)(null);
   const menuRef = (0, import_react34.useRef)(null);
@@ -15617,7 +15624,7 @@ function AccountLauncher({ seat = true, settingsOpen, openSettings, openOnboardi
     };
   }, [openOnboarding]);
   (0, import_react34.useEffect)(() => {
-    if (!open) return void 0;
+    if (!open || !shown) return void 0;
     const onDown = (event) => {
       if (event.target instanceof Element && (event.target.closest(".bt-account-menu") || button.current?.contains(event.target))) return;
       setOpen(false);
@@ -15636,7 +15643,7 @@ function AccountLauncher({ seat = true, settingsOpen, openSettings, openOnboardi
       window.removeEventListener("mousedown", onDown);
       window.removeEventListener("keydown", onKey, true);
     };
-  }, [open]);
+  }, [open, shown]);
   const signIn = actions.signInEntry?.() ?? null;
   const ops = (0, import_react34.useMemo)(() => signIn?.inject?.() ?? {}, [signIn]);
   const accountSource = ops.hooks?.account;
@@ -15704,6 +15711,7 @@ function AccountLauncher({ seat = true, settingsOpen, openSettings, openOnboardi
   ];
   if (signedIn) groups.push([[accountT("signOut"), SignOutIcon, askSignOut, void 0, true]]);
   else if (signedOut) groups.push([[t("Sign in to DeepSeek"), SignInIcon, () => actions.signIn()]]);
+  if (!shown) return null;
   return (0, import_react34.createElement)(
     import_react34.Fragment,
     null,
@@ -15860,9 +15868,9 @@ function useLandOnMainBot(roster, useSessions, actions) {
   }, [mainView, roster]);
 }
 function FooterAccount(props) {
-  const seated = props.useUi((value) => value.accountSeated === true);
-  if (seated) return null;
-  return (0, import_react34.createElement)("span", { className: "bt-foot-account" }, (0, import_react34.createElement)(AccountLauncher, { ...props, seat: false }));
+  const mode = props.useSurface ? props.useSurface((value) => value.mode) : "bot";
+  if (mode !== "agent") return null;
+  return (0, import_react34.createElement)("span", { className: "bt-foot-account" }, (0, import_react34.createElement)(AccountLauncher, { ...props, place: "footer" }));
 }
 function BotReturn({ useSurface, useRoster, actions }) {
   const mode = useSurface((value) => value.mode);
@@ -15913,11 +15921,14 @@ var SIDEBAR_CSS = `
 .bt-rail .bt-pin{position:absolute;top:1px;left:calc(50% + 14px)}
 .bt-side .bt-read-only{margin:4px 8px 6px;padding:8px 10px;border-radius:10px;background:var(--bt-hover);font-size:12px;line-height:1.45;text-align:left}
 /* The account entry sits in the foot of our own column, whose three-column grid puts it first
-   and keeps the shell's settings trigger last. */
-[class*="_footArea"]:has(.bt-foot-account){grid-template-columns:auto minmax(0,1fr) auto;column-gap:6px}
-[class*="_footArea"]>[class*="_footerActions"]>div>.bt-foot-account{grid-column:1;order:1;display:inline-flex}
-[class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{grid-column:3}
-[class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
+   and keeps the shell's settings trigger last. The classic Agent page has no Bot column, so
+   there the shell's own footer keeps its own layout: these rules only apply while the Bot
+   surface is up (data-bt-surface is set on the document root). The icon itself stays in both
+   surfaces — only the layout around it changes. */
+:root[data-bt-surface=bot] [class*="_footArea"]:has(.bt-foot-account){grid-template-columns:auto minmax(0,1fr) auto;column-gap:6px}
+:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_footerActions"]>div>.bt-foot-account{grid-column:1;order:1;display:inline-flex}
+:root[data-bt-surface=bot] [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{grid-column:3}
+:root[data-bt-surface=bot] [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
 
 /* The update cloud springs in when a newer LinkBot shows up; its arrow drops in a
    loop while the install runs. */
@@ -27799,7 +27810,6 @@ function apply(ctx) {
     const navigation = ctx.get("pluginNavigation");
     return navigation ? () => navigation.openBundle(VOICE_BUNDLE) : null;
   };
-  actions.seatAccount = (on) => ui2.set((state) => state.accountSeated === on ? state : { ...state, accountSeated: on });
   actions.installUpdate = async () => {
     const value = await call("update-install");
     update.set((previous) => ({ ...previous, ...value }));
@@ -28132,8 +28142,10 @@ function apply(ctx) {
     () => shadow("sidebar.workspaces", { priority: BOT_PRIORITY, inject: face }, TeamSidebar),
     () => shadow("settings.trigger", { priority: BOT_PRIORITY }, YouAvatar),
     // The whale wins the seat over a shell account plugin's own launcher (the
-    // Desktop's "··· More"), which comes back in Agent mode.
-    () => shadow("settings.launcher", { priority: BOT_PRIORITY, inject: face }, AccountLauncher),
+    // Desktop's "··· More"). The seat belongs to the classic page: the Bot page
+    // shows the account in our own column, and the shell's sidebar is a rail
+    // there, so this launcher draws nothing.
+    () => shadow("settings.launcher", { priority: BOT_PRIORITY, inject: face }, (props) => (0, import_react63.createElement)(AccountLauncher, { ...props, place: "shell" })),
     () => shadow("settings.onboarding", { id: MODELS_STEP, order: MODELS_STEP_ORDER }, OpenModelsStep),
     () => shadow("shell.overlay", { id: "bot-computer", order: 40, inject: face }, ComputerIndicator),
     () => shadow("shell.overlay", { id: "bot", order: 50, inject: face }, Overlays),
@@ -28197,6 +28209,7 @@ function apply(ctx) {
     // its cell; it lists only the sends the user authored (#663).
     () => shadow("conversation.input.dock", { id: "queue", order: 20, priority: BOT_PRIORITY, inject: queueFace }, QueueDock)
   ];
+  ctx.effect(() => installCompiledStyles(BASE_CSS, "base"), "ds-bot: base styles");
   ctx.effect(() => installCompiledStyles(RETURN_CSS, "return"), "ds-bot: return styles");
   ctx.effect(() => installCompiledStyles(FOOTER_CSS, "footer"), "ds-bot: footer styles");
   ctx.effect(() => installCompiledStyles(COMPUTER_CSS, "computer"), "ds-bot: computer styles");
@@ -28282,6 +28295,8 @@ function apply(ctx) {
       verifyTimer = setTimeout(verifySidebar, 250);
     };
     const reconcile = () => {
+      const mode = surface.getSnapshot().mode;
+      if (typeof document !== "undefined") document.documentElement.dataset.btSurface = mode;
       groups.reconcile(groupsFor(surface.getSnapshot()));
       clearTimeout(verifyTimer);
       verifyAttempts = 0;

@@ -85,7 +85,7 @@ describe('watchReleases', () => {
     assert.equal(await updates.latest(), null)
     assert.deepEqual(calls[0], {
       url: RELEASES_URL,
-      options: { headers: { accept: 'application/vnd.github+json', 'user-agent': 'LinkBot/0.1.7' } },
+      options: { headers: { accept: 'application/vnd.github+json', 'user-agent': 'LinkHarness/0.1.7' } },
     })
 
     const feed = 'http://127.0.0.1:8080/'

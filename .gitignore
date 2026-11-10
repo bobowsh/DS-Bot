@@ -47,8 +47,6 @@ node_modules/
 # Bytecode from the record-browser-gif encoder's local media tests.
 __pycache__/
 
-# Scratch space for probes and one-off scripts. Nothing in here is a deliverable, and the
-# copies of packaged apps and asar archives that pile up while investigating a release are
-# large enough to bloat a commit.
-/tmp/
-/app/tmp/
+# The scratch directory for this workspace's temporary scripts and output.
+tmp/
+app/tmp/

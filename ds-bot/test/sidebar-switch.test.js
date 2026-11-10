@@ -338,7 +338,8 @@ const showing = rules.filter(rule => /display:inline-flex/.test(rule.body))
 function shell({ platform, collapsed }) {
   const darwin = platform === 'mac'
   const toggle = '<button class="x_iconButton x_toggle" aria-label="Toggle sidebar"></button>'
-  const html = `<!doctype html><html${platform === 'windows' ? ' data-windows-titlebar' : ''}${darwin ? ' data-platform="darwin"' : ''}><body>
+  // This is the Bot surface's shell: the footer rules that lay it out only apply there.
+  const html = `<!doctype html><html data-bt-surface="bot"${platform === 'windows' ? ' data-windows-titlebar' : ''}${darwin ? ' data-platform="darwin"' : ''}><body>
     <div${collapsed ? ' data-sidebar-collapsed="true"' : ''}>
       <div class="x_root${collapsed ? ' x_collapsed' : ''}">
         ${darwin ? `<div class="x_topStrip">${toggle}</div>` : ''}
@@ -488,7 +489,9 @@ test('the shell footer is a grid wherever the shell shows it', () => {
 // #452: the footer lost its Connect plugins button; the account menu and the
 // entries other plugins add keep the places they had.
 test('the Bot footer lays out the account, another plugin\'s entry and the settings trigger', () => {
-  const html = `<!doctype html><html><body><div class="x_root"><div class="x_footArea">
+  // The Bot column's footer rules only apply while the Bot surface is up: the classic Agent
+  // page has no Bot column, and there the shell keeps its own footer layout.
+  const html = `<!doctype html><html data-bt-surface="bot"><body><div class="x_root"><div class="x_footArea">
     <div class="x_footerActions">
       <div><span class="bt-foot-account"></span></div>
       <div><span class="x_other-plugin"></span></div>
