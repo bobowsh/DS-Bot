@@ -172,7 +172,7 @@ export async function syncFactorySkills({ dataDir, repoDir, registry = SKILLHUB_
     published = await publishedSkills(registry, fetchImpl)
   } catch (error) {
     result.reason = `the SkillHub skill list could not be read: ${error instanceof Error ? error.message : String(error)}`
-    log.error(`LinkBot: ${result.reason}`)
+    log.error(`LinkHarness: ${result.reason}`)
     return result
   }
   result.checked = true
@@ -200,14 +200,14 @@ export async function syncFactorySkills({ dataDir, repoDir, registry = SKILLHUB_
       if (outcome.updated) {
         versions[slug] = remote
         result.updated.push(slug)
-        log.info(`LinkBot: skill ${slug} updated to ${remote}`)
+        log.info(`LinkHarness: skill ${slug} updated to ${remote}`)
       } else {
         result.failed.push(slug)
-        log.error(`LinkBot: skill ${slug} was not updated: ${outcome.reason ?? 'unknown reason'}`)
+        log.error(`LinkHarness: skill ${slug} was not updated: ${outcome.reason ?? 'unknown reason'}`)
       }
     } catch (error) {
       result.failed.push(slug)
-      log.error(`LinkBot: skill ${slug} was not updated: ${error instanceof Error ? error.message : String(error)}`)
+      log.error(`LinkHarness: skill ${slug} was not updated: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
   await writeSyncState(dataDir, { versions })

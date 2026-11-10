@@ -1,9 +1,9 @@
 # The app id names the Windows uninstall entry and the single-instance lock: it is a technical
 # identifier, not a name the user sees, so it stays as it is.
 appId: io.github.fei2411.deepseekbot
-productName: LinkBot
+productName: LinkHarness
 copyright: Copyright 2026 Fei2411 and the DS Bot contributors
-artifactName: LinkBot-${version}-${os}-${arch}.${ext}
+artifactName: LinkHarness-${version}-${os}-${arch}.${ext}
 directories:
   output: dist-pack
 files:
@@ -115,7 +115,7 @@ linux:
       arch: [x64]
   # The binary and the deb's menu entry take this name; productName has a space, which a
   # terminal command should not have.
-  executableName: linkbot
+  executableName: linkharness
   # A deb needs a maintainer; package.json's author has no email, so it goes here.
   maintainer: Fei2411 <https://github.com/Fei2411>
   # Links the running window to the menu entry (WM_CLASS = app id).

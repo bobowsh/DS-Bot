@@ -11,6 +11,10 @@ import { fakeContext } from './fake-ctx.js'
 // assemble must add none of them.
 const HIDDEN = ['ask_user_question', 'subagent', 'list_subagent_models', 'send_message']
 
+// A Bot's own scope: the team tools, plus the Bot's own `read`, which shadows
+// the host's UTF-8 one there. `read_browser` only exists in the Desktop profile.
+const BOT_SCOPE = [...new Set([...TEAM_TOOLS, 'read'])].filter(name => name !== 'read_browser').sort()
+
 // A Bot-owned Session gets its Agent before ds-bot records the owner, so the
 // scoped show_view and the hidden-tool restrict used to wait for a later
 // resolveAgent that a held kickoff never ran. These tests drive each creation
@@ -184,7 +188,7 @@ test('a Bot Session gets every team tool in its own scope', async (t) => {
   t.after(host.stop)
   await host.call('state', {})
   await host.agentCreated('a')
-  assert.deepEqual(scopedNames(host, 'a').sort(), [...TEAM_TOOLS].filter(name => name !== 'read_browser').sort())
+  assert.deepEqual(scopedNames(host, 'a').sort(), BOT_SCOPE)
 })
 
 test('a Bot moved onto a local agent route gets the approval bridge, and loses it moving off', async (t) => {
@@ -388,9 +392,11 @@ test("a Bot's own Session the creation path missed gets the whole scope at the a
   await host.call('state', {})
   const agent = host.agentOf('a')
   const assembled = await assemble(host, agent, { tools: [{ name: 'read' }], sections: [] })
-  const expected = [...TEAM_TOOLS].filter(name => name !== 'read_browser').sort()
+  const expected = BOT_SCOPE
   assert.deepEqual(scopedNames(host, 'a').sort(), expected)
-  assert.deepEqual(assembled.tools.map(tool => tool.name).sort(), ['read', ...expected].sort())
+  // The scoped `read` replaces the host's own entry of that name, so the list
+  // holds it once.
+  assert.deepEqual(assembled.tools.map(tool => tool.name).sort(), expected)
   // The hidden DSH tools are masked and filtered as on the creation path: none
   // of their names joined the list the assemble added.
   assert.ok(denied(host, 'a'), 'the blocking question tool is denied')

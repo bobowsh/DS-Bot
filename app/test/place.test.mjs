@@ -81,14 +81,14 @@ test('a drive runs low at a fifth of the free space it had when the data went th
 
 test('the picker opens in the data folder\'s parent', (t) => {
   const dir = temp(t)
-  assert.equal(pickFrom(join(dir, 'LinkBot', 'data')), join(dir, 'LinkBot'))
+  assert.equal(pickFrom(join(dir, 'LinkHarness', 'data')), join(dir, 'LinkHarness'))
 })
 
 test('the current root is the parent of a data and a workspace folder that are siblings', (t) => {
   const dir = temp(t)
   assert.equal(currentRootOf(join(dir, 'R', DATA_DIR), join(dir, 'R', WORKSPACE_DIR)), join(dir, 'R'))
   // The default places are not under one root.
-  assert.equal(currentRootOf(join(dir, '.ds-bot'), join(dir, 'LinkBot')), undefined)
+  assert.equal(currentRootOf(join(dir, '.ds-bot'), join(dir, 'LinkHarness')), undefined)
   assert.equal(currentRootOf(join(dir, 'R', DATA_DIR), undefined), undefined)
 })
 
@@ -113,7 +113,7 @@ test('a new or empty folder is the root itself', (t) => {
   assert.deepEqual(rootOf(empty, noProbe), { root: empty, dataDir: join(empty, DATA_DIR), workspace: join(empty, WORKSPACE_DIR), added: false })
 })
 
-test('a drive or a folder with other things in it gets a LinkBot layer', (t) => {
+test('a drive or a folder with other things in it gets a LinkHarness layer', (t) => {
   const dir = temp(t)
   writeFileSync(join(dir, 'notes.txt'), '')
   const layered = rootOf(dir, noProbe)
@@ -157,18 +157,18 @@ test('the place the data is in now is no change, and a place inside it is refuse
   assert.equal(rootOf(join(current.workspace, 'sub'), { ...noProbe, current }).reason, 'nested')
   // The default places: picking the home puts the root on the workspace the start made.
   const home = join(dir, 'home')
-  mkdirSync(join(home, 'LinkBot'), { recursive: true })
+  mkdirSync(join(home, 'LinkHarness'), { recursive: true })
   writeFileSync(join(home, 'other.txt'), '')
-  const defaults = { dataDir: join(home, '.ds-bot'), workspace: join(home, 'LinkBot') }
+  const defaults = { dataDir: join(home, '.ds-bot'), workspace: join(home, 'LinkHarness') }
   const atHome = rootOf(home, { ...noProbe, current: defaults })
   assert.equal(atHome.reason, undefined)
-  assert.equal(atHome.root, join(home, 'LinkBot'))
+  assert.equal(atHome.root, join(home, 'LinkHarness'))
   assert.equal(atHome.added, true)
-  assert.equal(rootOf(join(home, 'LinkBot'), { ...noProbe, current: defaults }).added, false)
+  assert.equal(rootOf(join(home, 'LinkHarness'), { ...noProbe, current: defaults }).added, false)
   // Once the workspace holds files, the layer the home pick would add is a used folder.
-  writeFileSync(join(home, 'LinkBot', 'theirs.txt'), '')
+  writeFileSync(join(home, 'LinkHarness', 'theirs.txt'), '')
   assert.equal(rootOf(home, { ...noProbe, current: defaults }).reason, 'foreign')
-  assert.equal(rootOf(join(home, 'LinkBot', 'sub'), { ...noProbe, current: defaults }).reason, 'nested')
+  assert.equal(rootOf(join(home, 'LinkHarness', 'sub'), { ...noProbe, current: defaults }).reason, 'nested')
   assert.equal(rootOf(join(home, 'elsewhere'), { ...noProbe, current: defaults }).reason, undefined)
 })
 

@@ -40,10 +40,10 @@ export function checkRuntimeAssets(appDir, assets = JSON.parse(readFileSync(join
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1] === import.meta.filename) {
   const result = checkRuntimeAssets(appDir)
   if (result.ok) {
-    console.log(`LinkBot: all ${result.checked} runtime assets are in place`)
+    console.log(`LinkHarness: all ${result.checked} runtime assets are in place`)
   } else {
     for (const { plugin, asset } of result.missing) {
-      console.error(`LinkBot: the factory plugin ${plugin} is missing its runtime asset ${asset}`)
+      console.error(`LinkHarness: the factory plugin ${plugin} is missing its runtime asset ${asset}`)
     }
     process.exit(1)
   }

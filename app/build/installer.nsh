@@ -252,7 +252,7 @@
     ClearErrors
     FileOpen $R2 "$INSTDIR\data\factory\plugins.txt" r
     ${If} ${Errors}
-      DetailPrint "LinkBot: the factory plugin list could not be read."
+      DetailPrint "LinkHarness: the factory plugin list could not be read."
       Goto dsbFactoryDone
     ${EndIf}
     dsbFactoryLoop:
@@ -273,7 +273,7 @@
         CreateDirectory "$6"
         CopyFiles /SILENT "$5\*.*" "$6"
         ${If} ${Errors}
-          DetailPrint "LinkBot: the plugin $4 could not be moved to the data folder."
+          DetailPrint "LinkHarness: the plugin $4 could not be moved to the data folder."
           StrCpy $R7 1
         ${EndIf}
       ${EndIf}
@@ -296,7 +296,7 @@
     CreateDirectory "$R1\lsp"
     CopyFiles /SILENT "$INSTDIR\data\lsp\*.*" "$R1\lsp"
     ${If} ${Errors}
-      DetailPrint "LinkBot: the language servers could not be moved to the data folder."
+      DetailPrint "LinkHarness: the language servers could not be moved to the data folder."
       StrCpy $R7 1
     ${EndIf}
   ${EndIf}
@@ -324,7 +324,7 @@
         CreateDirectory "$6"
         CopyFiles /SILENT "$5\*.*" "$6"
         ${If} ${Errors}
-          DetailPrint "LinkBot: the skill $3 could not be moved to the data folder."
+          DetailPrint "LinkHarness: the skill $3 could not be moved to the data folder."
           StrCpy $R7 1
         ${EndIf}
       ${EndIf}

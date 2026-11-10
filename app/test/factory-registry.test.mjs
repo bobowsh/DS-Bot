@@ -29,7 +29,7 @@ describe('the profile .npmrc', () => {
   test('written with the intranet registry when the profile has none', () => {
     const r = writeFactoryNpmrc(dir)
     assert.deepEqual(r, { written: true, kept: false })
-    assert.equal(readFileSync(join(dir, '.npmrc'), 'utf8'), `# managed by LinkBot factory registries\nregistry=${NPM_REGISTRY}\n`)
+    assert.equal(readFileSync(join(dir, '.npmrc'), 'utf8'), `# managed by LinkHarness factory registries\nregistry=${NPM_REGISTRY}\n`)
   })
 
   test('a second launch leaves it alone', () => {
@@ -51,9 +51,9 @@ describe('the profile .npmrc', () => {
   })
 
   test('an outdated file of our own is refreshed', () => {
-    writeFileSync(join(dir, '.npmrc'), '# managed by LinkBot factory registries\nregistry=http://old.example/\n')
+    writeFileSync(join(dir, '.npmrc'), '# managed by LinkHarness factory registries\nregistry=http://old.example/\n')
     assert.deepEqual(writeFactoryNpmrc(dir), { written: true, kept: false })
-    assert.equal(readFileSync(join(dir, '.npmrc'), 'utf8'), `# managed by LinkBot factory registries\nregistry=${NPM_REGISTRY}\n`)
+    assert.equal(readFileSync(join(dir, '.npmrc'), 'utf8'), `# managed by LinkHarness factory registries\nregistry=${NPM_REGISTRY}\n`)
   })
 })
 

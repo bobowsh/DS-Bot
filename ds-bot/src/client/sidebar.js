@@ -826,12 +826,12 @@ export function TeamSidebar(props) {
   // the whole session view — opening the workbench would cost a full-screen rebuild.
   const toAide = h(AideButton, { label: t('AIDE workbench') })
   const foot = wideContent
-    ? h('div', { className: 'bt-leftcol-foot' }, toAgent, toAide, h(AccountLauncher, { seat: false, actions }))
+    ? h('div', { className: 'bt-leftcol-foot' }, toAgent, toAide, h(AccountLauncher, { place: 'column', useSurface: props.useSurface, actions }))
     : h('div', { className: 'bt-leftcol-foot bt-leftcol-foot-rail' },
         h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: () => actions.openNewChat('new') }, h(PlusIcon)),
         toAgent,
         toAide,
-        h(AccountLauncher, { seat: false, actions }))
+        h(AccountLauncher, { place: 'column', useSurface: props.useSurface, actions }))
   const content = h('div', { className: wideContent ? 'bt-side' : 'bt-side bt-rail', onKeyDown: typeToSearch },
     top,
     wideContent && roster.readOnly ? h('div', { className: 'bt-hint bt-read-only', role: 'status' }, hostText(roster.readOnly)) : null,
@@ -914,31 +914,31 @@ function UpdateButton({ useUpdate, actions }) {
     setDshError('')
     void actions.installDshUpdate().catch(failure => setDshError(hostText(failure?.message ?? String(failure))))
   }
-  const label = phase === 'installing' ? t('Updating LinkBot…')
+  const label = phase === 'installing' ? t('Updating LinkHarness…')
     : dshPhase === 'installing' ? t('Updating DSH…')
-      : phase === 'installed' ? t('LinkBot {version} is installed. Restart DSH to use it.', { version: update.installed ?? update.latest })
-        : phase === 'updated' ? t('LinkBot {version} is installed.', { version: update.installed ?? update.latest })
+      : phase === 'installed' ? t('LinkHarness {version} is installed. Restart DSH to use it.', { version: update.installed ?? update.latest })
+        : phase === 'updated' ? t('LinkHarness {version} is installed.', { version: update.installed ?? update.latest })
         : dshPhase === 'installed' ? t('Restart DSH to start using DSH {version}.', { version: dsh.installed ?? dsh.verified })
-          : update?.available ? t('LinkBot {version} is available', { version: update.latest })
+          : update?.available ? t('LinkHarness {version} is available', { version: update.latest })
             : t('DSH {version} is available', { version: dsh?.verified })
   const message = error || (phase === 'failed' ? update.error : '')
   const dshMessage = dshError || (dshPhase === 'failed' ? dsh?.error : '')
   const dshText = dshPhase === 'installed'
     ? t('Restart DSH to start using DSH {version}.', { version: dsh.installed ?? dsh.verified })
     : dsh?.available === false && dsh?.blockedBy
-      ? t('Update LinkBot {version} first.', { version: dsh.blockedBy })
+      ? t('Update LinkHarness {version} first.', { version: dsh.blockedBy })
       : t('You have {version}.', { version: dsh?.current })
   return h(Fragment, null,
     h('button', {
       ref: button, type: 'button', className: 'bt-round bt-update', 'data-phase': cloudPhase, 'aria-label': label, title: label,
       'aria-haspopup': 'dialog', 'aria-expanded': open, onClick: toggle,
     }, h(CloudDownloadIcon, { done: phase === 'installed' || phase === 'updated' }), phase === 'failed' || dshPhase === 'failed' ? h('span', { className: 'bt-update-dot', 'aria-hidden': true }) : null),
-    shown && box ? createPortal(h('div', { className: 'bt-update-pop', role: 'dialog', 'aria-label': update?.available || phase !== 'idle' ? t('LinkBot update') : t('DSH update'), style: box, 'data-leaving': leaving || undefined },
+    shown && box ? createPortal(h('div', { className: 'bt-update-pop', role: 'dialog', 'aria-label': update?.available || phase !== 'idle' ? t('LinkHarness update') : t('DSH update'), style: box, 'data-leaving': leaving || undefined },
       update?.available || phase !== 'idle' ? h(Fragment, null,
-        h('div', { className: 'bt-update-title' }, phase === 'installed' || phase === 'updated' ? t('Update installed') : t('LinkBot {version}', { version: update.latest })),
+        h('div', { className: 'bt-update-title' }, phase === 'installed' || phase === 'updated' ? t('Update installed') : t('LinkHarness {version}', { version: update.latest })),
         h('div', { className: 'bt-update-text' }, phase === 'installed'
-          ? t('Restart DSH to start using LinkBot {version}.', { version: update.installed ?? update.latest })
-          : phase === 'updated' ? t('LinkBot {version} is installed.', { version: update.installed ?? update.latest })
+          ? t('Restart DSH to start using LinkHarness {version}.', { version: update.installed ?? update.latest })
+          : phase === 'updated' ? t('LinkHarness {version} is installed.', { version: update.installed ?? update.latest })
             : t('You have {version}.', { version: update.current })),
         message ? h('div', { className: 'bt-update-error', role: 'alert' }, t('The update did not finish: {reason}', { reason: message })) : null,
         h('div', { className: 'bt-update-actions' },
@@ -989,22 +989,29 @@ const NO_SNAPSHOT = () => null
 
 // The footer avatar opens an account menu above itself, with Bot settings as one
 // entry. Shell panels hidden from the Bot sidebar (plugins, automation) live here too.
-// `seat` is the shell's settings.launcher seat: at priority -10 the whale wins it
-// over a shell account plugin's own launcher (the Desktop's "··· More"), which comes
-// back in Agent mode; FooterAccount stands in while no seat exists at all.
-export function AccountLauncher({ seat = true, settingsOpen, actions }) {
+//
+// `place` says which of the three places this launcher is:
+//   'shell'   — the shell's settings.launcher seat, in the host's own trigger row
+//   'footer'  — the host's own footer, standing in for the seat
+//   'column'  — the foot of our own Bot column
+//
+// The classic page shows the account in the shell; the Bot page shows it in our
+// own column, because the shell's sidebar is a rail there and holds nothing.
+// So exactly one of them draws it — the place decides, not the others' flags.
+export function AccountLauncher({ place = 'column', settingsOpen, openSettings, openOnboarding, actions, useSurface }) {
   const [open, setOpen] = useState(false)
-  useLayoutEffect(() => {
-    if (!seat) return undefined
-    actions.seatAccount(true)
-    return () => actions.seatAccount(false)
-  }, [seat])
+  // The surface mode is the only thing that decides who draws the account.
+  const mode = useSurface ? useSurface(value => value.mode) : 'bot'
+  const shown = place === 'column' ? mode === 'bot' : mode === 'agent'
   const [box, setBox] = useState(null)
   const button = useRef(null)
   const menuRef = useRef(null)
   useEffect(() => { if (settingsOpen) setOpen(false) }, [settingsOpen])
   useEffect(() => {
-    if (!open) return undefined
+    // A launcher that does not draw itself holds no menu and listens to nothing:
+    // the shell's trigger row keeps the launcher mounted even when the shell's
+    // sidebar is a rail, and a hidden one must not keep the page's listeners.
+    if (!open || !shown) return undefined
     const onDown = (event) => {
       if (event.target instanceof Element && (event.target.closest('.bt-account-menu') || button.current?.contains(event.target))) return
       setOpen(false)
@@ -1016,7 +1023,7 @@ export function AccountLauncher({ seat = true, settingsOpen, actions }) {
     window.addEventListener('mousedown', onDown)
     window.addEventListener('keydown', onKey, true)
     return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey, true) }
-  }, [open])
+  }, [open, shown])
   // The shell's account plugin lends its sign-out operation; the item shows only
   // when the plugin's entry is there and its account snapshot says signed in. The
   // entry can arrive after this mounts, so its operations follow the entry.
@@ -1079,6 +1086,9 @@ export function AccountLauncher({ seat = true, settingsOpen, actions }) {
   ]
   if (signedIn) groups.push([[accountT('signOut'), SignOutIcon, askSignOut, undefined, true]])
   else if (signedOut) groups.push([[t('Sign in to DeepSeek'), SignInIcon, () => actions.signIn()]])
+  // A launcher that this surface does not show draws nothing at all — not a
+  // hidden button the user can still reach, and not a menu left open behind it.
+  if (!shown) return null
   return h(Fragment, null,
     h('button', { ref: button, type: 'button', className: 'bt-account', 'aria-label': t('Account'), 'aria-haspopup': 'menu', 'aria-expanded': open, onClick: toggle },
       h('span', { className: 'bt-you', 'aria-hidden': true }, h(GearIcon))),
@@ -1235,10 +1245,13 @@ function useLandOnMainBot(roster, useSessions, actions) {
   }, [mainView, roster])
 }
 
+// The account menu in the host's own footer. The classic page shows the account
+// there; the Bot page shows it in our own column instead, so this one stands
+// down there — the place decides, not a flag the other place sets.
 export function FooterAccount(props) {
-  const seated = props.useUi(value => value.accountSeated === true)
-  if (seated) return null
-  return h('span', { className: 'bt-foot-account' }, h(AccountLauncher, { ...props, seat: false }))
+  const mode = props.useSurface ? props.useSurface(value => value.mode) : 'bot'
+  if (mode !== 'agent') return null
+  return h('span', { className: 'bt-foot-account' }, h(AccountLauncher, { ...props, place: 'footer' }))
 }
 
 // The only entry registered in every mode: in Agent mode the whole Bot surface is
@@ -1251,7 +1264,7 @@ export function BotReturn({ useSurface, useRoster, actions }) {
   if (mode !== 'agent') return null
   // The foot of the column carries icons only: the word beside the mark would be the only
   // text in a row of icons, and the mark is the same one the column's top carries.
-  return h('button', { type: 'button', className: 'bt-return', 'aria-label': t('LinkBot'), title: t('LinkBot'), onClick: () => actions.setSurface('bot') },
+  return h('button', { type: 'button', className: 'bt-return', 'aria-label': t('LinkHarness'), title: t('LinkHarness'), onClick: () => actions.setSurface('bot') },
     h(BotMark, { look: MAIN_LOOK, size: 20 }))
 }
 
@@ -1305,10 +1318,15 @@ export const SIDEBAR_CSS = `
 .bt-rail .bt-row{position:relative}
 .bt-rail .bt-pin{position:absolute;top:1px;left:calc(50% + 14px)}
 .bt-side .bt-read-only{margin:4px 8px 6px;padding:8px 10px;border-radius:10px;background:var(--bt-hover);font-size:12px;line-height:1.45;text-align:left}
-[class*="_footArea"]:has(.bt-foot-account){grid-template-columns:auto minmax(0,1fr) auto;column-gap:6px}
-[class*="_footArea"]>[class*="_footerActions"]>div>.bt-foot-account{grid-column:1;order:1;display:inline-flex}
-[class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{grid-column:3}
-[class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
+/* The account entry sits in the foot of our own column, whose three-column grid puts it first
+   and keeps the shell's settings trigger last. The classic Agent page has no Bot column, so
+   there the shell's own footer keeps its own layout: these rules only apply while the Bot
+   surface is up (data-bt-surface is set on the document root). The icon itself stays in both
+   surfaces — only the layout around it changes. */
+:root[data-bt-surface=bot] [class*="_footArea"]:has(.bt-foot-account){grid-template-columns:auto minmax(0,1fr) auto;column-gap:6px}
+:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_footerActions"]>div>.bt-foot-account{grid-column:1;order:1;display:inline-flex}
+:root[data-bt-surface=bot] [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{grid-column:3}
+:root[data-bt-surface=bot] [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
 
 /* The update cloud springs in when a newer LinkBot shows up; its arrow drops in a
    loop while the install runs. */

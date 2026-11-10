@@ -195,7 +195,7 @@ describe('the data home of an install', () => {
   let dataDir
   before(() => {
     root = mkdtempSync(join(tmpdir(), 'ds-bot-install-data-'))
-    installRoot = join(root, 'LinkBot')
+    installRoot = join(root, 'LinkHarness')
     dataDir = join(installRoot, 'data')
     // The user's own data.
     write(join(dataDir, 'bot', 'state.json'), '{"bots":{}}\n')

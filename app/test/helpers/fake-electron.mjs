@@ -16,7 +16,7 @@ export const paths = {
   root,
   userData: join(root, 'userData'),
   downloads: join(root, 'downloads'),
-  exe: join(programFolder, 'LinkBot.exe'),
+  exe: join(programFolder, 'LinkHarness.exe'),
   // The folder of the app itself: the Host's pnpm lives in it.
   appPath: programFolder,
 }
@@ -162,7 +162,7 @@ class FakeWebContents extends EventEmitter {
 class FakeApp extends EventEmitter {
   constructor() {
     super()
-    this.name = 'LinkBot'
+    this.name = 'LinkHarness'
     this.getVersion = () => '0.2.2'
     this.getLocale = () => 'en-US'
     this.getPath = (name) => paths[name] ?? join(root, String(name))

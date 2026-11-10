@@ -38,7 +38,7 @@ if (startPage !== undefined) {
         try { run(from) } finally { requestAnimationFrame(() => { requestAnimationFrame(() => { ipcRenderer.send('ds-bot:handoff-ready') }) }) }
       })
     },
-    // LinkBot's settings show and move the app's data location through this.
+    // LinkHarness's settings show and move the app's data location through this.
     dataLocation: () => ipcRenderer.invoke('ds-bot:data-location'),
     moveData: (workspace) => ipcRenderer.invoke('ds-bot:move-data', typeof workspace === 'string' ? workspace : undefined),
     teamWorkspaceChanged: (path) => { ipcRenderer.send('ds-bot:team-workspace', String(path)) },
@@ -570,7 +570,7 @@ function startBridge() {
   const listeners = new Set()
   let last
   const tell = (listener, state) => {
-    try { listener(state) } catch (error) { console.error('LinkBot: a start state listener failed', error) }
+    try { listener(state) } catch (error) { console.error('LinkHarness: a start state listener failed', error) }
   }
   ipcRenderer.on('ds-bot:start-state', (_event, state) => {
     last = state
@@ -592,13 +592,13 @@ function browserBridge() {
   const viewListeners = new Set()
   ipcRenderer.on('ds-bot:browser-view-changed', (_event, change) => {
     for (const listener of [...viewListeners]) {
-      try { listener(change) } catch (error) { console.error('LinkBot: a browser view listener failed', error) }
+      try { listener(change) } catch (error) { console.error('LinkHarness: a browser view listener failed', error) }
     }
   })
   ipcRenderer.on('ds-bot:browser-open-requested', (_event, request) => {
     if (typeof request?.lease !== 'string' || typeof request.url !== 'string') return
     for (const listener of [...(listeners.get(request.lease) ?? [])]) {
-      try { listener(request.url) } catch (error) { console.error('LinkBot: a browser link handler failed', error) }
+      try { listener(request.url) } catch (error) { console.error('LinkHarness: a browser link handler failed', error) }
     }
   })
   return {
@@ -640,7 +640,7 @@ function updatesBridge() {
   const listeners = new Set()
   ipcRenderer.on('ds-bot:app-update-changed', (_event, state) => {
     for (const listener of [...listeners]) {
-      try { listener(state) } catch (error) { console.error('LinkBot: an update state handler failed', error) }
+      try { listener(state) } catch (error) { console.error('LinkHarness: an update state handler failed', error) }
     }
   })
   return {

@@ -64,7 +64,7 @@ export async function prepareBundledPlugins(appDir, entries, pluginsDev = defaul
   // One reachability probe for the whole build: an offline machine pays it once, not per plugin.
   const registry = factoryRegistry()
   const useRegistry = await registryReachable(registry)
-  if (!useRegistry) console.log(`LinkBot: the factory registry ${registry} is unreachable, packing the plugins from ${pluginsDev}`)
+  if (!useRegistry) console.log(`LinkHarness: the factory registry ${registry} is unreachable, packing the plugins from ${pluginsDev}`)
   const made = []
   for (const entry of entries) {
     const staged = await sourceOf(appDir, entry, pluginsDev, useRegistry)
@@ -131,7 +131,7 @@ async function sourceOf(appDir, entry, pluginsDev, useRegistry) {
   if (useRegistry) {
     const staged = await packFromRegistry(entry, registry).catch(() => undefined)
     if (staged !== undefined) return { ...staged, via: 'registry' }
-    console.log(`LinkBot: ${entry.name}@${entry.version} is not on the registry, falling back to ${pluginsDev}`)
+    console.log(`LinkHarness: ${entry.name}@${entry.version} is not on the registry, falling back to ${pluginsDev}`)
   }
   // The development folder names a plugin directory after the package name without its scope,
   // or after the full scoped name; both shapes are accepted, the flat one is the convention.

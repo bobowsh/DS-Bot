@@ -212,7 +212,7 @@ if (canonical !== undefined) {
   logs = new LogFile({ dir: join(app.getPath('userData'), 'logs') })
   rawOutput = captureStdio(logs)
   app.once('will-quit', () => { logs.flush() })
-  console.log(`LinkBot ${app.getVersion()} (${process.platform} ${process.arch}), Electron ${process.versions.electron}`)
+  console.log(`LinkHarness ${app.getVersion()} (${process.platform} ${process.arch}), Electron ${process.versions.electron}`)
   startWindow = new StartWindow({
     electron: { BrowserWindow, ipcMain, screen, shell: electronShell, clipboard, nativeTheme, systemPreferences },
     // 〔保存日志…〕 on the start window's failure cards.
@@ -297,7 +297,7 @@ const startKind = () => {
   const root = dirname(program)
   const beside = root === program || root === dirname(root) ? undefined : join(root, 'data')
   const drive = ['D:', 'E:'].find(letter => existsSync(`${letter}\\`)) ?? homedir()
-  const dataDir = beside ?? join(drive, 'LinkBot', 'data')
+  const dataDir = beside ?? join(drive, 'LinkHarness', 'data')
   return existsSync(join(dataDir, 'bot', 'state.json')) ? 'later' : 'first'
 }
 
@@ -482,7 +482,7 @@ async function boot(mine) {
       name: entry.name,
       version: entry.version,
       disabledByDefault: turnedOff.has(entry.name),
-    }).catch(error => { console.error(`LinkBot: the plugin ${entry.name} was not put in place:`, error) })
+    }).catch(error => { console.error(`LinkHarness: the plugin ${entry.name} was not put in place:`, error) })
   }
   // The factory seed lands before the Host starts: ds-bot builds the seeded team at its
   // startup, and reads the seed file from the data location. It runs off the ready path so a
@@ -491,7 +491,7 @@ async function boot(mine) {
   // first-start step: they travel inside the data tree the installer puts in place.
   setImmediate(() => {
     void installFactoryResources({ dataDir: places.dataDir, resourcesDir: resourcesDir() })
-      .catch(error => { console.error('LinkBot: the factory resources were not put in place:', error) })
+      .catch(error => { console.error('LinkHarness: the factory resources were not put in place:', error) })
   })
   // The factory plugins update themselves after 22:00: the app asks the intranet catalog what
   // they have become and puts the newer ones in place. The Host runs them, so the new copy
@@ -591,7 +591,7 @@ async function pickAndPlace() {
     return
   }
   if (root.reason !== undefined) {
-    console.log(`LinkBot: the place ${root.at} cannot be used (${root.reason})`)
+    console.log(`LinkHarness: the place ${root.at} cannot be used (${root.reason})`)
     proposed = undefined
     startWindow.card({ kind: 'rejected', reason: root.reason, path: root.at })
     return
@@ -634,7 +634,7 @@ async function startOver(root) {
     if (stopping || mine !== attempt) return
     setPlaces({ dataDir: root.dataDir, workspace: root.workspace })
     saveLocations(places)
-    console.log(`LinkBot: the data goes to ${places.dataDir}`)
+    console.log(`LinkHarness: the data goes to ${places.dataDir}`)
   } finally {
     restarting = false
   }
@@ -729,9 +729,9 @@ async function startEngine(mine) {
   // taken has nothing left out.
   if (warm === undefined) {
     await restoreSessions(places.dataDir).then(({ copied, newer }) => {
-      if (copied.length > 0) console.log(`LinkBot: copied ${copied.join(', ')}, which the import left out`)
-      if (newer.length > 0) console.warn(`LinkBot: this DSH cannot read ${newer.join(', ')}, which the import left out`)
-    }, (error) => { console.error('LinkBot: the Sessions the import left out were not copied:', error) })
+      if (copied.length > 0) console.log(`LinkHarness: copied ${copied.join(', ')}, which the import left out`)
+      if (newer.length > 0) console.warn(`LinkHarness: this DSH cannot read ${newer.join(', ')}, which the import left out`)
+    }, (error) => { console.error('LinkHarness: the Sessions the import left out were not copied:', error) })
   }
   host = warm?.host ?? newHost()
   host.onMessage(message => {
@@ -822,7 +822,7 @@ async function importStep(mine) {
   if (result.outcome === 'copied') {
     startWindow.done('import')
     const { summary } = result
-    console.log(`LinkBot: copied ${String(summary.bots)} Bots and ${String(summary.sessions)} Sessions from ${summary.from}`)
+    console.log(`LinkHarness: copied ${String(summary.bots)} Bots and ${String(summary.sessions)} Sessions from ${summary.from}`)
     // The team lives here now; moving it is Settings' job (the data move).
     startWindow.place(undefined)
     return {}
@@ -844,7 +844,7 @@ async function importElsewhere(signal) {
     const root = rootOf(picked, { dshHome: userDshHome(), program: app.isPackaged ? programFolder() : undefined, current: places })
     if (root.same) return false
     if (root.reason !== undefined) {
-      console.log(`LinkBot: the place ${root.at} cannot be used (${root.reason})`)
+      console.log(`LinkHarness: the place ${root.at} cannot be used (${root.reason})`)
       if (await askCard({ kind: 'rejected', reason: root.reason, path: root.at }, { signal }) === 'pick') continue
       return false
     }
@@ -954,7 +954,7 @@ function handleIpc() {
   ipcMain.handle(IPC.browserImportLive, async (event, sourceId, close) => {
     assertWindow(event)
     const source = (await listSources()).find((item) => item.id === sourceId)
-    if (!source) throw new Error('LinkBot: an unknown browser profile')
+    if (!source) throw new Error('LinkHarness: an unknown browser profile')
     let outcome
     try {
       outcome = await importFromBrowser(source, { close: close === true })
@@ -971,9 +971,9 @@ function handleIpc() {
   })
   ipcMain.handle(IPC.browserImportApply, async (event, key, id) => {
     assertWindow(event)
-    if (typeof key !== 'string' || !key.startsWith('bot:')) throw new Error('LinkBot: a Bot storage key is required')
+    if (typeof key !== 'string' || !key.startsWith('bot:')) throw new Error('LinkHarness: a Bot storage key is required')
     const pending = cookieImports.take(typeof id === 'string' ? id : '')
-    if (!pending) throw new Error('LinkBot: this import is no longer pending')
+    if (!pending) throw new Error('LinkHarness: this import is no longer pending')
     const storage = session.fromPartition(partitionOf(key))
     return applyCookies(storage, pending.cookies)
   })
@@ -1043,14 +1043,14 @@ async function checkTeam(where, signal, onProgress) {
     try {
       signal.throwIfAborted()
       const { unreadable } = await check.start()
-      if (unreadable.length > 0) console.warn(`LinkBot: this DSH cannot read ${unreadable.join(', ')}`)
+      if (unreadable.length > 0) console.warn(`LinkHarness: this DSH cannot read ${unreadable.join(', ')}`)
       return unreadable.length
     } finally {
       signal.removeEventListener('abort', stop)
       await check.stop()
     }
   } catch (error) {
-    if (!signal.aborted) console.error('LinkBot: the chats were not checked before the copy:', error)
+    if (!signal.aborted) console.error('LinkHarness: the chats were not checked before the copy:', error)
     return 0
   } finally {
     await rm(home, { recursive: true, force: true, maxRetries: 5 }).catch((error) => { console.error(error) })
@@ -1096,7 +1096,7 @@ async function pickMove() {
 function moveCard(to) {
   const reason = moveReason(to)
   if (reason !== undefined) {
-    console.log(`LinkBot: the data cannot move to ${to} (${reason})`)
+    console.log(`LinkHarness: the data cannot move to ${to} (${reason})`)
     startWindow.card({ kind: 'rejected', reason, path: to })
     return
   }
@@ -1289,7 +1289,7 @@ async function askDownloadNow(version) {
 // makes it count.
 async function tellPluginsUpdated(names) {
   if (names.length === 0) return
-  console.info(`LinkBot: plugins updated: ${names.join(', ')}`)
+  console.info(`LinkHarness: plugins updated: ${names.join(', ')}`)
   if (failed || !await afterHandoff()) return
   await askInWindow({
     message: tx('dialog.plugin.updated', { count: names.length, names: names.join(', ') }),
@@ -1596,7 +1596,7 @@ function shellText() {
 function assertWindow(event) {
   const contents = mainWindow?.webContents
   if (contents === undefined || event.sender !== contents || event.senderFrame !== contents.mainFrame
-    || !event.senderFrame.url.startsWith(`${origin}/`)) throw new Error('LinkBot: rejected IPC from an unknown page')
+    || !event.senderFrame.url.startsWith(`${origin}/`)) throw new Error('LinkHarness: rejected IPC from an unknown page')
 }
 
 function fromWindow(event) {

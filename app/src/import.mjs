@@ -73,7 +73,7 @@ function modelProfiles(from) {
       patch = parse(readFileSync(file, 'utf8'))
     } catch (error) {
       // An unreadable profile has no model settings to copy; the team is still there.
-      console.warn(`LinkBot: skipped the model settings in ${file}: ${error instanceof Error ? error.message : String(error)}`)
+      console.warn(`LinkHarness: skipped the model settings in ${file}: ${error instanceof Error ? error.message : String(error)}`)
       return []
     }
     const rows = Array.isArray(patch) ? patch.filter(row => MODEL_ROWS.includes(row?.id)) : []
@@ -353,7 +353,7 @@ async function copyThroughStage({ found, from, to, workspace, profile, dsh, sign
     const leave = leaveRegenerable ? path => path.split(/[\\/]/u).some(name => REGENERABLE.has(name)) : undefined
     // Bots that ran npm or pnpm there leave links, some of them to nothing.
     const skipped = await copyTree(join(oldBot, 'workspace'), workspace, { force: false, skip: true, signal, leave, seen })
-    if (skipped.length > 0) console.warn('LinkBot: the import skipped what it could not read in the old team workspace:', skipped)
+    if (skipped.length > 0) console.warn('LinkHarness: the import skipped what it could not read in the old team workspace:', skipped)
   }
   signal?.throwIfAborted()
   const keys = []
@@ -363,7 +363,7 @@ async function copyThroughStage({ found, from, to, workspace, profile, dsh, sign
     if (done === 'copied') keys.push(name)
     if (done === 'kept') keptKeys.push(name)
   }
-  if (keptKeys.length > 0) console.warn(`LinkBot: the import kept the ${keptKeys.join(' and ')} that the data location has`)
+  if (keptKeys.length > 0) console.warn(`LinkHarness: the import kept the ${keptKeys.join(' and ')} that the data location has`)
   const rows = found.profiles.find(entry => entry.name === profile)?.rows ?? []
   if (rows.length > 0) await writeModelRows(to, rows)
 

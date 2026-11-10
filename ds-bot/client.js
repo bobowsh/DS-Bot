@@ -265,10 +265,10 @@ var ZH = {
   "Add a provider": "添加服务商",
   "Needs an API key": "需要 API key",
   "Key set": "已设置 key",
-  "Key set outside LinkBot": "key 在 LinkBot 之外设置",
+  "Key set outside LinkHarness": "key 在 LinkHarness 之外设置",
   "No models": "没有模型",
   "{count} models": "{count} 个模型",
-  "This key comes from outside LinkBot, such as an environment variable, and cannot be changed here.": "这个 key 来自 LinkBot 之外（例如环境变量），这里改不了。",
+  "This key comes from outside LinkHarness, such as an environment variable, and cannot be changed here.": "这个 key 来自 LinkHarness 之外（例如环境变量），这里改不了。",
   // What a Bot runs on
   "Runs on": "运行方式",
   "DS Bot model": "DS Bot 模型",
@@ -373,7 +373,7 @@ var ZH = {
   "HTTP status": "HTTP 状态码",
   "Request ID": "请求 ID",
   "Provider message": "原文",
-  "LinkBot": "LinkBot",
+  "LinkHarness": "LinkHarness",
   "Message {name}": "给 {name} 发消息",
   "Press Enter to steer queued messages": "按 Enter 插话发送排队的消息",
   "Couldn’t steer the queued messages. Try again.": "插话发送失败，请重试。",
@@ -451,7 +451,7 @@ var ZH = {
   "Rename {name}": "重命名 {name}",
   "Add instructions in Bot settings": "在 Bot 设置里添加说明",
   "No scheduled tasks yet. To add one, tell the Bot in its chat what to do and when.": "还没有定时任务。要添加，在对话里告诉 Bot 做什么、什么时候做。",
-  "The browser is in DSH Desktop and the LinkBot app.": "浏览器在 DSH 桌面版和 LinkBot 应用里。",
+  "The browser is in DSH Desktop and the LinkHarness app.": "浏览器在 DSH 桌面版和 LinkHarness 应用里。",
   "New tab": "新标签页",
   "Close tab": "关闭标签页",
   "Open {title}": "打开 {title}",
@@ -590,7 +590,7 @@ var ZH = {
   "No group chats yet.": "还没有群聊。",
   "A group chat lets several Bots work on one thing with you.": "在群聊里，几个 Bot 和你一起做一件事。",
   "Back to group chats": "返回群聊列表",
-  "LinkBot settings": "LinkBot 设置",
+  "LinkHarness settings": "LinkHarness 设置",
   "Settings pages": "设置页面",
   "Advanced settings": "高级设置",
   "Back to models": "返回模型",
@@ -649,14 +649,17 @@ var ZH = {
   "{n} min": "{n} 分钟",
   "{n} h": "{n} 小时",
   "{n} d": "{n} 天",
-  "LinkBot {version} is available": "LinkBot {version} 可以更新",
-  "Updating LinkBot…": "正在更新 LinkBot…",
-  "LinkBot {version} is installed. Restart DSH to use it.": "LinkBot {version} 已安装，重启 DSH 后生效",
-  "LinkBot {version} is installed.": "LinkBot {version} 已安装。",
-  "LinkBot update": "LinkBot 更新",
-  "LinkBot {version}": "LinkBot {version}",
+  "LinkHarness {version} is available": "LinkHarness {version} 可以更新",
+  "Updating LinkHarness…": "正在更新 LinkHarness…",
+  // The brand rename reached the settings rows before the update row: this one still says the
+  // old name when it was written, so both spellings carry the same Chinese text.
+  "Updating LinkBot…": "正在更新 LinkHarness…",
+  "LinkHarness {version} is installed. Restart DSH to use it.": "LinkHarness {version} 已安装，重启 DSH 后生效",
+  "LinkHarness {version} is installed.": "LinkHarness {version} 已安装。",
+  "LinkHarness update": "LinkHarness 更新",
+  "LinkHarness {version}": "LinkHarness {version}",
   "Update installed": "更新已安装",
-  "Restart DSH to start using LinkBot {version}.": "重启 DSH 后开始使用 LinkBot {version}。",
+  "Restart DSH to start using LinkHarness {version}.": "重启 DSH 后开始使用 LinkHarness {version}。",
   "You have {version}.": "当前版本 {version}。",
   "The update did not finish: {reason}": "更新没有完成：{reason}",
   "Updating…": "正在更新…",
@@ -665,7 +668,7 @@ var ZH = {
   "DSH update": "DSH 更新",
   "DSH {version}": "DSH {version}",
   "Restart DSH to start using DSH {version}.": "重启 DSH 后开始使用 DSH {version}。",
-  "Update LinkBot {version} first.": "先更新 LinkBot {version}。",
+  "Update LinkHarness {version} first.": "先更新 LinkHarness {version}。",
   "Open updates": "打开更新",
   "Search Bots, chats and messages": "搜索 Bot、对话和消息",
   "Clear search": "清除搜索",
@@ -1027,11 +1030,11 @@ var ZH = {
   "Compared with the day before": "与前一天相比",
   "Compared with the {count} days before": "与再往前 {count} 天相比",
   "{share}% of all usage from {span}": "占 {span} 全部用量的 {share}%",
-  "About LinkBot": "关于 LinkBot",
+  "About LinkHarness": "关于 LinkHarness",
   "Version {version}": "版本 {version}",
-  "Star LinkBot on GitHub": "在 GitHub 上给 LinkBot 点 Star",
+  "Star LinkHarness on GitHub": "在 GitHub 上给 LinkHarness 点 Star",
   "{count} stars": "{count} 个 Star",
-  "If LinkBot helps you, a star on GitHub helps more people find it.": "如果 LinkBot 对你有用，欢迎在 GitHub 上点个 Star，让更多人看到它。",
+  "If LinkHarness helps you, a star on GitHub helps more people find it.": "如果 LinkHarness 对你有用，欢迎在 GitHub 上点个 Star，让更多人看到它。",
   "Check for updates": "检查更新",
   "Checking…": "正在检查…",
   "Up to date": "已是最新版本",
@@ -1045,7 +1048,7 @@ var ZH = {
   "{version} is available": "{version} 已发布",
   "Installed from a local folder; update it there.": "从本地文件夹安装，请在那里更新。",
   "Updates are not offered for this install.": "这种安装方式不提供更新。",
-  "Updates come with the LinkBot app.": "随 LinkBot 应用一起更新。",
+  "Updates come with the LinkHarness app.": "随 LinkHarness 应用一起更新。",
   "Source code": "源代码",
   "Release notes": "发布说明",
   "Report a problem": "报告问题",
@@ -1054,7 +1057,7 @@ var ZH = {
   "For example: I asked Writer in the group chat and it showed an error.": "例如：我在群聊里问 Writer，它显示出错了。",
   "Versions, system, models, and the latest errors. Saved keys, tokens, and your home folder are hidden.": "版本、系统、模型和最近的错误。已保存的密钥、令牌和你的用户目录都已隐藏。",
   "GitHub issue": "GitHub issue",
-  "Opens a new issue in the LinkBot repository with all of this filled in. Nothing is sent until you submit it there.": "在 LinkBot 仓库新建一个 issue，并填好以上内容。你在 GitHub 上提交之前，什么都不会发出。",
+  "Opens a new issue in the LinkHarness repository with all of this filled in. Nothing is sent until you submit it there.": "在 LinkHarness 仓库新建一个 issue，并填好以上内容。你在 GitHub 上提交之前，什么都不会发出。",
   "Report on GitHub": "在 GitHub 上报告",
   "Copied the diagnostics.": "已复制诊断信息。",
   "Could not copy. Select the text below and copy it.": "无法复制。请选中下面的文字手动复制。",
@@ -1066,7 +1069,7 @@ var ZH = {
   "Recent errors": "最近的错误",
   "Recent errors · {count}": "最近的错误 · {count}",
   "No errors recorded.": "没有错误记录。",
-  "Failed model calls and LinkBot problems show here, newest first.": "模型调用失败和 LinkBot 的问题会显示在这里，最新的在前。",
+  "Failed model calls and LinkHarness problems show here, newest first.": "模型调用失败和 LinkHarness 的问题会显示在这里，最新的在前。",
   "Model call": "模型调用",
   "This window": "这个窗口",
   "Error log": "错误日志",
@@ -1209,14 +1212,14 @@ var ZH = {
   "This side chat is no longer here.": "这个侧边对话已经不在了。",
   "This side question is no longer here.": "这个侧边提问已经不在了。",
   "This Bot has not called a model yet. Send a normal message first.": "这个 Bot 还没有调用过模型，请先正常发一条消息。",
-  "LinkBot restarted before this answer finished.": "LinkBot 在回答完成前重启了。",
+  "LinkHarness restarted before this answer finished.": "LinkHarness 在回答完成前重启了。",
   "The model called a tool again after being told not to, so this aside was not answered.": "模型在被要求不要调用工具之后又调用了工具，所以这次没有回答。",
   "The model wrote nothing.": "模型没有写任何内容。",
   "Nothing to ask": "没有要问的内容",
   "Nothing to open": "没有要打开的内容",
   "Nothing to cancel": "没有要取消的内容",
   "Nothing to close": "没有要关闭的内容",
-  "LinkBot is still loading this chat.": "LinkBot 还在加载这个对话。",
+  "LinkHarness is still loading this chat.": "LinkHarness 还在加载这个对话。",
   "No model is available. Add one in Harness settings.": "没有可用的模型，请先在 Harness 设置里添加模型。",
   Working: "工作中",
   Search: "搜索",
@@ -1626,7 +1629,7 @@ var ZH = {
 var HOST_ERRORS = [
   [/^Could not reach the mail server at (.+)\. Check the server address\.$/, "连不上邮件服务器 $1，请检查服务器地址。"],
   [/^Model (.+) is not available\. Available: (.*)$/, "模型 $1 不可用。可用的：$2"],
-  [/^The API key for (.+) is set outside LinkBot and cannot be changed here$/, "$1 的 API key 是在 LinkBot 之外设置的，这里改不了"],
+  [/^The API key for (.+) is set outside LinkHarness and cannot be changed here$/, "$1 的 API key 是在 LinkHarness 之外设置的，这里改不了"],
   [/^(.+) takes no API key here$/, "$1 不能在这里填 API key"],
   [/^(.+) is already set up$/, "$1 已经设置过了"],
   [/^DSH offers no provider (.+)$/, "DSH 没有服务商 $1"],
@@ -1844,8 +1847,8 @@ function failureLabel(code, message) {
 }
 var URL_LIMIT = 7e3;
 var WHAT_MAX = 2e3;
-var PASTE_NOTE = "LinkBot copied the diagnostics to the clipboard. Paste them here.";
-var REST_NOTE = "The recent errors do not fit in the link. LinkBot copied the diagnostics to the clipboard: paste them below this line.";
+var PASTE_NOTE = "LinkHarness copied the diagnostics to the clipboard. Paste them here.";
+var REST_NOTE = "The recent errors do not fit in the link. LinkHarness copied the diagnostics to the clipboard: paste them below this line.";
 function issueUrl(base, { what = "", diagnostics }) {
   const text = what.trim().slice(0, WHAT_MAX);
   const title = text.split("\n")[0].slice(0, 80);
@@ -2151,7 +2154,7 @@ function teamActions({ call: call2, after, partFor, roster, ui: ui2, live, cards
       ui2.set((state) => ({ ...state, details: id, view: "details", renaming: true, tab: null, panelYield: yieldTo(state, "details") }));
     },
     openSettings,
-    // LinkBot's own Models page: the providers DSH serves, their keys and models.
+    // LinkHarness's own Models page: the providers DSH serves, their keys and models.
     openModels: () => openSettings("models"),
     closeSettings: () => {
       ui2.set((state) => state.settings ? { ...state, settings: null } : state);
@@ -3145,17 +3148,34 @@ function writeSidebar(value, storage = globalThis.localStorage) {
 }
 
 // src/client/styles.js
-var SHELL_CSS = `
-body{--bt-im-telegram:#229ed9;--bt-im-weixin:#07c160;--bt-im-feishu:#3370ff;--bt-im-dingtalk:#1e88e5;--bt-im-wecom:#0082ef;--bt-im-qq:#e03e3e;--bt-im-discord:#5865f2;--bt-im-slack:#4a154b;--bt-im-mark-ink:#ffffff;--bt-vscode:#0098ff;--bt-qr-paper:#ffffff;--bt-qr-ink:#141414;--bt-ink:#141414;--bt-danger:#e02135;--bt-ink-2:rgba(20,20,20,.6);--bt-ink-3:rgba(20,20,20,.36);--bt-bubble:#eeeeee;--bt-sidebar:#f7f7f7;--bt-main:#fcfcfc;--bt-line:rgba(20,20,20,.08);--bt-line-2:rgba(20,20,20,.15);--bt-line-weak:rgba(20,20,20,.1);--bt-hover:rgba(119,119,119,.09);--bt-active:rgba(119,119,119,.17);--bt-card:#ffffff;--bt-accent:#4d6bfe;--bt-green:#00c972;--bt-star:#ff9800;--bt-user:#070707;--bt-user-ink:#fcfcfc;--bt-tag-bg:rgba(20,20,20,.06);--bt-tag-ink:rgba(20,20,20,.56);--bt-knob:#ffffff;--bt-glass-bg:color-mix(in srgb,var(--bt-main) 78%,transparent);--bt-glass-border:rgba(255,255,255,.72);--bt-glass-rim:rgba(20,20,20,.09);--bt-glass-shadow:0 8px 28px -6px rgba(0,0,0,.08),0 2px 6px -1px rgba(0,0,0,.04),inset 0 1px 0 rgba(255,255,255,.82);--bt-accent-soft:color-mix(in srgb,var(--bt-accent) 14%,transparent);--bt-danger-soft:color-mix(in srgb,var(--bt-danger) 14%,transparent);--bt-danger-glow:color-mix(in srgb,var(--bt-danger) 24%,transparent);-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;--bt-font:var(--dsw-font-family,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif)}
-/* iOS waits out a double-tap zoom on buttons; the plugin's own controls never zoom. */
-:is(.bt-tool,.bt-uaction,.bt-menu button,.bt-menu-item,.bt-icon-btn,.bt-round,.bt-pill,.bt-account,.bt-set-row,.bt-settings-item,.bt-react-strip button,.bt-palette-row,.bt-palette-clear,.bt-tab,.bt-ptab,.bt-ptab-x,.bt-bcard-x,.bt-plus,.bt-q-btn,.bt-q-x,.bt-x,.bt-nc-send,.bt-send,.bt-soft,.bt-mini,.bt-side-send,.bt-shape,.bt-swatch,.bt-color,.bt-newchat,.bt-task-day,.bt-task-remove,.bt-fb-btn){touch-action:manipulation}
-:is(.bt-round,.bt-you,.bt-account,.bt-color,.bt-color span,.bt-swatch,.bt-icon-btn,.bt-avatar-trigger,.bt-avatar-pencil,.bt-plus,.bt-mic,.bt-voice){corner-shape:round}
+var BASE_CSS = `body{--bt-im-telegram:#229ed9;--bt-im-weixin:#07c160;--bt-im-feishu:#3370ff;--bt-im-dingtalk:#1e88e5;--bt-im-wecom:#0082ef;--bt-im-qq:#e03e3e;--bt-im-discord:#5865f2;--bt-im-slack:#4a154b;--bt-im-mark-ink:#ffffff;--bt-vscode:#0098ff;--bt-qr-paper:#ffffff;--bt-qr-ink:#141414;--bt-ink:#141414;--bt-danger:#e02135;--bt-ink-2:rgba(20,20,20,.6);--bt-ink-3:rgba(20,20,20,.36);--bt-bubble:#eeeeee;--bt-sidebar:#f7f7f7;--bt-main:#fcfcfc;--bt-line:rgba(20,20,20,.08);--bt-line-2:rgba(20,20,20,.15);--bt-line-weak:rgba(20,20,20,.1);--bt-hover:rgba(119,119,119,.09);--bt-active:rgba(119,119,119,.17);--bt-card:#ffffff;--bt-accent:#4d6bfe;--bt-green:#00c972;--bt-star:#ff9800;--bt-user:#070707;--bt-user-ink:#fcfcfc;--bt-tag-bg:rgba(20,20,20,.06);--bt-tag-ink:rgba(20,20,20,.56);--bt-knob:#ffffff;--bt-glass-bg:color-mix(in srgb,var(--bt-main) 78%,transparent);--bt-glass-border:rgba(255,255,255,.72);--bt-glass-rim:rgba(20,20,20,.09);--bt-glass-shadow:0 8px 28px -6px rgba(0,0,0,.08),0 2px 6px -1px rgba(0,0,0,.04),inset 0 1px 0 rgba(255,255,255,.82);--bt-accent-soft:color-mix(in srgb,var(--bt-accent) 14%,transparent);--bt-danger-soft:color-mix(in srgb,var(--bt-danger) 14%,transparent);--bt-danger-glow:color-mix(in srgb,var(--bt-danger) 24%,transparent);-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;--bt-font:var(--dsw-font-family,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif)}
 body[data-ds-dark-theme]{--bt-im-telegram:#2ea8de;--bt-im-weixin:#17c96a;--bt-im-feishu:#4d84ff;--bt-im-dingtalk:#3d99ed;--bt-im-wecom:#2898f2;--bt-im-qq:#e85555;--bt-im-discord:#6e7bf2;--bt-im-slack:#7c4380;--bt-im-mark-ink:#ffffff;--bt-ink:#f2f2f2;--bt-ink-2:rgba(242,242,242,.6);--bt-ink-3:rgba(242,242,242,.36);--bt-bubble:#262626;--bt-sidebar:#1b1b1b;--bt-main:#141414;--bt-line:rgba(255,255,255,.08);--bt-line-2:rgba(255,255,255,.15);--bt-line-weak:rgba(255,255,255,.1);--bt-hover:rgba(160,160,160,.12);--bt-active:rgba(160,160,160,.2);--bt-card:#1f1f1f;--bt-user:#f2f2f2;--bt-user-ink:#141414;--bt-tag-bg:rgba(255,255,255,.09);--bt-tag-ink:rgba(242,242,242,.62);--bt-glass-bg:color-mix(in srgb,var(--bt-main) 74%,transparent);--bt-glass-border:rgba(255,255,255,.13);--bt-glass-rim:rgba(255,255,255,.11);--bt-glass-shadow:0 12px 32px -6px rgba(0,0,0,.42),0 2px 8px -1px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.12);--bt-accent-soft:color-mix(in srgb,var(--bt-accent) 18%,transparent);--bt-danger-soft:color-mix(in srgb,var(--bt-danger) 18%,transparent);--bt-danger-glow:color-mix(in srgb,var(--bt-danger) 28%,transparent)}
 ${Object.entries(INKS).map(([name, [light]]) => `body{--bt-ink-${name}:${light}}`).join("")}
 ${Object.entries(INKS).map(([name, [, dark]]) => `body[data-ds-dark-theme]{--bt-ink-${name}:${dark}}`).join("")}
 .bt-mark{display:inline-block;flex:none;position:relative;line-height:0}
 .bt-mark svg{width:100%;height:100%;overflow:visible}
 .bt-mark-img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;box-shadow:inset 0 0 0 1px var(--bt-line)}
+.bt-brand-whale{display:inline-flex;color:var(--bt-accent)}
+.bt-brand-name{font-weight:600;font-size:14px;white-space:nowrap}
+.bt-round{width:36px;height:36px;border-radius:50%;border:1px solid var(--bt-line);background:var(--bt-main);color:var(--bt-ink);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:background-color .12s ease,transform .12s ease}
+.bt-round:hover{background:var(--bt-hover)}
+.bt-round:active{transform:scale(.94)}
+.bt-you{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bt-ink) 5%,var(--bt-sidebar));color:var(--bt-ink-2);box-shadow:inset 0 0 0 1px var(--bt-line);transition:background-color .12s ease}
+button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
+.bt-you-wrap{display:inline-flex;padding:0}
+.bt-account{flex:none;width:36px;height:36px;border:0;padding:0;background:none;border-radius:50%;cursor:pointer;display:inline-flex}
+.bt-account:hover .bt-you,.bt-account[aria-expanded=true] .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
+/* In the classic Agent page this gear fills the shell's own settings button, which is a 42px
+   tall row that spans the column. A 36px circle with its own ring inside it reads as a second
+   button on top of the first, so there it takes the shell's own shape and size — the icon
+   stays, only its frame follows the host. */
+:root[data-bt-surface=agent] [class*="_settingsArea"] button[class*="_trigger"] .bt-you{width:100%;height:100%;border-radius:inherit;box-shadow:none;background:none}
+:root[data-bt-surface=agent] [class*="_settingsArea"] button[class*="_trigger"]:hover .bt-you{background:none}
+`;
+var SHELL_CSS = `
+/* iOS waits out a double-tap zoom on buttons; the plugin's own controls never zoom. */
+:is(.bt-tool,.bt-uaction,.bt-menu button,.bt-menu-item,.bt-icon-btn,.bt-round,.bt-pill,.bt-account,.bt-set-row,.bt-settings-item,.bt-react-strip button,.bt-palette-row,.bt-palette-clear,.bt-tab,.bt-ptab,.bt-ptab-x,.bt-bcard-x,.bt-plus,.bt-q-btn,.bt-q-x,.bt-x,.bt-nc-send,.bt-send,.bt-soft,.bt-mini,.bt-side-send,.bt-shape,.bt-swatch,.bt-color,.bt-newchat,.bt-task-day,.bt-task-remove,.bt-fb-btn){touch-action:manipulation}
+:is(.bt-round,.bt-you,.bt-account,.bt-color,.bt-color span,.bt-swatch,.bt-icon-btn,.bt-avatar-trigger,.bt-avatar-pencil,.bt-plus,.bt-mic,.bt-voice){corner-shape:round}
 .bt-mark .bt-b,.bt-mark .bt-eye,.bt-mark .bt-eyes,.bt-mark .bt-gaze{transform-box:fill-box}
 .bt-mark .bt-b{transform-origin:50% 100%}
 .bt-mark .bt-eye,.bt-mark .bt-eyes{transform-origin:center}
@@ -3252,11 +3272,6 @@ body[data-bt-motion=quiet] .bt-mark[data-poke]{cursor:default}
 .bt-side{display:flex;flex-direction:column;min-height:0;flex:1 1 auto;gap:2px;padding:0 12px 8px 0;color:var(--bt-ink);font-family:var(--bt-font)}
 .bt-side-top{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:6px 5px 0 0}
 .bt-brand{display:inline-flex;align-items:center;gap:6px;margin-right:auto;padding:4px 8px 4px 4px;border:0;border-radius:8px;background:none;cursor:pointer;font-family:inherit;font-size:15px;line-height:20px;font-weight:600;letter-spacing:-.01em;color:var(--bt-ink);white-space:nowrap}
-.bt-brand-whale{display:inline-flex;color:var(--bt-accent)}
-.bt-brand-name{font-weight:600;font-size:14px;white-space:nowrap}
-.bt-round{width:36px;height:36px;border-radius:50%;border:1px solid var(--bt-line);background:var(--bt-main);color:var(--bt-ink);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:background-color .12s ease,transform .12s ease}
-.bt-round:hover{background:var(--bt-hover)}
-.bt-round:active{transform:scale(.94)}
 .bt-list{display:flex;flex-direction:column;gap:3px;overflow-y:auto;min-height:0;flex:1 1 auto}
 /* Chromium ignores ::-webkit-scrollbar when scrollbar-width or scrollbar-color (inherited) is non-auto. */
 .bt-side:not(.bt-rail)>.bt-list{margin-right:-12px;scrollbar-gutter:stable;scrollbar-width:auto;scrollbar-color:auto}
@@ -3534,7 +3549,7 @@ html[data-windows-titlebar]:not([data-fullscreen]) :is(.bt-pane,.bt-panel)::befo
 .bt-fold{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;margin-top:4px;white-space:normal}
 .bt-fold-code{position:relative}
 .bt-fold-code>.bt-tool{position:absolute;right:6px;bottom:6px}
-/* The part of a cut code block the preview keeps, drawn by LinkBot so the host's
+/* The part of a cut code block the preview keeps, drawn by LinkHarness so the host's
    Markdown draws no copy control of its own for it. */
 .bt-fold-code>.bt-fold-pre{margin:0;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,currentColor 6%,transparent);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:20px;overflow-x:auto}
 .bt-fold-code>*+.bt-fold-pre{margin-top:6px}
@@ -3808,15 +3823,18 @@ html[data-windows-titlebar] .bt-title-toggle:hover{background:var(--bt-hover)}
 html:not([data-windows-titlebar]) .bt-title-toggle{position:fixed;left:12px;top:calc(var(--dsh-frame-top-clearance,0px) + 6px);z-index:30}
 /* The footer ends in the Bot row: the whale's settings seat, then the account menu
    when no plugin holds that seat. Every other plugin's entry takes a whole row above
-   it, in the shell's order, so none of them squeezes the Bot row. */
-[class*="_footArea"]{grid-template-columns:auto minmax(0,1fr);grid-auto-flow:row dense;align-items:center;gap:4px 9px;padding:8px 6px 6px!important}
+   it, in the shell's order, so none of them squeezes the Bot row.
+   These are the Bot column's rules. The classic Agent page has no Bot column, and there
+   the shell lays out its own footer: a second grid over it is what stacked the account
+   gear on top of the shell's settings button, so the rules stop at the surface. */
+:root[data-bt-surface=bot] [class*="_footArea"]{grid-template-columns:auto minmax(0,1fr);grid-auto-flow:row dense;align-items:center;gap:4px 9px;padding:8px 6px 6px!important}
 /* DSH hides the footer of a collapsed sidebar under a Windows title bar; the grid
    stays out of that one place. */
-html:not([data-windows-titlebar]) [class*="_footArea"],:not([class*="_collapsed"])>[class*="_footArea"]{display:grid!important}
-[class*="_footArea"]>[class*="_footerActions"],[class*="_footArea"]>[class*="_footerActions"]>div{display:contents!important}
-[class*="_footArea"]>[class*="_footerActions"]>div>*{grid-column:1/-1}
-[class*="_footArea"]>[class*="_settingsArea"]{grid-column:1;order:1;width:auto!important}
-[class*="_footArea"] button[aria-label="Settings"]{width:auto!important;padding:0!important;background:none!important;border-radius:50%!important;height:auto!important}
+:root[data-bt-surface=bot]:not([data-windows-titlebar]) [class*="_footArea"],:root[data-bt-surface=bot] :not([class*="_collapsed"])>[class*="_footArea"]{display:grid!important}
+:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_footerActions"],:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_footerActions"]>div{display:contents!important}
+:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_footerActions"]>div>*{grid-column:1/-1}
+:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_settingsArea"]{grid-column:1;order:1;width:auto!important}
+:root[data-bt-surface=bot] [class*="_footArea"] button[aria-label="Settings"]{width:auto!important;padding:0!important;background:none!important;border-radius:50%!important;height:auto!important}
 [class*="_widthHandle"]{display:none!important}
 
 .bt-voice-pane{flex-direction:column;align-items:center;justify-content:center;animation:bt-fade .2s ease-out}
@@ -3893,9 +3911,6 @@ body[data-bt-layout=flat] .bt-tools::after{display:none}
 .bt-react:active{scale:.92}
 @keyframes bt-react-pop{from{transform:scale(.6);opacity:0}}
 .bt-bubble a[href^="${MENTION_ORIGIN}"] svg{display:none}
-.bt-you{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bt-ink) 5%,var(--bt-sidebar));color:var(--bt-ink-2);box-shadow:inset 0 0 0 1px var(--bt-line);transition:background-color .12s ease}
-button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
-.bt-you-wrap{display:inline-flex;padding:0}
 
 .bt-menu{position:fixed;pointer-events:auto;z-index:60;min-width:200px;padding:6px;border-radius:12px;background:var(--bt-glass-bg);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);border:.5px solid var(--bt-glass-rim);box-shadow:var(--bt-glass-shadow),0 0 0 1px rgba(228,228,228,.04);display:flex;flex-direction:column;gap:2px;transform-origin:var(--bt-origin,top left);animation:bt-pop-drop ${SPRING_TAP.duration}ms ${SPRING_TAP.easing},bt-veil-in .14s ease-out;font-family:var(--bt-font);box-sizing:border-box}
 .bt-menu button{display:flex;align-items:center;gap:4px;width:100%;min-height:30px;text-align:left;border:0;background:none;border-radius:6px;padding:6px 8px;font:inherit;font-size:13px;line-height:18px;color:var(--bt-ink);cursor:pointer;box-sizing:border-box}
@@ -3945,8 +3960,6 @@ button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-side
 .bt-palette-empty-hint{font-size:13px;line-height:16px;color:var(--bt-ink-3)}
 @media (prefers-reduced-motion:reduce){.bt-palette{animation:bt-fade .1s ease-out}}
 .bt-account-menu{width:224px}
-.bt-account{flex:none;width:36px;height:36px;border:0;padding:0;background:none;border-radius:50%;cursor:pointer;display:inline-flex}
-.bt-account:hover .bt-you,.bt-account[aria-expanded=true] .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
 /* Popover keyframes move translate and scale, which compose with a transform the popover
    already has. */
 @keyframes bt-pop-drop{from{translate:0 -4px;scale:.96}}
@@ -4198,7 +4211,7 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 /* A turn's process seat is a flow child of its own, not a flowItem: a seat whose
    member cells all emptied themselves (a hidden exchange turn, a turn whose
    calls draw nothing) still kept its margin, stacking a blank band per hidden
-   call. Only the slot a LinkBot cell marked counts, so a seat another renderer
+   call. Only the slot a LinkHarness cell marked counts, so a seat another renderer
    fills — even with plain text and no element child — is never taken for empty. */
 [data-step-process]:has(> [data-step-process-body] [data-slot="conversation.chat.node"][data-bt-emptied]):not(:has(> [data-step-process-body] [data-slot="conversation.chat.node"]:not([data-bt-emptied]))){display:none!important}
 [class*="_header"]:has(.bt-head){border-bottom-color:transparent!important;box-shadow:none!important}
@@ -9969,7 +9982,7 @@ function ModelKeyCard({ model, actions, onSaved }) {
     )
   );
 }
-var manageModels = (actions) => actions.openModels ?? (actions.openSettings ? () => actions.openSettings("models") : void 0);
+var manageModels = (actions) => actions.openModels ?? actions.openHarnessModels ?? actions.openHarnessSettings;
 function setupChoices(actions) {
   const custom = manageModels(actions);
   return [
@@ -16255,13 +16268,13 @@ function TeamSidebar(props) {
     onClick: () => actions.setSurface("agent")
   }, (0, import_react35.createElement)(SwitchIcon));
   const toAide = (0, import_react35.createElement)(AideButton, { label: t("AIDE workbench") });
-  const foot = wideContent ? (0, import_react35.createElement)("div", { className: "bt-leftcol-foot" }, toAgent, toAide, (0, import_react35.createElement)(AccountLauncher, { seat: false, actions })) : (0, import_react35.createElement)(
+  const foot = wideContent ? (0, import_react35.createElement)("div", { className: "bt-leftcol-foot" }, toAgent, toAide, (0, import_react35.createElement)(AccountLauncher, { place: "column", useSurface: props.useSurface, actions })) : (0, import_react35.createElement)(
     "div",
     { className: "bt-leftcol-foot bt-leftcol-foot-rail" },
     (0, import_react35.createElement)("button", { type: "button", className: "bt-round", "aria-label": t("New…"), title: t("New…"), onClick: () => actions.openNewChat("new") }, (0, import_react35.createElement)(PlusIcon)),
     toAgent,
     toAide,
-    (0, import_react35.createElement)(AccountLauncher, { seat: false, actions })
+    (0, import_react35.createElement)(AccountLauncher, { place: "column", useSurface: props.useSurface, actions })
   );
   const content = (0, import_react35.createElement)(
     "div",
@@ -16362,10 +16375,10 @@ function UpdateButton({ useUpdate, actions }) {
     setDshError("");
     void actions.installDshUpdate().catch((failure) => setDshError(hostText(failure?.message ?? String(failure))));
   };
-  const label = phase === "installing" ? t("Updating LinkBot…") : dshPhase === "installing" ? t("Updating DSH…") : phase === "installed" ? t("LinkBot {version} is installed. Restart DSH to use it.", { version: update.installed ?? update.latest }) : phase === "updated" ? t("LinkBot {version} is installed.", { version: update.installed ?? update.latest }) : dshPhase === "installed" ? t("Restart DSH to start using DSH {version}.", { version: dsh.installed ?? dsh.verified }) : update?.available ? t("LinkBot {version} is available", { version: update.latest }) : t("DSH {version} is available", { version: dsh?.verified });
+  const label = phase === "installing" ? t("Updating LinkHarness…") : dshPhase === "installing" ? t("Updating DSH…") : phase === "installed" ? t("LinkHarness {version} is installed. Restart DSH to use it.", { version: update.installed ?? update.latest }) : phase === "updated" ? t("LinkHarness {version} is installed.", { version: update.installed ?? update.latest }) : dshPhase === "installed" ? t("Restart DSH to start using DSH {version}.", { version: dsh.installed ?? dsh.verified }) : update?.available ? t("LinkHarness {version} is available", { version: update.latest }) : t("DSH {version} is available", { version: dsh?.verified });
   const message = error || (phase === "failed" ? update.error : "");
   const dshMessage = dshError || (dshPhase === "failed" ? dsh?.error : "");
-  const dshText = dshPhase === "installed" ? t("Restart DSH to start using DSH {version}.", { version: dsh.installed ?? dsh.verified }) : dsh?.available === false && dsh?.blockedBy ? t("Update LinkBot {version} first.", { version: dsh.blockedBy }) : t("You have {version}.", { version: dsh?.current });
+  const dshText = dshPhase === "installed" ? t("Restart DSH to start using DSH {version}.", { version: dsh.installed ?? dsh.verified }) : dsh?.available === false && dsh?.blockedBy ? t("Update LinkHarness {version} first.", { version: dsh.blockedBy }) : t("You have {version}.", { version: dsh?.current });
   return (0, import_react35.createElement)(
     import_react35.Fragment,
     null,
@@ -16382,12 +16395,12 @@ function UpdateButton({ useUpdate, actions }) {
     }, (0, import_react35.createElement)(CloudDownloadIcon, { done: phase === "installed" || phase === "updated" }), phase === "failed" || dshPhase === "failed" ? (0, import_react35.createElement)("span", { className: "bt-update-dot", "aria-hidden": true }) : null),
     shown && box ? (0, import_react_dom5.createPortal)((0, import_react35.createElement)(
       "div",
-      { className: "bt-update-pop", role: "dialog", "aria-label": update?.available || phase !== "idle" ? t("LinkBot update") : t("DSH update"), style: box, "data-leaving": leaving || void 0 },
+      { className: "bt-update-pop", role: "dialog", "aria-label": update?.available || phase !== "idle" ? t("LinkHarness update") : t("DSH update"), style: box, "data-leaving": leaving || void 0 },
       update?.available || phase !== "idle" ? (0, import_react35.createElement)(
         import_react35.Fragment,
         null,
-        (0, import_react35.createElement)("div", { className: "bt-update-title" }, phase === "installed" || phase === "updated" ? t("Update installed") : t("LinkBot {version}", { version: update.latest })),
-        (0, import_react35.createElement)("div", { className: "bt-update-text" }, phase === "installed" ? t("Restart DSH to start using LinkBot {version}.", { version: update.installed ?? update.latest }) : phase === "updated" ? t("LinkBot {version} is installed.", { version: update.installed ?? update.latest }) : t("You have {version}.", { version: update.current })),
+        (0, import_react35.createElement)("div", { className: "bt-update-title" }, phase === "installed" || phase === "updated" ? t("Update installed") : t("LinkHarness {version}", { version: update.latest })),
+        (0, import_react35.createElement)("div", { className: "bt-update-text" }, phase === "installed" ? t("Restart DSH to start using LinkHarness {version}.", { version: update.installed ?? update.latest }) : phase === "updated" ? t("LinkHarness {version} is installed.", { version: update.installed ?? update.latest }) : t("You have {version}.", { version: update.current })),
         message ? (0, import_react35.createElement)("div", { className: "bt-update-error", role: "alert" }, t("The update did not finish: {reason}", { reason: message })) : null,
         (0, import_react35.createElement)(
           "div",
@@ -16446,13 +16459,10 @@ function pressesShellShortcut(event, id) {
 var NO_SUBSCRIBE = () => () => {
 };
 var NO_SNAPSHOT = () => null;
-function AccountLauncher({ seat = true, settingsOpen, actions }) {
+function AccountLauncher({ place = "column", settingsOpen, openSettings, openOnboarding, actions, useSurface }) {
   const [open, setOpen] = (0, import_react35.useState)(false);
-  (0, import_react35.useLayoutEffect)(() => {
-    if (!seat) return void 0;
-    actions.seatAccount(true);
-    return () => actions.seatAccount(false);
-  }, [seat]);
+  const mode = useSurface ? useSurface((value) => value.mode) : "bot";
+  const shown = place === "column" ? mode === "bot" : mode === "agent";
   const [box, setBox] = (0, import_react35.useState)(null);
   const button = (0, import_react35.useRef)(null);
   const menuRef = (0, import_react35.useRef)(null);
@@ -16460,7 +16470,7 @@ function AccountLauncher({ seat = true, settingsOpen, actions }) {
     if (settingsOpen) setOpen(false);
   }, [settingsOpen]);
   (0, import_react35.useEffect)(() => {
-    if (!open) return void 0;
+    if (!open || !shown) return void 0;
     const onDown = (event) => {
       if (event.target instanceof Element && (event.target.closest(".bt-account-menu") || button.current?.contains(event.target))) return;
       setOpen(false);
@@ -16479,7 +16489,7 @@ function AccountLauncher({ seat = true, settingsOpen, actions }) {
       window.removeEventListener("mousedown", onDown);
       window.removeEventListener("keydown", onKey, true);
     };
-  }, [open]);
+  }, [open, shown]);
   const signIn = actions.signInEntry?.() ?? null;
   const ops = (0, import_react35.useMemo)(() => signIn?.inject?.() ?? {}, [signIn]);
   const accountSource = ops.hooks?.account;
@@ -16547,6 +16557,7 @@ function AccountLauncher({ seat = true, settingsOpen, actions }) {
   ];
   if (signedIn) groups.push([[accountT("signOut"), SignOutIcon, askSignOut, void 0, true]]);
   else if (signedOut) groups.push([[t("Sign in to DeepSeek"), SignInIcon, () => actions.signIn()]]);
+  if (!shown) return null;
   return (0, import_react35.createElement)(
     import_react35.Fragment,
     null,
@@ -16703,9 +16714,9 @@ function useLandOnMainBot(roster, useSessions, actions) {
   }, [mainView, roster]);
 }
 function FooterAccount(props) {
-  const seated = props.useUi((value) => value.accountSeated === true);
-  if (seated) return null;
-  return (0, import_react35.createElement)("span", { className: "bt-foot-account" }, (0, import_react35.createElement)(AccountLauncher, { ...props, seat: false }));
+  const mode = props.useSurface ? props.useSurface((value) => value.mode) : "bot";
+  if (mode !== "agent") return null;
+  return (0, import_react35.createElement)("span", { className: "bt-foot-account" }, (0, import_react35.createElement)(AccountLauncher, { ...props, place: "footer" }));
 }
 function BotReturn({ useSurface, useRoster, actions }) {
   const mode = useSurface((value) => value.mode);
@@ -16714,7 +16725,7 @@ function BotReturn({ useSurface, useRoster, actions }) {
   if (mode !== "agent") return null;
   return (0, import_react35.createElement)(
     "button",
-    { type: "button", className: "bt-return", "aria-label": t("LinkBot"), title: t("LinkBot"), onClick: () => actions.setSurface("bot") },
+    { type: "button", className: "bt-return", "aria-label": t("LinkHarness"), title: t("LinkHarness"), onClick: () => actions.setSurface("bot") },
     (0, import_react35.createElement)(BotMark, { look: MAIN_LOOK, size: 20 })
   );
 }
@@ -16755,10 +16766,15 @@ var SIDEBAR_CSS = `
 .bt-rail .bt-row{position:relative}
 .bt-rail .bt-pin{position:absolute;top:1px;left:calc(50% + 14px)}
 .bt-side .bt-read-only{margin:4px 8px 6px;padding:8px 10px;border-radius:10px;background:var(--bt-hover);font-size:12px;line-height:1.45;text-align:left}
-[class*="_footArea"]:has(.bt-foot-account){grid-template-columns:auto minmax(0,1fr) auto;column-gap:6px}
-[class*="_footArea"]>[class*="_footerActions"]>div>.bt-foot-account{grid-column:1;order:1;display:inline-flex}
-[class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{grid-column:3}
-[class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
+/* The account entry sits in the foot of our own column, whose three-column grid puts it first
+   and keeps the shell's settings trigger last. The classic Agent page has no Bot column, so
+   there the shell's own footer keeps its own layout: these rules only apply while the Bot
+   surface is up (data-bt-surface is set on the document root). The icon itself stays in both
+   surfaces — only the layout around it changes. */
+:root[data-bt-surface=bot] [class*="_footArea"]:has(.bt-foot-account){grid-template-columns:auto minmax(0,1fr) auto;column-gap:6px}
+:root[data-bt-surface=bot] [class*="_footArea"]>[class*="_footerActions"]>div>.bt-foot-account{grid-column:1;order:1;display:inline-flex}
+:root[data-bt-surface=bot] [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{grid-column:3}
+:root[data-bt-surface=bot] [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
 
 /* The update cloud springs in when a newer LinkBot shows up; its arrow drops in a
    loop while the install runs. */
@@ -21079,7 +21095,7 @@ function entrySummary(entry) {
   if (entry.source === "turn") return failureLabel(entry.code, entry.text);
   return entry.text;
 }
-var SOURCES = { turn: "Model call", host: "LinkBot", api: "LinkBot", browser: "This window" };
+var SOURCES = { turn: "Model call", host: "LinkHarness", api: "LinkHarness", browser: "This window" };
 var issueWindow = reserveWindow;
 function FeedbackPage({ actions, run: run2, Section: Section2, Row: Row4 }) {
   const [what, setWhat] = (0, import_react44.useState)("");
@@ -21148,7 +21164,7 @@ function FeedbackPage({ actions, run: run2, Section: Section2, Row: Row4 }) {
       preview ? (0, import_react44.createElement)("div", { className: "bt-set-row bt-fb-preview" }, (0, import_react44.createElement)("pre", { tabIndex: 0, "aria-label": t("Diagnostics") }, report?.markdown || t("Loading…"))) : null,
       (0, import_react44.createElement)(
         Row4,
-        { label: t("GitHub issue"), hint: t("Opens a new issue in the LinkBot repository with all of this filled in. Nothing is sent until you submit it there.") },
+        { label: t("GitHub issue"), hint: t("Opens a new issue in the LinkHarness repository with all of this filled in. Nothing is sent until you submit it there.") },
         (0, import_react44.createElement)("button", { type: "button", className: "bt-fb-primary", onClick: openIssue }, t("Report on GitHub"))
       )
     ),
@@ -21161,7 +21177,7 @@ function FeedbackPage({ actions, run: run2, Section: Section2, Row: Row4 }) {
     (0, import_react44.createElement)(
       Section2,
       { key: "errors", title: report ? t("Recent errors · {count}", { count: total }) : t("Recent errors") },
-      shown.length === 0 ? (0, import_react44.createElement)(Row4, { label: t("No errors recorded."), hint: t("Failed model calls and LinkBot problems show here, newest first.") }) : shown.map((entry, index) => (0, import_react44.createElement)(
+      shown.length === 0 ? (0, import_react44.createElement)(Row4, { label: t("No errors recorded."), hint: t("Failed model calls and LinkHarness problems show here, newest first.") }) : shown.map((entry, index) => (0, import_react44.createElement)(
         "div",
         { key: `${entry.time}-${index}`, className: "bt-set-row bt-fb-entry", title: entry.text },
         (0, import_react44.createElement)("span", { className: "bt-fb-dot", "data-level": entry.level, "aria-hidden": true }),
@@ -21169,7 +21185,7 @@ function FeedbackPage({ actions, run: run2, Section: Section2, Row: Row4 }) {
           "div",
           { className: "bt-set-copy" },
           (0, import_react44.createElement)("span", { className: "bt-fb-text" }, entrySummary(entry)),
-          (0, import_react44.createElement)("span", { className: "bt-set-hint" }, [whenText(entry.time), entry.bot, entry.where, t(SOURCES[entry.source] ?? "LinkBot")].filter(Boolean).join(" · "))
+          (0, import_react44.createElement)("span", { className: "bt-set-hint" }, [whenText(entry.time), entry.bot, entry.where, t(SOURCES[entry.source] ?? "LinkHarness")].filter(Boolean).join(" · "))
         ),
         entry.code ? (0, import_react44.createElement)("span", { className: "bt-tag bt-fb-code" }, entry.status ? `${entry.code} ${entry.status}` : entry.code) : null
       )),
@@ -21241,12 +21257,12 @@ var import_react45 = require("react");
 var CHEER_MS = 1800;
 var starCount = (count) => new Intl.NumberFormat(dateLocale(), { notation: "compact", maximumFractionDigits: 1 }).format(count);
 function botHint(update) {
-  if (update.phase === "installing") return t("Updating LinkBot…");
-  if (update.phase === "installed") return t("Restart DSH to start using LinkBot {version}.", { version: update.installed ?? update.latest });
-  if (update.phase === "updated") return t("LinkBot {version} is installed.", { version: update.installed ?? update.latest });
+  if (update.phase === "installing") return t("Updating LinkHarness…");
+  if (update.phase === "installed") return t("Restart DSH to start using LinkHarness {version}.", { version: update.installed ?? update.latest });
+  if (update.phase === "updated") return t("LinkHarness {version} is installed.", { version: update.installed ?? update.latest });
   if (update.phase === "failed") return t("The update did not finish: {reason}", { reason: hostText(update.error ?? "") });
-  if (update.available) return t("LinkBot {version} is available", { version: update.latest });
-  if (update.source === "app") return t("Updates come with the LinkBot app.");
+  if (update.available) return t("LinkHarness {version} is available", { version: update.latest });
+  if (update.source === "app") return t("Updates come with the LinkHarness app.");
   if (update.enabled === false) return t("Update checks are off.");
   if (update.source === "path") return t("Installed from a local folder; update it there.");
   if (!update.checkedAt) return null;
@@ -21278,7 +21294,7 @@ function dshHint(dsh, shown) {
   if (dsh.phase === "installing") return t("Updating DSH…");
   if (dsh.phase === "installed") return t("Restart DSH to start using DSH {version}.", { version: dsh.installed ?? dsh.verified });
   if (dsh.phase === "failed") return t("The update did not finish: {reason}", { reason: hostText(dsh.error ?? "") });
-  if (dsh.available === false && dsh.blockedBy) return t("Update LinkBot {version} first.", { version: dsh.blockedBy });
+  if (dsh.available === false && dsh.blockedBy) return t("Update LinkHarness {version} first.", { version: dsh.blockedBy });
   if (shown) return t("DSH {version} is available", { version: dsh.verified });
   return t("Version {version}", { version: dsh.current });
 }
@@ -21340,7 +21356,7 @@ function AboutPage({ useUpdate, actions, run: run2, Section: Section2, Row: Row4
       (0, import_react45.createElement)(
         "div",
         { className: "bt-about-copy" },
-        (0, import_react45.createElement)("span", { className: "bt-about-name" }, "LinkBot"),
+        (0, import_react45.createElement)("span", { className: "bt-about-name" }, "LinkHarness"),
         update.current ? (0, import_react45.createElement)("span", { className: "bt-about-version" }, t("Version {version}", { version: update.current })) : null
       ),
       repo ? (0, import_react45.createElement)(
@@ -21350,18 +21366,18 @@ function AboutPage({ useUpdate, actions, run: run2, Section: Section2, Row: Row4
           href: repo,
           target: "_blank",
           rel: "noopener noreferrer",
-          title: t("Star LinkBot on GitHub"),
-          "aria-label": stars === null ? t("Star LinkBot on GitHub") : `${t("Star LinkBot on GitHub")} · ${t("{count} stars", { count: stars })}`
+          title: t("Star LinkHarness on GitHub"),
+          "aria-label": stars === null ? t("Star LinkHarness on GitHub") : `${t("Star LinkHarness on GitHub")} · ${t("{count} stars", { count: stars })}`
         },
         (0, import_react45.createElement)("span", { className: "bt-star-main" }, (0, import_react45.createElement)("span", { className: "bt-star-icon" }, (0, import_react45.createElement)(StarLineIcon)), "Star"),
         stars === null ? null : (0, import_react45.createElement)("span", { className: "bt-star-count" }, starCount(stars))
       ) : null
     ),
-    repo ? (0, import_react45.createElement)("p", { key: "ask", className: "bt-about-ask" }, t("If LinkBot helps you, a star on GitHub helps more people find it.")) : null,
+    repo ? (0, import_react45.createElement)("p", { key: "ask", className: "bt-about-ask" }, t("If LinkHarness helps you, a star on GitHub helps more people find it.")) : null,
     (0, import_react45.createElement)(
       Section2,
       { key: "updates", title: t("Updates") },
-      (0, import_react45.createElement)(Row4, { label: "LinkBot", hint: ownRow?.hint ?? botHint(update) }, botControl, update.available && update.notesUrl ? (0, import_react45.createElement)("a", linkProps(update.notesUrl), t("What's new")) : null),
+      (0, import_react45.createElement)(Row4, { label: "LinkHarness", hint: ownRow?.hint ?? botHint(update) }, botControl, update.available && update.notesUrl ? (0, import_react45.createElement)("a", linkProps(update.notesUrl), t("What's new")) : null),
       dsh?.current ? (0, import_react45.createElement)(Row4, { label: "DeepSeek Harness", hint: dshHint(dsh, dshShown) }, dshControl) : null
     ),
     (0, import_react45.createElement)(
@@ -21452,7 +21468,7 @@ function ProvidersPage({ actions, run: run2, Section: Section2, advanced = null 
 function keyState(key) {
   if (key === null) return null;
   if (!key.configured) return ["missing", t("Needs an API key")];
-  return key.writable ? ["set", t("Key set")] : ["outside", t("Key set outside LinkBot")];
+  return key.writable ? ["set", t("Key set")] : ["outside", t("Key set outside LinkHarness")];
 }
 function ProviderRow({ provider, apply: apply2, actions, open, onToggle }) {
   const [confirm, setConfirm] = (0, import_react46.useState)(false);
@@ -21480,7 +21496,7 @@ function ProviderRow({ provider, apply: apply2, actions, open, onToggle }) {
       "div",
       { className: "bt-secret-edit" },
       provider.key?.writable ? (0, import_react46.createElement)(KeyEditor, { provider, apply: apply2, actions }) : null,
-      provider.key && !provider.key.writable ? (0, import_react46.createElement)("div", { className: "bt-set-hint" }, t("This key comes from outside LinkBot, such as an environment variable, and cannot be changed here.")) : null,
+      provider.key && !provider.key.writable ? (0, import_react46.createElement)("div", { className: "bt-set-hint" }, t("This key comes from outside LinkHarness, such as an environment variable, and cannot be changed here.")) : null,
       provider.models.length > 0 ? (0, import_react46.createElement)(
         "div",
         { className: "bt-secret-edit-block" },
@@ -21802,7 +21818,7 @@ function LocalAgentsPage({ run: run2, Section: Section2, Row: Row4 }) {
 var import_react48 = require("react");
 var import_dsh_client_ui_primitives2 = require("@deepseek-ai/dsh-client-ui-primitives");
 var capitalize2 = (word) => word[0].toUpperCase() + word.slice(1);
-var SETTINGS_PAGES = [["general", "General"], ["models", "Models"], ["local-agents", "Local agents"], ["bots", "Bots"], ["groups", "Group chats"], ["connectors", "Connectors"], ["im", "IM"], ["capabilities", "Capabilities"], ["browser", "Browser"], ["computer", "Computer use"], ["schedules", "Scheduled tasks"], ["usage", "Usage"], ["secrets", "Secrets"], ["feedback", "Feedback"], ["about", "About LinkBot"]];
+var SETTINGS_PAGES = [["general", "General"], ["models", "Models"], ["local-agents", "Local agents"], ["bots", "Bots"], ["groups", "Group chats"], ["connectors", "Connectors"], ["im", "IM"], ["capabilities", "Capabilities"], ["browser", "Browser"], ["computer", "Computer use"], ["schedules", "Scheduled tasks"], ["usage", "Usage"], ["secrets", "Secrets"], ["feedback", "Feedback"], ["about", "About LinkHarness"]];
 var LAST_PAGES = /* @__PURE__ */ new Set(["feedback", "about"]);
 var MERGED_SECTIONS = /* @__PURE__ */ new Set(["general", "models"]);
 var LOOK_ITEMS = ["appearance", "font-size"];
@@ -22234,7 +22250,7 @@ function SettingsDialog({ page, id, roster, actions, useUpdate, leaving = false,
     (0, import_react48.createElement)("div", { className: "bt-scrim", onMouseDown: close }),
     (0, import_react48.createElement)(
       "div",
-      { className: "bt-settings", role: "dialog", "aria-modal": true, "aria-label": t("LinkBot settings"), "data-shortcut-modal": "settings" },
+      { className: "bt-settings", role: "dialog", "aria-modal": true, "aria-label": t("LinkHarness settings"), "data-shortcut-modal": "settings" },
       (0, import_react48.createElement)(
         "nav",
         { ref: nav.box, className: "bt-settings-nav", "aria-label": t("Settings pages") },
@@ -23535,7 +23551,7 @@ var SIDE_TOKEN = "/side ";
 var GROUP_REFUSAL = "Side chat is only available in a Bot's private chat.";
 var ATTACHMENT_REFUSAL = "/side does not take attachments.";
 var EMPTY_REFUSAL = "Write a question after /side.";
-var LOADING_REFUSAL = "LinkBot is still loading this chat.";
+var LOADING_REFUSAL = "LinkHarness is still loading this chat.";
 function sideSurface(roster, sessionId) {
   if (!roster?.ready) return "unknown";
   if (roster.roomsById?.[sessionId]) return "group";
@@ -25608,7 +25624,7 @@ function BrowserCards({ bot, sessionId, roster, actions, useBrowserTabs, useBrow
     actions.browserEnsure?.(bot.id);
   }, [bot.id]);
   if (roster.browser !== true || !actions.browserShow) {
-    return (0, import_react59.createElement)("div", { className: "bt-muted" }, t("The browser is in DSH Desktop and the LinkBot app."));
+    return (0, import_react59.createElement)("div", { className: "bt-muted" }, t("The browser is in DSH Desktop and the LinkHarness app."));
   }
   if (state.ids.length === 0) {
     return (0, import_react59.createElement)(
@@ -29594,7 +29610,6 @@ function apply(ctx) {
     const navigation = ctx.get("pluginNavigation");
     return navigation ? () => navigation.openBundle(VOICE_BUNDLE) : null;
   };
-  actions.seatAccount = (on) => ui2.set((state) => state.accountSeated === on ? state : { ...state, accountSeated: on });
   actions.installUpdate = async () => {
     const value = await call("update-install");
     update.set((previous) => ({ ...previous, ...value }));
@@ -29961,8 +29976,11 @@ function apply(ctx) {
     () => shadow("sidebar.workspaces", { priority: BOT_PRIORITY, inject: face }, TeamSidebar),
     () => shadow("settings.trigger", { priority: BOT_PRIORITY }, YouAvatar),
     // The whale wins the seat over a shell account plugin's own launcher (the
-    // Desktop's "··· More"), which comes back in Agent mode.
-    () => shadow("settings.launcher", { priority: BOT_PRIORITY, inject: face }, AccountLauncher),
+    // Desktop's "··· More"). The seat belongs to the classic page: the Bot page
+    // shows the account in our own column, and the shell's sidebar is a rail
+    // there, so this launcher draws nothing.
+    () => shadow("settings.launcher", { priority: BOT_PRIORITY, inject: face }, (props) => (0, import_react65.createElement)(AccountLauncher, { ...props, place: "shell" })),
+    () => shadow("settings.onboarding", { id: MODELS_STEP, order: MODELS_STEP_ORDER }, OpenModelsStep),
     () => shadow("shell.overlay", { id: "bot-computer", order: 40, inject: face }, ComputerIndicator),
     () => shadow("shell.overlay", { id: "bot", order: 50, inject: face }, Overlays),
     () => shadow("shell.overlay", { id: "bot-signin", order: 55, inject: face }, DeepSeekSignIn),
@@ -30025,6 +30043,7 @@ function apply(ctx) {
     // its cell; it lists only the sends the user authored (#663).
     () => shadow("conversation.input.dock", { id: "queue", order: 20, priority: BOT_PRIORITY, inject: queueFace }, QueueDock)
   ];
+  ctx.effect(() => installCompiledStyles(BASE_CSS, "base"), "ds-bot: base styles");
   ctx.effect(() => installCompiledStyles(RETURN_CSS, "return"), "ds-bot: return styles");
   ctx.effect(() => installCompiledStyles(FOOTER_CSS, "footer"), "ds-bot: footer styles");
   ctx.effect(() => installCompiledStyles(COMPUTER_CSS, "computer"), "ds-bot: computer styles");
@@ -30110,6 +30129,8 @@ function apply(ctx) {
       verifyTimer = setTimeout(verifySidebar, 250);
     };
     const reconcile = () => {
+      const mode = surface.getSnapshot().mode;
+      if (typeof document !== "undefined") document.documentElement.dataset.btSurface = mode;
       groups.reconcile(groupsFor(surface.getSnapshot()));
       clearTimeout(verifyTimer);
       verifyAttempts = 0;
