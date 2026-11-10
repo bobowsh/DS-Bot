@@ -397,7 +397,7 @@ export function ModelKeyCard({ model, actions, onSaved }) {
       h('button', { type: 'button', className: 'bt-q-submit', disabled: !ready, onClick: save }, busy ? t('Saving…') : t('Save'))))
 }
 
-// Where the providers are set up: LinkBot's Models page, else DSH's own.
+// Where the providers are set up: LinkHarness's Models page, else DSH's own.
 export const manageModels = actions => actions.openModels ?? actions.openHarnessModels ?? actions.openHarnessSettings
 
 // Ways to get a first model. The DeepSeek sign-in exists only where the shell carries

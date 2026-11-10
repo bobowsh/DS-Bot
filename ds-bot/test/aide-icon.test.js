@@ -35,7 +35,7 @@ test('the plugin ships the same mark as its own icon', () => {
 
 test('the entry sits in the foot of the host sidebar too', () => {
   // 宿主的侧栏页脚有一个 slot（sidebar.footer.action），我们把按钮注册进去，
-  // 它就落在 DSH 界面的 LinkBot / 导入会话 那一行里。
+  // 它就落在 DSH 界面的 LinkHarness / 导入会话 那一行里。
   const index = read('src/client/index.js')
   assert.ok(index.includes("'sidebar.footer.action'"), '注册在宿主的侧栏页脚 slot 上')
   assert.ok(index.includes('AideFooterButton'), '按钮组件注册在里面')

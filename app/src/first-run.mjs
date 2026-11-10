@@ -60,7 +60,7 @@ export function fixedPlaces() {
   const root = dirname(program)
   if (root === program || root === dirname(root)) return undefined
   if (!canWrite(root)) {
-    console.warn(`LinkBot: ${root} cannot be written, the data goes to the default place instead`)
+    console.warn(`LinkHarness: ${root} cannot be written, the data goes to the default place instead`)
     return undefined
   }
   return { dataDir: join(root, 'data'), workspace: join(root, 'workspace') }
@@ -79,7 +79,7 @@ export function fixedPlaces() {
  */
 export function defaultPlaces() {
   const root = driveRoot()
-  return { dataDir: join(root, 'LinkBot', 'data'), workspace: join(root, 'LinkBot', 'workspace') }
+  return { dataDir: join(root, 'LinkHarness', 'data'), workspace: join(root, 'LinkHarness', 'workspace') }
 }
 
 /**
@@ -241,7 +241,7 @@ function makePlaces(dataDir, workspace) {
     try {
       mkdirSync(dir, { recursive: true })
     } catch (error) {
-      console.error(`LinkBot: the folder ${dir} was not made: ${error instanceof Error ? error.message : String(error)}`)
+      console.error(`LinkHarness: the folder ${dir} was not made: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 }

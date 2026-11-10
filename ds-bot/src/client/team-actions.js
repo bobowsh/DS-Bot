@@ -53,7 +53,7 @@ export function teamActions({ call, after, partFor, roster, ui, live, cards, hel
     // Opening the conversation would move focus to its composer and blur the name field.
     renameBot: (id) => { ui.set(state => ({ ...state, details: id, view: 'details', renaming: true, tab: null, panelYield: yieldTo(state, 'details') })) },
     openSettings,
-    // LinkBot's own Models page: the providers DSH serves, their keys and models.
+    // LinkHarness's own Models page: the providers DSH serves, their keys and models.
     openModels: () => openSettings('models'),
     closeSettings: () => { ui.set(state => (state.settings ? { ...state, settings: null } : state)) },
     openMemory: (id) => { ui.set(state => ({ ...state, memory: id, menu: null, palette: null })) },

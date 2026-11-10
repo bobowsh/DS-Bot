@@ -253,10 +253,10 @@ var ZH = {
   "Add a provider": "添加服务商",
   "Needs an API key": "需要 API key",
   "Key set": "已设置 key",
-  "Key set outside LinkBot": "key 在 LinkBot 之外设置",
+  "Key set outside LinkHarness": "key 在 LinkHarness 之外设置",
   "No models": "没有模型",
   "{count} models": "{count} 个模型",
-  "This key comes from outside LinkBot, such as an environment variable, and cannot be changed here.": "这个 key 来自 LinkBot 之外（例如环境变量），这里改不了。",
+  "This key comes from outside LinkHarness, such as an environment variable, and cannot be changed here.": "这个 key 来自 LinkHarness 之外（例如环境变量），这里改不了。",
   // Local agents page
   "Local agents": "本地 Agent",
   "This DSH cannot register local agent routes.": "这个 DSH 不能注册本地 Agent 路由。",
@@ -339,7 +339,7 @@ var ZH = {
   "HTTP status": "HTTP 状态码",
   "Request ID": "请求 ID",
   "Provider message": "原文",
-  "LinkBot": "LinkBot",
+  "LinkHarness": "LinkHarness",
   "Message {name}": "给 {name} 发消息",
   "Press Enter to steer queued messages": "按 Enter 插话发送排队的消息",
   "Couldn’t steer the queued messages. Try again.": "插话发送失败，请重试。",
@@ -417,7 +417,7 @@ var ZH = {
   "Rename {name}": "重命名 {name}",
   "Add instructions in Bot settings": "在 Bot 设置里添加说明",
   "No scheduled tasks yet. To add one, tell the Bot in its chat what to do and when.": "还没有定时任务。要添加，在对话里告诉 Bot 做什么、什么时候做。",
-  "The browser is in DSH Desktop and the LinkBot app.": "浏览器在 DSH 桌面版和 LinkBot 应用里。",
+  "The browser is in DSH Desktop and the LinkHarness app.": "浏览器在 DSH 桌面版和 LinkHarness 应用里。",
   "New tab": "新标签页",
   "Close tab": "关闭标签页",
   "Open {title}": "打开 {title}",
@@ -552,7 +552,7 @@ var ZH = {
   "No group chats yet.": "还没有群聊。",
   "A group chat lets several Bots work on one thing with you.": "在群聊里，几个 Bot 和你一起做一件事。",
   "Back to group chats": "返回群聊列表",
-  "LinkBot settings": "LinkBot 设置",
+  "LinkHarness settings": "LinkHarness 设置",
   "Settings pages": "设置页面",
   "Models, providers, and the rest of DeepSeek Harness": "模型、服务商和 DeepSeek Harness 的其他设置",
   "Harness settings": "Harness 设置",
@@ -575,14 +575,17 @@ var ZH = {
   "{n} min": "{n} 分钟",
   "{n} h": "{n} 小时",
   "{n} d": "{n} 天",
-  "LinkBot {version} is available": "LinkBot {version} 可以更新",
-  "Updating LinkBot…": "正在更新 LinkBot…",
-  "LinkBot {version} is installed. Restart DSH to use it.": "LinkBot {version} 已安装，重启 DSH 后生效",
-  "LinkBot {version} is installed.": "LinkBot {version} 已安装。",
-  "LinkBot update": "LinkBot 更新",
-  "LinkBot {version}": "LinkBot {version}",
+  "LinkHarness {version} is available": "LinkHarness {version} 可以更新",
+  "Updating LinkHarness…": "正在更新 LinkHarness…",
+  // The brand rename reached the settings rows before the update row: this one still says the
+  // old name when it was written, so both spellings carry the same Chinese text.
+  "Updating LinkBot…": "正在更新 LinkHarness…",
+  "LinkHarness {version} is installed. Restart DSH to use it.": "LinkHarness {version} 已安装，重启 DSH 后生效",
+  "LinkHarness {version} is installed.": "LinkHarness {version} 已安装。",
+  "LinkHarness update": "LinkHarness 更新",
+  "LinkHarness {version}": "LinkHarness {version}",
   "Update installed": "更新已安装",
-  "Restart DSH to start using LinkBot {version}.": "重启 DSH 后开始使用 LinkBot {version}。",
+  "Restart DSH to start using LinkHarness {version}.": "重启 DSH 后开始使用 LinkHarness {version}。",
   "You have {version}.": "当前版本 {version}。",
   "The update did not finish: {reason}": "更新没有完成：{reason}",
   "Updating…": "正在更新…",
@@ -591,7 +594,7 @@ var ZH = {
   "DSH update": "DSH 更新",
   "DSH {version}": "DSH {version}",
   "Restart DSH to start using DSH {version}.": "重启 DSH 后开始使用 DSH {version}。",
-  "Update LinkBot {version} first.": "先更新 LinkBot {version}。",
+  "Update LinkHarness {version} first.": "先更新 LinkHarness {version}。",
   "Open updates": "打开更新",
   "Search Bots, chats and messages": "搜索 Bot、对话和消息",
   "Clear search": "清除搜索",
@@ -947,11 +950,11 @@ var ZH = {
   "Compared with the day before": "与前一天相比",
   "Compared with the {count} days before": "与再往前 {count} 天相比",
   "{share}% of all usage from {span}": "占 {span} 全部用量的 {share}%",
-  "About LinkBot": "关于 LinkBot",
+  "About LinkHarness": "关于 LinkHarness",
   "Version {version}": "版本 {version}",
-  "Star LinkBot on GitHub": "在 GitHub 上给 LinkBot 点 Star",
+  "Star LinkHarness on GitHub": "在 GitHub 上给 LinkHarness 点 Star",
   "{count} stars": "{count} 个 Star",
-  "If LinkBot helps you, a star on GitHub helps more people find it.": "如果 LinkBot 对你有用，欢迎在 GitHub 上点个 Star，让更多人看到它。",
+  "If LinkHarness helps you, a star on GitHub helps more people find it.": "如果 LinkHarness 对你有用，欢迎在 GitHub 上点个 Star，让更多人看到它。",
   "Check for updates": "检查更新",
   "Checking…": "正在检查…",
   "Up to date": "已是最新版本",
@@ -965,7 +968,7 @@ var ZH = {
   "{version} is available": "{version} 已发布",
   "Installed from a local folder; update it there.": "从本地文件夹安装，请在那里更新。",
   "Updates are not offered for this install.": "这种安装方式不提供更新。",
-  "Updates come with the LinkBot app.": "随 LinkBot 应用一起更新。",
+  "Updates come with the LinkHarness app.": "随 LinkHarness 应用一起更新。",
   "Source code": "源代码",
   "Release notes": "发布说明",
   "Report a problem": "报告问题",
@@ -974,7 +977,7 @@ var ZH = {
   "For example: I asked Writer in the group chat and it showed an error.": "例如：我在群聊里问 Writer，它显示出错了。",
   "Versions, system, models, and the latest errors. Saved keys, tokens, and your home folder are hidden.": "版本、系统、模型和最近的错误。已保存的密钥、令牌和你的用户目录都已隐藏。",
   "GitHub issue": "GitHub issue",
-  "Opens a new issue in the LinkBot repository with all of this filled in. Nothing is sent until you submit it there.": "在 LinkBot 仓库新建一个 issue，并填好以上内容。你在 GitHub 上提交之前，什么都不会发出。",
+  "Opens a new issue in the LinkHarness repository with all of this filled in. Nothing is sent until you submit it there.": "在 LinkHarness 仓库新建一个 issue，并填好以上内容。你在 GitHub 上提交之前，什么都不会发出。",
   "Report on GitHub": "在 GitHub 上报告",
   "Copied the diagnostics.": "已复制诊断信息。",
   "Could not copy. Select the text below and copy it.": "无法复制。请选中下面的文字手动复制。",
@@ -986,7 +989,7 @@ var ZH = {
   "Recent errors": "最近的错误",
   "Recent errors · {count}": "最近的错误 · {count}",
   "No errors recorded.": "没有错误记录。",
-  "Failed model calls and LinkBot problems show here, newest first.": "模型调用失败和 LinkBot 的问题会显示在这里，最新的在前。",
+  "Failed model calls and LinkHarness problems show here, newest first.": "模型调用失败和 LinkHarness 的问题会显示在这里，最新的在前。",
   "Model call": "模型调用",
   "This window": "这个窗口",
   "Error log": "错误日志",
@@ -1129,14 +1132,14 @@ var ZH = {
   "This side chat is no longer here.": "这个侧边对话已经不在了。",
   "This side question is no longer here.": "这个侧边提问已经不在了。",
   "This Bot has not called a model yet. Send a normal message first.": "这个 Bot 还没有调用过模型，请先正常发一条消息。",
-  "LinkBot restarted before this answer finished.": "LinkBot 在回答完成前重启了。",
+  "LinkHarness restarted before this answer finished.": "LinkHarness 在回答完成前重启了。",
   "The model called a tool again after being told not to, so this aside was not answered.": "模型在被要求不要调用工具之后又调用了工具，所以这次没有回答。",
   "The model wrote nothing.": "模型没有写任何内容。",
   "Nothing to ask": "没有要问的内容",
   "Nothing to open": "没有要打开的内容",
   "Nothing to cancel": "没有要取消的内容",
   "Nothing to close": "没有要关闭的内容",
-  "LinkBot is still loading this chat.": "LinkBot 还在加载这个对话。",
+  "LinkHarness is still loading this chat.": "LinkHarness 还在加载这个对话。",
   "No model is available. Add one in Harness settings.": "没有可用的模型，请先在 Harness 设置里添加模型。",
   Working: "工作中",
   Search: "搜索",
@@ -1546,7 +1549,7 @@ var ZH = {
 var HOST_ERRORS = [
   [/^Could not reach the mail server at (.+)\. Check the server address\.$/, "连不上邮件服务器 $1，请检查服务器地址。"],
   [/^Model (.+) is not available\. Available: (.*)$/, "模型 $1 不可用。可用的：$2"],
-  [/^The API key for (.+) is set outside LinkBot and cannot be changed here$/, "$1 的 API key 是在 LinkBot 之外设置的，这里改不了"],
+  [/^The API key for (.+) is set outside LinkHarness and cannot be changed here$/, "$1 的 API key 是在 LinkHarness 之外设置的，这里改不了"],
   [/^(.+) takes no API key here$/, "$1 不能在这里填 API key"],
   [/^(.+) is already set up$/, "$1 已经设置过了"],
   [/^DSH offers no provider (.+)$/, "DSH 没有服务商 $1"],
@@ -1758,8 +1761,8 @@ function failureLabel(code, message) {
 }
 var URL_LIMIT = 7e3;
 var WHAT_MAX = 2e3;
-var PASTE_NOTE = "LinkBot copied the diagnostics to the clipboard. Paste them here.";
-var REST_NOTE = "The recent errors do not fit in the link. LinkBot copied the diagnostics to the clipboard: paste them below this line.";
+var PASTE_NOTE = "LinkHarness copied the diagnostics to the clipboard. Paste them here.";
+var REST_NOTE = "The recent errors do not fit in the link. LinkHarness copied the diagnostics to the clipboard: paste them below this line.";
 function issueUrl(base, { what = "", diagnostics }) {
   const text = what.trim().slice(0, WHAT_MAX);
   const title = text.split("\n")[0].slice(0, 80);
@@ -2064,7 +2067,7 @@ function teamActions({ call: call2, after, partFor, roster, ui: ui2, live, cards
       ui2.set((state) => ({ ...state, details: id, view: "details", renaming: true, tab: null, panelYield: yieldTo(state, "details") }));
     },
     openSettings,
-    // LinkBot's own Models page: the providers DSH serves, their keys and models.
+    // LinkHarness's own Models page: the providers DSH serves, their keys and models.
     openModels: () => openSettings("models"),
     closeSettings: () => {
       ui2.set((state) => state.settings ? { ...state, settings: null } : state);
@@ -3445,7 +3448,7 @@ html[data-windows-titlebar]:not([data-fullscreen]) :is(.bt-pane,.bt-panel)::befo
 .bt-fold{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;margin-top:4px;white-space:normal}
 .bt-fold-code{position:relative}
 .bt-fold-code>.bt-tool{position:absolute;right:6px;bottom:6px}
-/* The part of a cut code block the preview keeps, drawn by LinkBot so the host's
+/* The part of a cut code block the preview keeps, drawn by LinkHarness so the host's
    Markdown draws no copy control of its own for it. */
 .bt-fold-code>.bt-fold-pre{margin:0;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,currentColor 6%,transparent);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:20px;overflow-x:auto}
 .bt-fold-code>*+.bt-fold-pre{margin-top:6px}
@@ -4078,7 +4081,7 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 /* A turn's process seat is a flow child of its own, not a flowItem: a seat whose
    member cells all emptied themselves (a hidden exchange turn, a turn whose
    calls draw nothing) still kept its margin, stacking a blank band per hidden
-   call. Only the slot a LinkBot cell marked counts, so a seat another renderer
+   call. Only the slot a LinkHarness cell marked counts, so a seat another renderer
    fills — even with plain text and no element child — is never taken for empty. */
 [data-step-process]:has(> [data-step-process-body] [data-slot="conversation.chat.node"][data-bt-emptied]):not(:has(> [data-step-process-body] [data-slot="conversation.chat.node"]:not([data-bt-emptied]))){display:none!important}
 [class*="_header"]:has(.bt-head){border-bottom-color:transparent!important;box-shadow:none!important}
@@ -15453,10 +15456,10 @@ function UpdateButton({ useUpdate, actions }) {
     setDshError("");
     void actions.installDshUpdate().catch((failure) => setDshError(hostText(failure?.message ?? String(failure))));
   };
-  const label = phase === "installing" ? t("Updating LinkBot…") : dshPhase === "installing" ? t("Updating DSH…") : phase === "installed" ? t("LinkBot {version} is installed. Restart DSH to use it.", { version: update.installed ?? update.latest }) : phase === "updated" ? t("LinkBot {version} is installed.", { version: update.installed ?? update.latest }) : dshPhase === "installed" ? t("Restart DSH to start using DSH {version}.", { version: dsh.installed ?? dsh.verified }) : update?.available ? t("LinkBot {version} is available", { version: update.latest }) : t("DSH {version} is available", { version: dsh?.verified });
+  const label = phase === "installing" ? t("Updating LinkHarness…") : dshPhase === "installing" ? t("Updating DSH…") : phase === "installed" ? t("LinkHarness {version} is installed. Restart DSH to use it.", { version: update.installed ?? update.latest }) : phase === "updated" ? t("LinkHarness {version} is installed.", { version: update.installed ?? update.latest }) : dshPhase === "installed" ? t("Restart DSH to start using DSH {version}.", { version: dsh.installed ?? dsh.verified }) : update?.available ? t("LinkHarness {version} is available", { version: update.latest }) : t("DSH {version} is available", { version: dsh?.verified });
   const message = error || (phase === "failed" ? update.error : "");
   const dshMessage = dshError || (dshPhase === "failed" ? dsh?.error : "");
-  const dshText = dshPhase === "installed" ? t("Restart DSH to start using DSH {version}.", { version: dsh.installed ?? dsh.verified }) : dsh?.available === false && dsh?.blockedBy ? t("Update LinkBot {version} first.", { version: dsh.blockedBy }) : t("You have {version}.", { version: dsh?.current });
+  const dshText = dshPhase === "installed" ? t("Restart DSH to start using DSH {version}.", { version: dsh.installed ?? dsh.verified }) : dsh?.available === false && dsh?.blockedBy ? t("Update LinkHarness {version} first.", { version: dsh.blockedBy }) : t("You have {version}.", { version: dsh?.current });
   return (0, import_react34.createElement)(
     import_react34.Fragment,
     null,
@@ -15473,12 +15476,12 @@ function UpdateButton({ useUpdate, actions }) {
     }, (0, import_react34.createElement)(CloudDownloadIcon, { done: phase === "installed" || phase === "updated" }), phase === "failed" || dshPhase === "failed" ? (0, import_react34.createElement)("span", { className: "bt-update-dot", "aria-hidden": true }) : null),
     shown && box ? (0, import_react_dom5.createPortal)((0, import_react34.createElement)(
       "div",
-      { className: "bt-update-pop", role: "dialog", "aria-label": update?.available || phase !== "idle" ? t("LinkBot update") : t("DSH update"), style: box, "data-leaving": leaving || void 0 },
+      { className: "bt-update-pop", role: "dialog", "aria-label": update?.available || phase !== "idle" ? t("LinkHarness update") : t("DSH update"), style: box, "data-leaving": leaving || void 0 },
       update?.available || phase !== "idle" ? (0, import_react34.createElement)(
         import_react34.Fragment,
         null,
-        (0, import_react34.createElement)("div", { className: "bt-update-title" }, phase === "installed" || phase === "updated" ? t("Update installed") : t("LinkBot {version}", { version: update.latest })),
-        (0, import_react34.createElement)("div", { className: "bt-update-text" }, phase === "installed" ? t("Restart DSH to start using LinkBot {version}.", { version: update.installed ?? update.latest }) : phase === "updated" ? t("LinkBot {version} is installed.", { version: update.installed ?? update.latest }) : t("You have {version}.", { version: update.current })),
+        (0, import_react34.createElement)("div", { className: "bt-update-title" }, phase === "installed" || phase === "updated" ? t("Update installed") : t("LinkHarness {version}", { version: update.latest })),
+        (0, import_react34.createElement)("div", { className: "bt-update-text" }, phase === "installed" ? t("Restart DSH to start using LinkHarness {version}.", { version: update.installed ?? update.latest }) : phase === "updated" ? t("LinkHarness {version} is installed.", { version: update.installed ?? update.latest }) : t("You have {version}.", { version: update.current })),
         message ? (0, import_react34.createElement)("div", { className: "bt-update-error", role: "alert" }, t("The update did not finish: {reason}", { reason: message })) : null,
         (0, import_react34.createElement)(
           "div",
@@ -15876,7 +15879,7 @@ function BotReturn({ useSurface, useRoster, actions }) {
   if (mode !== "agent") return null;
   return (0, import_react34.createElement)(
     "button",
-    { type: "button", className: "bt-return", "aria-label": t("LinkBot"), title: t("LinkBot"), onClick: () => actions.setSurface("bot") },
+    { type: "button", className: "bt-return", "aria-label": t("LinkHarness"), title: t("LinkHarness"), onClick: () => actions.setSurface("bot") },
     (0, import_react34.createElement)(BotMark, { look: MAIN_LOOK, size: 20 })
   );
 }
@@ -16590,7 +16593,7 @@ var SIDE_TOKEN = "/side ";
 var GROUP_REFUSAL = "Side chat is only available in a Bot's private chat.";
 var ATTACHMENT_REFUSAL = "/side does not take attachments.";
 var EMPTY_REFUSAL = "Write a question after /side.";
-var LOADING_REFUSAL = "LinkBot is still loading this chat.";
+var LOADING_REFUSAL = "LinkHarness is still loading this chat.";
 function sideSurface(roster, sessionId) {
   if (!roster?.ready) return "unknown";
   if (roster.roomsById?.[sessionId]) return "group";
@@ -22247,7 +22250,7 @@ function entrySummary(entry) {
   if (entry.source === "turn") return failureLabel(entry.code, entry.text);
   return entry.text;
 }
-var SOURCES = { turn: "Model call", host: "LinkBot", api: "LinkBot", browser: "This window" };
+var SOURCES = { turn: "Model call", host: "LinkHarness", api: "LinkHarness", browser: "This window" };
 var issueWindow = reserveWindow;
 function FeedbackPage({ actions, run: run2, Section: Section2, Row: Row4 }) {
   const [what, setWhat] = (0, import_react50.useState)("");
@@ -22316,7 +22319,7 @@ function FeedbackPage({ actions, run: run2, Section: Section2, Row: Row4 }) {
       preview ? (0, import_react50.createElement)("div", { className: "bt-set-row bt-fb-preview" }, (0, import_react50.createElement)("pre", { tabIndex: 0, "aria-label": t("Diagnostics") }, report?.markdown || t("Loading…"))) : null,
       (0, import_react50.createElement)(
         Row4,
-        { label: t("GitHub issue"), hint: t("Opens a new issue in the LinkBot repository with all of this filled in. Nothing is sent until you submit it there.") },
+        { label: t("GitHub issue"), hint: t("Opens a new issue in the LinkHarness repository with all of this filled in. Nothing is sent until you submit it there.") },
         (0, import_react50.createElement)("button", { type: "button", className: "bt-fb-primary", onClick: openIssue }, t("Report on GitHub"))
       )
     ),
@@ -22329,7 +22332,7 @@ function FeedbackPage({ actions, run: run2, Section: Section2, Row: Row4 }) {
     (0, import_react50.createElement)(
       Section2,
       { key: "errors", title: report ? t("Recent errors · {count}", { count: total }) : t("Recent errors") },
-      shown.length === 0 ? (0, import_react50.createElement)(Row4, { label: t("No errors recorded."), hint: t("Failed model calls and LinkBot problems show here, newest first.") }) : shown.map((entry, index) => (0, import_react50.createElement)(
+      shown.length === 0 ? (0, import_react50.createElement)(Row4, { label: t("No errors recorded."), hint: t("Failed model calls and LinkHarness problems show here, newest first.") }) : shown.map((entry, index) => (0, import_react50.createElement)(
         "div",
         { key: `${entry.time}-${index}`, className: "bt-set-row bt-fb-entry", title: entry.text },
         (0, import_react50.createElement)("span", { className: "bt-fb-dot", "data-level": entry.level, "aria-hidden": true }),
@@ -22337,7 +22340,7 @@ function FeedbackPage({ actions, run: run2, Section: Section2, Row: Row4 }) {
           "div",
           { className: "bt-set-copy" },
           (0, import_react50.createElement)("span", { className: "bt-fb-text" }, entrySummary(entry)),
-          (0, import_react50.createElement)("span", { className: "bt-set-hint" }, [whenText(entry.time), entry.bot, entry.where, t(SOURCES[entry.source] ?? "LinkBot")].filter(Boolean).join(" · "))
+          (0, import_react50.createElement)("span", { className: "bt-set-hint" }, [whenText(entry.time), entry.bot, entry.where, t(SOURCES[entry.source] ?? "LinkHarness")].filter(Boolean).join(" · "))
         ),
         entry.code ? (0, import_react50.createElement)("span", { className: "bt-tag bt-fb-code" }, entry.status ? `${entry.code} ${entry.status}` : entry.code) : null
       )),
@@ -22409,12 +22412,12 @@ var import_react51 = require("react");
 var CHEER_MS = 1800;
 var starCount = (count) => new Intl.NumberFormat(dateLocale(), { notation: "compact", maximumFractionDigits: 1 }).format(count);
 function botHint(update) {
-  if (update.phase === "installing") return t("Updating LinkBot…");
-  if (update.phase === "installed") return t("Restart DSH to start using LinkBot {version}.", { version: update.installed ?? update.latest });
-  if (update.phase === "updated") return t("LinkBot {version} is installed.", { version: update.installed ?? update.latest });
+  if (update.phase === "installing") return t("Updating LinkHarness…");
+  if (update.phase === "installed") return t("Restart DSH to start using LinkHarness {version}.", { version: update.installed ?? update.latest });
+  if (update.phase === "updated") return t("LinkHarness {version} is installed.", { version: update.installed ?? update.latest });
   if (update.phase === "failed") return t("The update did not finish: {reason}", { reason: hostText(update.error ?? "") });
-  if (update.available) return t("LinkBot {version} is available", { version: update.latest });
-  if (update.source === "app") return t("Updates come with the LinkBot app.");
+  if (update.available) return t("LinkHarness {version} is available", { version: update.latest });
+  if (update.source === "app") return t("Updates come with the LinkHarness app.");
   if (update.enabled === false) return t("Update checks are off.");
   if (update.source === "path") return t("Installed from a local folder; update it there.");
   if (!update.checkedAt) return null;
@@ -22446,7 +22449,7 @@ function dshHint(dsh, shown) {
   if (dsh.phase === "installing") return t("Updating DSH…");
   if (dsh.phase === "installed") return t("Restart DSH to start using DSH {version}.", { version: dsh.installed ?? dsh.verified });
   if (dsh.phase === "failed") return t("The update did not finish: {reason}", { reason: hostText(dsh.error ?? "") });
-  if (dsh.available === false && dsh.blockedBy) return t("Update LinkBot {version} first.", { version: dsh.blockedBy });
+  if (dsh.available === false && dsh.blockedBy) return t("Update LinkHarness {version} first.", { version: dsh.blockedBy });
   if (shown) return t("DSH {version} is available", { version: dsh.verified });
   return t("Version {version}", { version: dsh.current });
 }
@@ -22508,7 +22511,7 @@ function AboutPage({ useUpdate, actions, run: run2, Section: Section2, Row: Row4
       (0, import_react51.createElement)(
         "div",
         { className: "bt-about-copy" },
-        (0, import_react51.createElement)("span", { className: "bt-about-name" }, "LinkBot"),
+        (0, import_react51.createElement)("span", { className: "bt-about-name" }, "LinkHarness"),
         update.current ? (0, import_react51.createElement)("span", { className: "bt-about-version" }, t("Version {version}", { version: update.current })) : null
       ),
       repo ? (0, import_react51.createElement)(
@@ -22518,18 +22521,18 @@ function AboutPage({ useUpdate, actions, run: run2, Section: Section2, Row: Row4
           href: repo,
           target: "_blank",
           rel: "noopener noreferrer",
-          title: t("Star LinkBot on GitHub"),
-          "aria-label": stars === null ? t("Star LinkBot on GitHub") : `${t("Star LinkBot on GitHub")} · ${t("{count} stars", { count: stars })}`
+          title: t("Star LinkHarness on GitHub"),
+          "aria-label": stars === null ? t("Star LinkHarness on GitHub") : `${t("Star LinkHarness on GitHub")} · ${t("{count} stars", { count: stars })}`
         },
         (0, import_react51.createElement)("span", { className: "bt-star-main" }, (0, import_react51.createElement)("span", { className: "bt-star-icon" }, (0, import_react51.createElement)(StarLineIcon)), "Star"),
         stars === null ? null : (0, import_react51.createElement)("span", { className: "bt-star-count" }, starCount(stars))
       ) : null
     ),
-    repo ? (0, import_react51.createElement)("p", { key: "ask", className: "bt-about-ask" }, t("If LinkBot helps you, a star on GitHub helps more people find it.")) : null,
+    repo ? (0, import_react51.createElement)("p", { key: "ask", className: "bt-about-ask" }, t("If LinkHarness helps you, a star on GitHub helps more people find it.")) : null,
     (0, import_react51.createElement)(
       Section2,
       { key: "updates", title: t("Updates") },
-      (0, import_react51.createElement)(Row4, { label: "LinkBot", hint: ownRow?.hint ?? botHint(update) }, botControl, update.available && update.notesUrl ? (0, import_react51.createElement)("a", linkProps(update.notesUrl), t("What's new")) : null),
+      (0, import_react51.createElement)(Row4, { label: "LinkHarness", hint: ownRow?.hint ?? botHint(update) }, botControl, update.available && update.notesUrl ? (0, import_react51.createElement)("a", linkProps(update.notesUrl), t("What's new")) : null),
       dsh?.current ? (0, import_react51.createElement)(Row4, { label: "DeepSeek Harness", hint: dshHint(dsh, dshShown) }, dshControl) : null
     ),
     (0, import_react51.createElement)(
@@ -22609,7 +22612,7 @@ function ProvidersPage({ actions, run: run2, Section: Section2 }) {
 function keyState(key) {
   if (key === null) return null;
   if (!key.configured) return ["missing", t("Needs an API key")];
-  return key.writable ? ["set", t("Key set")] : ["outside", t("Key set outside LinkBot")];
+  return key.writable ? ["set", t("Key set")] : ["outside", t("Key set outside LinkHarness")];
 }
 function ProviderRow({ provider, apply: apply2, actions, open, onToggle }) {
   const [confirm, setConfirm] = (0, import_react52.useState)(false);
@@ -22637,7 +22640,7 @@ function ProviderRow({ provider, apply: apply2, actions, open, onToggle }) {
       "div",
       { className: "bt-secret-edit" },
       provider.key?.writable ? (0, import_react52.createElement)(KeyEditor, { provider, apply: apply2, actions }) : null,
-      provider.key && !provider.key.writable ? (0, import_react52.createElement)("div", { className: "bt-set-hint" }, t("This key comes from outside LinkBot, such as an environment variable, and cannot be changed here.")) : null,
+      provider.key && !provider.key.writable ? (0, import_react52.createElement)("div", { className: "bt-set-hint" }, t("This key comes from outside LinkHarness, such as an environment variable, and cannot be changed here.")) : null,
       provider.models.length > 0 ? (0, import_react52.createElement)(
         "div",
         { className: "bt-secret-edit-block" },
@@ -22935,7 +22938,7 @@ function LocalAgentsPage({ run: run2, Section: Section2, Row: Row4 }) {
 // src/client/settings.js
 var import_react54 = require("react");
 var capitalize2 = (word) => word[0].toUpperCase() + word.slice(1);
-var SETTINGS_PAGES = [["general", "General"], ["models", "Models"], ["local-agents", "Local agents"], ["bots", "Bots"], ["groups", "Group chats"], ["connectors", "Connectors"], ["im", "IM"], ["capabilities", "Capabilities"], ["browser", "Browser"], ["computer", "Computer use"], ["schedules", "Scheduled tasks"], ["usage", "Usage"], ["secrets", "Secrets"], ["feedback", "Feedback"], ["about", "About LinkBot"]];
+var SETTINGS_PAGES = [["general", "General"], ["models", "Models"], ["local-agents", "Local agents"], ["bots", "Bots"], ["groups", "Group chats"], ["connectors", "Connectors"], ["im", "IM"], ["capabilities", "Capabilities"], ["browser", "Browser"], ["computer", "Computer use"], ["schedules", "Scheduled tasks"], ["usage", "Usage"], ["secrets", "Secrets"], ["feedback", "Feedback"], ["about", "About LinkHarness"]];
 var PAGE_ICONS = { ...SETTINGS_ICONS, models: SlidersIcon, "local-agents": TerminalIcon, connectors: ConnectorIcon, im: ChatsIcon, capabilities: PlugIcon, browser: GlobeIcon, computer: MonitorIcon, schedules: ClockIcon, secrets: KeyIcon, feedback: FeedbackIcon, about: InfoIcon };
 function SetSection({ title, className = "", children }) {
   return (0, import_react54.createElement)("section", { className: `bt-set-section ${className}`.trim() }, (0, import_react54.createElement)("h3", null, title), (0, import_react54.createElement)("div", { className: "bt-set-card" }, children));
@@ -23317,7 +23320,7 @@ function SettingsDialog({ page, id, roster, actions, useUpdate, leaving = false 
     (0, import_react54.createElement)("div", { className: "bt-scrim", onMouseDown: close }),
     (0, import_react54.createElement)(
       "div",
-      { className: "bt-settings", role: "dialog", "aria-modal": true, "aria-label": t("LinkBot settings") },
+      { className: "bt-settings", role: "dialog", "aria-modal": true, "aria-label": t("LinkHarness settings") },
       (0, import_react54.createElement)(
         "nav",
         { ref: nav.box, className: "bt-settings-nav", "aria-label": t("Settings pages") },
@@ -23819,7 +23822,7 @@ function BrowserCards({ bot, sessionId, roster, actions, useBrowserTabs, useBrow
     actions.browserEnsure?.(bot.id);
   }, [bot.id]);
   if (roster.browser !== true || !actions.browserShow) {
-    return (0, import_react57.createElement)("div", { className: "bt-muted" }, t("The browser is in DSH Desktop and the LinkBot app."));
+    return (0, import_react57.createElement)("div", { className: "bt-muted" }, t("The browser is in DSH Desktop and the LinkHarness app."));
   }
   if (state.ids.length === 0) {
     return (0, import_react57.createElement)(

@@ -32,7 +32,7 @@ const host = createServer((request, response) => {
   }
   if ((request.headers.cookie ?? '').includes(cookie)) {
     response.writeHead(200, { 'content-type': 'text/html' })
-    response.end('<!doctype html><title>LinkBot</title><h1 id="ready">ready</h1>')
+    response.end('<!doctype html><title>LinkHarness</title><h1 id="ready">ready</h1>')
     return
   }
   response.writeHead(401).end('unauthorized')
@@ -42,7 +42,7 @@ let mainWindow
 const shell = createShell({
   electron: { app, Menu, Tray, powerMonitor },
   platform: process.platform,
-  messages: () => ({ tooltip: 'LinkBot', open: 'Open LinkBot', quit: 'Quit LinkBot', notice: 'The app goes on.', noticeConfirm: 'OK' }),
+  messages: () => ({ tooltip: 'LinkHarness', open: 'Open LinkHarness', quit: 'Quit LinkHarness', notice: 'The app goes on.', noticeConfirm: 'OK' }),
   trayImage: () => {
     const file = join(assets, process.platform === 'win32' ? 'tray.ico' : process.platform === 'darwin' ? 'trayTemplate.png' : 'tray.png')
     const image = nativeImage.createFromPath(file)

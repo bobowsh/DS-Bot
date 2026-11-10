@@ -1,5 +1,5 @@
 // Reconcile #128: turning off `web-search-auto` does not undo the `web` row's
-// `searchProvider: auto`, which LinkBot's own patch selects for the profile — every
+// `searchProvider: auto`, which LinkHarness's own patch selects for the profile — every
 // search then fails with WEB_PROVIDER_CONFIGURED_MISSING. When the app's own bundles
 // configured the selector before ds-bot arrived, restore that selection through a
 // `--patch` overlay the app writes into its own data area next to the profiles

@@ -33,7 +33,7 @@ const FACTORY_PATCH_NAME = 'factory-registry.patch.yml'
 const FACTORY_PATCH_ROWS = [
   { id: 'astron-skillhub', name: '@astron-team/skillhub-dsh', config: { registryUrl: SKILLHUB_REGISTRY } },
 ]
-const npmrcMarker = '# managed by LinkBot factory registries\n'
+const npmrcMarker = '# managed by LinkHarness factory registries\n'
 const npmrcManaged = `${npmrcMarker}registry=${NPM_REGISTRY}\n`
 
 /**

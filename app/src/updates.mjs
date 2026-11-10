@@ -67,7 +67,7 @@ function stateHolder(log) {
     set: (next) => {
       state = next
       for (const listener of [...listeners]) {
-        try { listener(next) } catch (error) { log.error(`LinkBot: an update state listener failed: ${error instanceof Error ? error.message : String(error)}`) }
+        try { listener(next) } catch (error) { log.error(`LinkHarness: an update state listener failed: ${error instanceof Error ? error.message : String(error)}`) }
       }
     },
     subscribe: (listener) => {
@@ -80,7 +80,7 @@ function stateHolder(log) {
 // `asset` names the release asset of this install (default: the macOS zip); a release without
 // it does not count.
 export function watchReleases({ current, arch, fetch = globalThis.fetch, ask, open, feed = RELEASES_URL, log = console, asset }) {
-  const assetName = asset ?? (version => `LinkBot-${version}-mac-${arch}.zip`)
+  const assetName = asset ?? (version => `LinkHarness-${version}-mac-${arch}.zip`)
   let asked
   let latest = Promise.resolve(null)
   const holder = stateHolder(log)
@@ -89,16 +89,16 @@ export function watchReleases({ current, arch, fetch = globalThis.fetch, ask, op
     latest = (async () => {
       try {
         const response = await fetch(feed, {
-          headers: { accept: 'application/vnd.github+json', 'user-agent': `LinkBot/${current}` },
+          headers: { accept: 'application/vnd.github+json', 'user-agent': `LinkHarness/${current}` },
         })
         if (!response.ok) {
-          log.error(`LinkBot: update check failed: HTTP ${String(response.status)}`)
+          log.error(`LinkHarness: update check failed: HTTP ${String(response.status)}`)
           holder.set({ phase: 'failed' })
           return null
         }
         const releases = await response.json()
         if (!Array.isArray(releases)) {
-          log.error('LinkBot: update check failed: releases response is not an array')
+          log.error('LinkHarness: update check failed: releases response is not an array')
           holder.set({ phase: 'failed' })
           return null
         }
@@ -112,7 +112,7 @@ export function watchReleases({ current, arch, fetch = globalThis.fetch, ask, op
           if (!isNewer(version, current)) continue
           if (!Array.isArray(release.assets) || !release.assets.some(entry => entry?.name === assetName(version))) continue
           if (!isHttpsPage(release.html_url)) {
-            log.error('LinkBot: update check failed: release page URL is not HTTPS')
+            log.error('LinkHarness: update check failed: release page URL is not HTTPS')
             continue
           }
           if (found === undefined || isNewer(version, found.version)) found = { version, page: release.html_url }
@@ -121,17 +121,17 @@ export function watchReleases({ current, arch, fetch = globalThis.fetch, ask, op
           holder.set({ phase: 'current' })
           return null
         }
-        log.info(`LinkBot: update ${found.version} available`)
+        log.info(`LinkHarness: update ${found.version} available`)
         if (ask !== undefined && asked !== found.version) {
           asked = found.version
           void Promise.resolve().then(() => ask(found.version))
             .then(yes => (yes ? open(found.page) : undefined))
-            .catch((error) => { log.error(`LinkBot: update ${found.version} not opened: ${error instanceof Error ? error.message : String(error)}`) })
+            .catch((error) => { log.error(`LinkHarness: update ${found.version} not opened: ${error instanceof Error ? error.message : String(error)}`) })
         }
         holder.set({ phase: 'available', version: found.version, page: found.page })
         return found
       } catch (error) {
-        log.error(`LinkBot: update check failed: ${error instanceof Error ? error.message : String(error)}`)
+        log.error(`LinkHarness: update check failed: ${error instanceof Error ? error.message : String(error)}`)
         holder.set({ phase: 'failed' })
         return null
       }
@@ -188,16 +188,16 @@ export function watchUpdates({ updater, beforeInstall, ask, feed, log = console 
     holder.set({ ...current, percent, received: Math.round(Number(progress.transferred) / MB) || 0, total: Math.round(Number(progress.total) / MB) || 0 })
   })
   updater.on('update-downloaded', ({ version }) => {
-    log.info(`LinkBot: update ${version} downloaded`)
+    log.info(`LinkHarness: update ${version} downloaded`)
     holder.set({ phase: 'downloaded', version })
     if (ask === undefined || asked === version) return
     asked = version
     void ask(version).then(now => (now ? install() : undefined))
-      .catch((error) => { log.error(`LinkBot: update ${version} not installed: ${error instanceof Error ? error.message : String(error)}`) })
+      .catch((error) => { log.error(`LinkHarness: update ${version} not installed: ${error instanceof Error ? error.message : String(error)}`) })
   })
   // A downloaded update stays ready: a later failed check does not hide it.
   updater.on('error', (error) => {
-    log.error(`LinkBot: update failed: ${error instanceof Error ? error.message : String(error)}`)
+    log.error(`LinkHarness: update failed: ${error instanceof Error ? error.message : String(error)}`)
     if (holder.state().phase !== 'downloaded') holder.set({ phase: 'failed' })
   })
   let latest = Promise.resolve(null)

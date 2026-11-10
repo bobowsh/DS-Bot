@@ -17,7 +17,7 @@ before(async () => { await startApp({ later: true }) })
 test('the app starts with a window and a tray', async () => {
   await waitFor(() => window() !== undefined, 'open the window')
   await waitFor(() => state.tray !== undefined, 'build the tray')
-  assert.equal(state.tray.tooltip, 'LinkBot')
+  assert.equal(state.tray.tooltip, 'LinkHarness')
   assert.equal(state.quits, 0, 'the app goes on')
 })
 

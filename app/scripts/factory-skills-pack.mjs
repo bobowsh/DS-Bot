@@ -47,6 +47,6 @@ export async function prepareFactorySkills(appDir, entries, skillsSrc = defaultS
   // reached) simply gets none: the plugin then shows the truth.
   const published = await publishedSkills(registry, fetchImpl)
   const marked = await writeSkillhubMetadata(bundledSkillsDir(appDir), published)
-  if (marked.length === 0) console.log('LinkBot: no factory skill is published on the SkillHub, so none carries its installation record')
+  if (marked.length === 0) console.log('LinkHarness: no factory skill is published on the SkillHub, so none carries its installation record')
   return { folders: made, marked }
 }
