@@ -969,10 +969,75 @@ export function YouAvatar() {
 }
 
 let shellShortcuts = null
+let openShellSettings = null
+let openShellOnboarding = null
 
 export function holdShellShortcuts(shortcuts) {
   shellShortcuts = shortcuts
   return () => { if (shellShortcuts === shortcuts) shellShortcuts = null }
+}
+
+// DeepSeek Harness hands its settings opener only to the settings.launcher seat. When
+// the Desktop's account menu holds that seat, its first item (Settings) is the way in;
+// the Desktop on Windows and macOS takes shortcuts natively, so a synthetic key press
+// reaches the shell only where the page delivers them (the Web, Linux).
+export function openHarnessSettings() {
+  // A frame first, so a Bot dialog that closes on this click leaves the modal stack.
+  requestAnimationFrame(() => {
+    if (openShellSettings) { openShellSettings(); return }
+    const desktop = document.querySelector('button[aria-haspopup="menu"][data-signed-out]')
+    if (desktop) openThroughMenu(desktop)
+    else pressSettingsShortcut()
+  })
+}
+
+// Opens one of the shell's own onboarding editors, such as the DeepSeek API key form.
+export function openHarnessOnboarding(id) {
+  requestAnimationFrame(() => {
+    if (openShellOnboarding) openShellOnboarding(id)
+    else openHarnessSettings()
+  })
+}
+
+// The launcher seat can only open DSH's settings on their first section. This onboarding
+// step of LinkHarness's own, opened by id, hands the shell's openSection the Models page; the
+// first-run pass meets it last and it steps aside at once.
+export const MODELS_STEP = 'ds-bot-models'
+export const MODELS_STEP_ORDER = 1000
+
+export function OpenModelsStep({ explicit, complete, openSection }) {
+  useEffect(() => {
+    if (explicit) {
+      if (typeof openSection === 'function') openSection('models')
+      else openHarnessSettings()
+    }
+    complete()
+  }, [explicit])
+  return null
+}
+
+function openThroughMenu(trigger) {
+  const before = new Set(document.querySelectorAll('[role="menu"]'))
+  trigger.click()
+  let frames = 0
+  const look = () => {
+    const menu = [...document.querySelectorAll('[role="menu"]')].find(node => !before.has(node))
+    const item = menu?.querySelector('button[role="menuitem"]')
+    if (item) item.click()
+    else if (++frames < 30) requestAnimationFrame(look)
+    else pressSettingsShortcut()
+  }
+  requestAnimationFrame(look)
+}
+
+function pressSettingsShortcut() {
+  const binding = shellShortcuts?.catalog.getSnapshot().find(row => row.id === 'settings.open')?.binding
+  if (!binding) return
+  const held = new Set(binding.modifiers)
+  window.dispatchEvent(new KeyboardEvent('keydown', {
+    code: binding.code, key: binding.code === 'Comma' ? ',' : '', bubbles: true, cancelable: true,
+    ctrlKey: held.has('control'), altKey: held.has('alt'), shiftKey: held.has('shift'), metaKey: held.has('meta'),
+  }))
 }
 
 // Whether a key press is the shell's current binding for one of its shortcuts.
@@ -1007,6 +1072,17 @@ export function AccountLauncher({ place = 'column', settingsOpen, openSettings, 
   const button = useRef(null)
   const menuRef = useRef(null)
   useEffect(() => { if (settingsOpen) setOpen(false) }, [settingsOpen])
+  // The settings dialog links back to the shell's own settings (models, providers).
+  useEffect(() => {
+    if (!openSettings) return undefined
+    openShellSettings = openSettings
+    return () => { if (openShellSettings === openSettings) openShellSettings = null }
+  }, [openSettings])
+  useEffect(() => {
+    if (!openOnboarding) return undefined
+    openShellOnboarding = openOnboarding
+    return () => { if (openShellOnboarding === openOnboarding) openShellOnboarding = null }
+  }, [openOnboarding])
   useEffect(() => {
     // A launcher that does not draw itself holds no menu and listens to nothing:
     // the shell's trigger row keeps the launcher mounted even when the shell's

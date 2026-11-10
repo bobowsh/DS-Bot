@@ -8,7 +8,7 @@ import { themeCss, shellTokens, registry, registerShape, registerTheme, allTheme
 import { MENTION_ORIGIN, currentPart } from './text.js'
 import { BASE_CSS, SHELL_CSS, CONVERSATION_CSS, botOwnCss, installStyles, installCompiledStyles } from './styles.js'
 import { lookOf } from './mark.js'
-import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, BotReturn, SIDEBAR_CSS, RETURN_CSS, FOOTER_CSS, holdShellShortcuts } from './sidebar.js'
+import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, BotReturn, SIDEBAR_CSS, RETURN_CSS, FOOTER_CSS, holdShellShortcuts, openHarnessSettings, openHarnessOnboarding, MODELS_STEP, MODELS_STEP_ORDER, OpenModelsStep } from './sidebar.js'
 import { AideFooterButton } from './aide-button.js'
 import { installSettingsShell, SETTINGS_SHELL_CSS } from './settings-shell.js'
 import { frameLayout, readSidebar, writeSidebar, toggledPref, DSH_NARROW } from './frame-layout.js'
@@ -716,6 +716,14 @@ export function apply(ctx) {
   // One of DSH's onboarding editors, such as the DeepSeek API key form, opened by id
   // through the settings shell's coordinator.
   actions.openHarnessOnboarding = id => settingsShell?.openOnboarding(id)
+  // DSH's own settings: models, providers, keys and its plugins.
+  actions.openHarnessSettings = openHarnessSettings
+  // DSH's Models page, through LinkHarness's own onboarding step while it is registered.
+  actions.openHarnessModels = () => {
+    const step = (ctx.slots.entries?.('settings.onboarding') ?? []).some(entry => entry.options?.id === MODELS_STEP)
+    if (step) openHarnessOnboarding(MODELS_STEP)
+    else openHarnessSettings()
+  }
   // With the plugin manager mounted, setup is its bundle page (the model's size
   // and download notes live there). Where it is not mounted — the desktop app's
   // profile has no plugin manager — the speech Remote prepares the provider

@@ -16444,11 +16444,70 @@ function YouAvatar() {
   );
 }
 var shellShortcuts = null;
+var openShellSettings = null;
+var openShellOnboarding = null;
 function holdShellShortcuts(shortcuts) {
   shellShortcuts = shortcuts;
   return () => {
     if (shellShortcuts === shortcuts) shellShortcuts = null;
   };
+}
+function openHarnessSettings() {
+  requestAnimationFrame(() => {
+    if (openShellSettings) {
+      openShellSettings();
+      return;
+    }
+    const desktop = document.querySelector('button[aria-haspopup="menu"][data-signed-out]');
+    if (desktop) openThroughMenu(desktop);
+    else pressSettingsShortcut();
+  });
+}
+function openHarnessOnboarding(id) {
+  requestAnimationFrame(() => {
+    if (openShellOnboarding) openShellOnboarding(id);
+    else openHarnessSettings();
+  });
+}
+var MODELS_STEP = "ds-bot-models";
+var MODELS_STEP_ORDER = 1e3;
+function OpenModelsStep({ explicit, complete, openSection }) {
+  (0, import_react35.useEffect)(() => {
+    if (explicit) {
+      if (typeof openSection === "function") openSection("models");
+      else openHarnessSettings();
+    }
+    complete();
+  }, [explicit]);
+  return null;
+}
+function openThroughMenu(trigger) {
+  const before = new Set(document.querySelectorAll('[role="menu"]'));
+  trigger.click();
+  let frames = 0;
+  const look = () => {
+    const menu = [...document.querySelectorAll('[role="menu"]')].find((node) => !before.has(node));
+    const item = menu?.querySelector('button[role="menuitem"]');
+    if (item) item.click();
+    else if (++frames < 30) requestAnimationFrame(look);
+    else pressSettingsShortcut();
+  };
+  requestAnimationFrame(look);
+}
+function pressSettingsShortcut() {
+  const binding = shellShortcuts?.catalog.getSnapshot().find((row) => row.id === "settings.open")?.binding;
+  if (!binding) return;
+  const held = new Set(binding.modifiers);
+  window.dispatchEvent(new KeyboardEvent("keydown", {
+    code: binding.code,
+    key: binding.code === "Comma" ? "," : "",
+    bubbles: true,
+    cancelable: true,
+    ctrlKey: held.has("control"),
+    altKey: held.has("alt"),
+    shiftKey: held.has("shift"),
+    metaKey: held.has("meta")
+  }));
 }
 function pressesShellShortcut(event, id) {
   const binding = shellShortcuts?.catalog.getSnapshot().find((row) => row.id === id)?.binding;
@@ -16469,6 +16528,20 @@ function AccountLauncher({ place = "column", settingsOpen, openSettings, openOnb
   (0, import_react35.useEffect)(() => {
     if (settingsOpen) setOpen(false);
   }, [settingsOpen]);
+  (0, import_react35.useEffect)(() => {
+    if (!openSettings) return void 0;
+    openShellSettings = openSettings;
+    return () => {
+      if (openShellSettings === openSettings) openShellSettings = null;
+    };
+  }, [openSettings]);
+  (0, import_react35.useEffect)(() => {
+    if (!openOnboarding) return void 0;
+    openShellOnboarding = openOnboarding;
+    return () => {
+      if (openShellOnboarding === openOnboarding) openShellOnboarding = null;
+    };
+  }, [openOnboarding]);
   (0, import_react35.useEffect)(() => {
     if (!open || !shown) return void 0;
     const onDown = (event) => {
@@ -29606,6 +29679,12 @@ function apply(ctx) {
   actions.accountT = () => ctx.get("locale").bind("settings.account");
   actions.speech = () => ctx.get("remote.speech") ?? void 0;
   actions.openHarnessOnboarding = (id) => settingsShell?.openOnboarding(id);
+  actions.openHarnessSettings = openHarnessSettings;
+  actions.openHarnessModels = () => {
+    const step = (ctx.slots.entries?.("settings.onboarding") ?? []).some((entry) => entry.options?.id === MODELS_STEP);
+    if (step) openHarnessOnboarding(MODELS_STEP);
+    else openHarnessSettings();
+  };
   actions.voiceSetup = () => {
     const navigation = ctx.get("pluginNavigation");
     return navigation ? () => navigation.openBundle(VOICE_BUNDLE) : null;

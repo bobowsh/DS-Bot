@@ -168,7 +168,7 @@ test('one Settings: DS Bot\'s pages, then DSH\'s, then Feedback and About; no Ha
   const labels = navLabels(dialog().tree)
   assert.ok(!labels.includes('Harness settings'))
   // The last page carries our product name (the rename to LinkHarness).
-  assert.deepEqual(labels.slice(-5), ['Account', 'Plugins', 'Agent presets', 'Feedback', 'About LinkBot'])
+  assert.deepEqual(labels.slice(-5), ['Account', 'Plugins', 'Agent presets', 'Feedback', 'About LinkHarness'])
   assert.equal(labels.filter(label => label === 'General').length, 1)
   assert.equal(labels.filter(label => label === 'Models').length, 1)
 })
@@ -227,7 +227,9 @@ test('General settings keeps the Classic Agent mode switch', () => {
 })
 
 // Settings in Agent mode carries DS Bot's own rules only: the DSH page around it keeps its look.
-const styles = load(await bundle("export { botOwnCss, SHELL_CSS } from './src/client/styles.js'"))
+// 注意：本仓库把静态暗色主题变量放在 BASE_CSS（而非上游 v0.3.2 的 SHELL_CSS），
+// 因为 classic Agent 页不挂载 shell 组，需要靠 BASE_CSS 拿到暗色变量。
+const styles = load(await bundle("export { botOwnCss, SHELL_CSS, BASE_CSS } from './src/client/styles.js'"))
 
 test('the Agent-mode sheet keeps DS Bot\'s own rules and drops the shell overrides', () => {
   const css = `body{--bt-ink:#111;-webkit-tap-highlight-color:transparent}
@@ -246,7 +248,10 @@ body[data-bt-motion=lively] .bt-mark{animation:none}`
   const shellOwn = styles.botOwnCss(styles.SHELL_CSS)
   assert.doesNotMatch(shellOwn, /class\*=/)
   assert.match(shellOwn, /\.bt-settings-nav\{/)
-  assert.match(shellOwn, /body\[data-ds-dark-theme\]\{--bt-im-telegram:/)
+  // 暗色主题变量跟随 BASE_CSS 安装（Agent 页也需暗色），见上面的说明。
+  const baseOwn = styles.botOwnCss(styles.BASE_CSS)
+  assert.match(baseOwn, /body\[data-ds-dark-theme\]\{--bt-im-telegram:/)
+  assert.doesNotMatch(shellOwn, /body\[data-ds-dark-theme\]\{--bt-im-telegram:/)
 })
 
 test('in Agent mode, General offers the way back to Bot mode', () => {
