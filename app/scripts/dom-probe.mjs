@@ -19,12 +19,21 @@ import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
+import { unsafeFolders } from './dom-probe-guard.mjs'
 
 const out = process.argv[2]
 const wait = Number(process.env.PROBE_WAIT ?? 20)
 const surface = process.env.PROBE_SURFACE ?? 'bot'
-if (!process.env.DS_BOT_HOME || !process.env.DS_BOT_SHELL_DATA) {
-  console.error('dom-probe: set DS_BOT_HOME and DS_BOT_SHELL_DATA to throwaway folders')
+// The probe starts the real application, so the folders have to be throwaway
+// ones. The guard lives in dom-probe-guard.mjs so a test can reach it.
+const unsafe = unsafeFolders({
+  home: process.env.DS_BOT_HOME,
+  shellData: process.env.DS_BOT_SHELL_DATA,
+  userProfile: process.env.USERPROFILE,
+  dshHome: process.env.DSH_HOME,
+})
+if (unsafe !== '') {
+  console.error(`dom-probe: ${unsafe}`)
   process.exit(2)
 }
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
