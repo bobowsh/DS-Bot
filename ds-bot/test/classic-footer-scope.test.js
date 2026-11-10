@@ -69,7 +69,9 @@ test('the Bot surface draws the same: the rules are in both tables, unchanged', 
   // The shell group installs the shell table, and the base table is installed for
   // both surfaces: the Bot surface therefore has every rule it had before.
   assert.match(index, /ctx\.effect\(\(\) => installCompiledStyles\(BASE_CSS, 'base'\)/)
-  assert.match(index, /installCompiledStyles\(SHELL_CSS, 'shell'\)/)
+  // The shell group's table is listed in SHELL_SHEETS as [SHELL_CSS, 'shell'] and
+  // installed from there (upstream v0.3.2 turned the list into data).
+  assert.match(index, /\[SHELL_CSS, 'shell'\]/)
   // The Bot surface's own footer grid is scoped to it and stays where it was.
   const sidebar = read('sidebar.js')
   assert.match(sidebar, /:root\[data-bt-surface=bot\][^{]*_footArea/)
