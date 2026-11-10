@@ -15376,13 +15376,13 @@ function TeamSidebar(props) {
     onClick: () => actions.setSurface("agent")
   }, (0, import_react34.createElement)(SwitchIcon));
   const toAide = (0, import_react34.createElement)(AideButton, { label: t("AIDE workbench") });
-  const foot = wideContent ? (0, import_react34.createElement)("div", { className: "bt-leftcol-foot" }, toAgent, toAide, (0, import_react34.createElement)(AccountLauncher, { seat: false, actions })) : (0, import_react34.createElement)(
+  const foot = wideContent ? (0, import_react34.createElement)("div", { className: "bt-leftcol-foot" }, toAgent, toAide, (0, import_react34.createElement)(AccountLauncher, { place: "column", useSurface: props.useSurface, actions })) : (0, import_react34.createElement)(
     "div",
     { className: "bt-leftcol-foot bt-leftcol-foot-rail" },
     (0, import_react34.createElement)("button", { type: "button", className: "bt-round", "aria-label": t("New…"), title: t("New…"), onClick: () => actions.openNewChat("new") }, (0, import_react34.createElement)(PlusIcon)),
     toAgent,
     toAide,
-    (0, import_react34.createElement)(AccountLauncher, { seat: false, actions })
+    (0, import_react34.createElement)(AccountLauncher, { place: "column", useSurface: props.useSurface, actions })
   );
   const content = (0, import_react34.createElement)(
     "div",
@@ -15596,13 +15596,10 @@ function pressesShellShortcut(event, id) {
 var NO_SUBSCRIBE = () => () => {
 };
 var NO_SNAPSHOT = () => null;
-function AccountLauncher({ seat = true, settingsOpen, openSettings, openOnboarding, actions }) {
+function AccountLauncher({ place = "column", settingsOpen, openSettings, openOnboarding, actions, useSurface }) {
   const [open, setOpen] = (0, import_react34.useState)(false);
-  (0, import_react34.useLayoutEffect)(() => {
-    if (!seat) return void 0;
-    actions.seatAccount(true);
-    return () => actions.seatAccount(false);
-  }, [seat]);
+  const mode = useSurface ? useSurface((value) => value.mode) : "bot";
+  const shown = place === "column" ? mode === "bot" : mode === "agent";
   const [box, setBox] = (0, import_react34.useState)(null);
   const button = (0, import_react34.useRef)(null);
   const menuRef = (0, import_react34.useRef)(null);
@@ -15624,7 +15621,7 @@ function AccountLauncher({ seat = true, settingsOpen, openSettings, openOnboardi
     };
   }, [openOnboarding]);
   (0, import_react34.useEffect)(() => {
-    if (!open) return void 0;
+    if (!open || !shown) return void 0;
     const onDown = (event) => {
       if (event.target instanceof Element && (event.target.closest(".bt-account-menu") || button.current?.contains(event.target))) return;
       setOpen(false);
@@ -15643,7 +15640,7 @@ function AccountLauncher({ seat = true, settingsOpen, openSettings, openOnboardi
       window.removeEventListener("mousedown", onDown);
       window.removeEventListener("keydown", onKey, true);
     };
-  }, [open]);
+  }, [open, shown]);
   const signIn = actions.signInEntry?.() ?? null;
   const ops = (0, import_react34.useMemo)(() => signIn?.inject?.() ?? {}, [signIn]);
   const accountSource = ops.hooks?.account;
@@ -15711,6 +15708,7 @@ function AccountLauncher({ seat = true, settingsOpen, openSettings, openOnboardi
   ];
   if (signedIn) groups.push([[accountT("signOut"), SignOutIcon, askSignOut, void 0, true]]);
   else if (signedOut) groups.push([[t("Sign in to DeepSeek"), SignInIcon, () => actions.signIn()]]);
+  if (!shown) return null;
   return (0, import_react34.createElement)(
     import_react34.Fragment,
     null,
@@ -15867,9 +15865,9 @@ function useLandOnMainBot(roster, useSessions, actions) {
   }, [mainView, roster]);
 }
 function FooterAccount(props) {
-  const seated = props.useUi((value) => value.accountSeated === true);
-  if (seated) return null;
-  return (0, import_react34.createElement)("span", { className: "bt-foot-account" }, (0, import_react34.createElement)(AccountLauncher, { ...props, seat: false }));
+  const mode = props.useSurface ? props.useSurface((value) => value.mode) : "bot";
+  if (mode !== "agent") return null;
+  return (0, import_react34.createElement)("span", { className: "bt-foot-account" }, (0, import_react34.createElement)(AccountLauncher, { ...props, place: "footer" }));
 }
 function BotReturn({ useSurface, useRoster, actions }) {
   const mode = useSurface((value) => value.mode);
@@ -27809,7 +27807,6 @@ function apply(ctx) {
     const navigation = ctx.get("pluginNavigation");
     return navigation ? () => navigation.openBundle(VOICE_BUNDLE) : null;
   };
-  actions.seatAccount = (on) => ui2.set((state) => state.accountSeated === on ? state : { ...state, accountSeated: on });
   actions.installUpdate = async () => {
     const value = await call("update-install");
     update.set((previous) => ({ ...previous, ...value }));
@@ -28142,8 +28139,10 @@ function apply(ctx) {
     () => shadow("sidebar.workspaces", { priority: BOT_PRIORITY, inject: face }, TeamSidebar),
     () => shadow("settings.trigger", { priority: BOT_PRIORITY }, YouAvatar),
     // The whale wins the seat over a shell account plugin's own launcher (the
-    // Desktop's "··· More"), which comes back in Agent mode.
-    () => shadow("settings.launcher", { priority: BOT_PRIORITY, inject: face }, AccountLauncher),
+    // Desktop's "··· More"). The seat belongs to the classic page: the Bot page
+    // shows the account in our own column, and the shell's sidebar is a rail
+    // there, so this launcher draws nothing.
+    () => shadow("settings.launcher", { priority: BOT_PRIORITY, inject: face }, (props) => (0, import_react63.createElement)(AccountLauncher, { ...props, place: "shell" })),
     () => shadow("settings.onboarding", { id: MODELS_STEP, order: MODELS_STEP_ORDER }, OpenModelsStep),
     () => shadow("shell.overlay", { id: "bot-computer", order: 40, inject: face }, ComputerIndicator),
     () => shadow("shell.overlay", { id: "bot", order: 50, inject: face }, Overlays),

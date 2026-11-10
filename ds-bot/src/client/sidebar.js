@@ -605,12 +605,12 @@ export function TeamSidebar(props) {
   // the whole session view — opening the workbench would cost a full-screen rebuild.
   const toAide = h(AideButton, { label: t('AIDE workbench') })
   const foot = wideContent
-    ? h('div', { className: 'bt-leftcol-foot' }, toAgent, toAide, h(AccountLauncher, { seat: false, actions }))
+    ? h('div', { className: 'bt-leftcol-foot' }, toAgent, toAide, h(AccountLauncher, { place: 'column', useSurface: props.useSurface, actions }))
     : h('div', { className: 'bt-leftcol-foot bt-leftcol-foot-rail' },
         h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: () => actions.openNewChat('new') }, h(PlusIcon)),
         toAgent,
         toAide,
-        h(AccountLauncher, { seat: false, actions }))
+        h(AccountLauncher, { place: 'column', useSurface: props.useSurface, actions }))
   const content = h('div', { className: wideContent ? 'bt-side' : 'bt-side bt-rail', onKeyDown: typeToSearch },
     top,
     wideContent && roster.readOnly ? h('div', { className: 'bt-hint bt-read-only', role: 'status' }, hostText(roster.readOnly)) : null,
@@ -813,16 +813,20 @@ const NO_SNAPSHOT = () => null
 
 // The footer avatar opens an account menu above itself, with Bot settings as one
 // entry. Shell panels hidden from the Bot sidebar (plugins, automation) live here too.
-// `seat` is the shell's settings.launcher seat: at priority -10 the whale wins it
-// over a shell account plugin's own launcher (the Desktop's "··· More"), which comes
-// back in Agent mode; FooterAccount stands in while no seat exists at all.
-export function AccountLauncher({ seat = true, settingsOpen, openSettings, openOnboarding, actions }) {
+//
+// `place` says which of the three places this launcher is:
+//   'shell'   — the shell's settings.launcher seat, in the host's own trigger row
+//   'footer'  — the host's own footer, standing in for the seat
+//   'column'  — the foot of our own Bot column
+//
+// The classic page shows the account in the shell; the Bot page shows it in our
+// own column, because the shell's sidebar is a rail there and holds nothing.
+// So exactly one of them draws it — the place decides, not the others' flags.
+export function AccountLauncher({ place = 'column', settingsOpen, openSettings, openOnboarding, actions, useSurface }) {
   const [open, setOpen] = useState(false)
-  useLayoutEffect(() => {
-    if (!seat) return undefined
-    actions.seatAccount(true)
-    return () => actions.seatAccount(false)
-  }, [seat])
+  // The surface mode is the only thing that decides who draws the account.
+  const mode = useSurface ? useSurface(value => value.mode) : 'bot'
+  const shown = place === 'column' ? mode === 'bot' : mode === 'agent'
   const [box, setBox] = useState(null)
   const button = useRef(null)
   const menuRef = useRef(null)
@@ -839,7 +843,10 @@ export function AccountLauncher({ seat = true, settingsOpen, openSettings, openO
     return () => { if (openShellOnboarding === openOnboarding) openShellOnboarding = null }
   }, [openOnboarding])
   useEffect(() => {
-    if (!open) return undefined
+    // A launcher that does not draw itself holds no menu and listens to nothing:
+    // the shell's trigger row keeps the launcher mounted even when the shell's
+    // sidebar is a rail, and a hidden one must not keep the page's listeners.
+    if (!open || !shown) return undefined
     const onDown = (event) => {
       if (event.target instanceof Element && (event.target.closest('.bt-account-menu') || button.current?.contains(event.target))) return
       setOpen(false)
@@ -851,7 +858,7 @@ export function AccountLauncher({ seat = true, settingsOpen, openSettings, openO
     window.addEventListener('mousedown', onDown)
     window.addEventListener('keydown', onKey, true)
     return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey, true) }
-  }, [open])
+  }, [open, shown])
   // The shell's account plugin lends its sign-out operation; the item shows only
   // when the plugin's entry is there and its account snapshot says signed in. The
   // entry can arrive after this mounts, so its operations follow the entry.
@@ -914,6 +921,9 @@ export function AccountLauncher({ seat = true, settingsOpen, openSettings, openO
   ]
   if (signedIn) groups.push([[accountT('signOut'), SignOutIcon, askSignOut, undefined, true]])
   else if (signedOut) groups.push([[t('Sign in to DeepSeek'), SignInIcon, () => actions.signIn()]])
+  // A launcher that this surface does not show draws nothing at all — not a
+  // hidden button the user can still reach, and not a menu left open behind it.
+  if (!shown) return null
   return h(Fragment, null,
     h('button', { ref: button, type: 'button', className: 'bt-account', 'aria-label': t('Account'), 'aria-haspopup': 'menu', 'aria-expanded': open, onClick: toggle },
       h('span', { className: 'bt-you', 'aria-hidden': true }, h(GearIcon))),
@@ -1070,10 +1080,13 @@ function useLandOnMainBot(roster, useSessions, actions) {
   }, [mainView, roster])
 }
 
+// The account menu in the host's own footer. The classic page shows the account
+// there; the Bot page shows it in our own column instead, so this one stands
+// down there — the place decides, not a flag the other place sets.
 export function FooterAccount(props) {
-  const seated = props.useUi(value => value.accountSeated === true)
-  if (seated) return null
-  return h('span', { className: 'bt-foot-account' }, h(AccountLauncher, { ...props, seat: false }))
+  const mode = props.useSurface ? props.useSurface(value => value.mode) : 'bot'
+  if (mode !== 'agent') return null
+  return h('span', { className: 'bt-foot-account' }, h(AccountLauncher, { ...props, place: 'footer' }))
 }
 
 // The only entry registered in every mode: in Agent mode the whole Bot surface is

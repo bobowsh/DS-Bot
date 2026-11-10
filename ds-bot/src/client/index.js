@@ -720,7 +720,6 @@ export function apply(ctx) {
     const navigation = ctx.get('pluginNavigation')
     return navigation ? () => navigation.openBundle(VOICE_BUNDLE) : null
   }
-  actions.seatAccount = on => ui.set(state => (state.accountSeated === on ? state : { ...state, accountSeated: on }))
   // The install runs on the host; the check loop follows it every two seconds.
   actions.installUpdate = async () => {
     const value = await call('update-install')
@@ -1082,8 +1081,10 @@ export function apply(ctx) {
     () => shadow('sidebar.workspaces', { priority: BOT_PRIORITY, inject: face }, TeamSidebar),
     () => shadow('settings.trigger', { priority: BOT_PRIORITY }, YouAvatar),
     // The whale wins the seat over a shell account plugin's own launcher (the
-    // Desktop's "··· More"), which comes back in Agent mode.
-    () => shadow('settings.launcher', { priority: BOT_PRIORITY, inject: face }, AccountLauncher),
+    // Desktop's "··· More"). The seat belongs to the classic page: the Bot page
+    // shows the account in our own column, and the shell's sidebar is a rail
+    // there, so this launcher draws nothing.
+    () => shadow('settings.launcher', { priority: BOT_PRIORITY, inject: face }, props => h(AccountLauncher, { ...props, place: 'shell' })),
     () => shadow('settings.onboarding', { id: MODELS_STEP, order: MODELS_STEP_ORDER }, OpenModelsStep),
     () => shadow('shell.overlay', { id: 'bot-computer', order: 40, inject: face }, ComputerIndicator),
     () => shadow('shell.overlay', { id: 'bot', order: 50, inject: face }, Overlays),
