@@ -676,7 +676,20 @@ button.bt-set-row:hover{background:var(--bt-hover)}
    sidebar is wide, so hiding it leaves the icon alone. Written after the rule
    above so it wins where the two meet. */
 [class*="_panelList"] [class*="_panelTitle"]{display:none!important}
-[class*="_panelList"] [class*="_panelRow"]{justify-content:center;padding-left:0;padding-right:0}
+/* Every panel row is one box: a fixed height, one icon size, one left edge. Each plugin
+   brings its own glyph at its own size (measured 16-21px), so without this the rows read
+   as uneven; the box makes the ink the same size whatever the source drew. */
+[class*="_panelList"]{--bt-panel-row-h:40px;--bt-panel-icon:20px;display:flex;flex-direction:column;gap:2px}
+[class*="_panelList"] [class*="_panelRow"]{justify-content:center;align-items:center;padding-left:0;padding-right:0;width:100%;height:var(--bt-panel-row-h);min-height:var(--bt-panel-row-h);border-radius:8px}
+[class*="_panelList"] [class*="_panelRow"] svg,[class*="_panelList"] [class*="_panelRow"] img{width:var(--bt-panel-icon)!important;height:var(--bt-panel-icon)!important;flex:none}
+/* The foot holds four controls from four sources (whale, gear, AIDE, switch); they share
+   one box and one pitch so the row reads as one line instead of four sizes. */
+.bt-leftcol-foot{gap:0!important;padding-top:8px;justify-content:flex-start}
+.bt-leftcol-foot>*{flex:none;width:36px!important;height:36px!important;display:inline-flex;align-items:center;justify-content:center}
+.bt-leftcol-foot svg{width:20px!important;height:20px!important}
+.bt-leftcol-foot .bt-you{width:100%!important;height:100%!important;border-radius:50%;box-shadow:none}
+.bt-leftcol-foot-rail{gap:4px!important;align-items:center}
+.bt-leftcol-foot-rail>*{margin-inline:auto}
 /* The shell's sidebar switch stays where the shell puts it whenever the sidebar is
    collapsed: on the rail, or fixed in a Windows title bar, where it also stays while
    the sidebar is open. Elsewhere an open sidebar uses the team's own top row. */
