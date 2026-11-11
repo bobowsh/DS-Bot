@@ -34,18 +34,30 @@ test('the global seating flag is gone', () => {
 
 test('every launcher says which place it is', () => {
   // Three places: the shell's settings row, the shell's own footer, our column.
-  assert.match(sidebar, /place === 'column' \? mode === 'bot' : mode === 'agent'/)
+  assert.match(sidebar, /place === 'column' \? mode === 'bot' : mode === 'agent' && place === 'shell'/)
   // The shell's seat.
   assert.match(index, /h\(AccountLauncher, \{ \.\.\.props, place: 'shell' \}\)/)
   // Our own column.
   assert.match(sidebar, /h\(AccountLauncher, \{ place: 'column', useSurface: props\.useSurface, actions \}\)/)
-  // The shell's footer.
-  assert.match(sidebar, /h\(AccountLauncher, \{ \.\.\.props, place: 'footer' \}\)/)
 })
 
-test('the classic page shows the account in the shell, the Bot page in our column', () => {
-  // The shell's footer entry stands down on the Bot page: our column shows it there.
-  assert.match(sidebar, /const mode = props\.useSurface \? props\.useSurface\(value => value\.mode\) : 'bot'\n  if \(mode !== 'agent'\) return null/)
+test('the classic page shows one gear: the shell\'s own settings row', () => {
+  // The classic page carries the account in the shell's settings row. The shell's own
+  // footer stands down: a second gear on the same page reads as two.
+  assert.doesNotMatch(sidebar, /h\(AccountLauncher, \{ \.\.\.props, place: 'footer' \}\)/)
+  // FooterAccount draws nothing at all, so the footer slot holds no account entry.
+  const footer = sidebar.slice(sidebar.indexOf('export function FooterAccount'))
+  assert.match(footer.slice(0, 200), /return null/)
+  // The account in the shell's settings row still draws on the classic page.
+  assert.match(sidebar, /mode === 'agent' && place === 'shell'/)
+})
+
+test('the Bot page shows one gear: our own column', () => {
+  // On the Bot page the shell's sidebar is a rail, so the shell's seat draws nothing
+  // and our column carries the account.
+  assert.match(sidebar, /place === 'column' \? mode === 'bot'/)
+  // The shell's own row is not drawn on the Bot page.
+  assert.match(sidebar, /mode === 'agent' && place === 'shell'/)
 })
 
 test('a launcher that does not draw itself holds no menu and no listeners', () => {

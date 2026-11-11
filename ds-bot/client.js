@@ -16534,7 +16534,7 @@ var NO_SNAPSHOT = () => null;
 function AccountLauncher({ place = "column", settingsOpen, openSettings, openOnboarding, actions, useSurface }) {
   const [open, setOpen] = (0, import_react35.useState)(false);
   const mode = useSurface ? useSurface((value) => value.mode) : "bot";
-  const shown = place === "column" ? mode === "bot" : mode === "agent";
+  const shown = place === "column" ? mode === "bot" : mode === "agent" && place === "shell";
   const [box, setBox] = (0, import_react35.useState)(null);
   const button = (0, import_react35.useRef)(null);
   const menuRef = (0, import_react35.useRef)(null);
@@ -16799,10 +16799,8 @@ function useLandOnMainBot(roster, useSessions, actions) {
     return () => clearTimeout(timer);
   }, [mainView, roster]);
 }
-function FooterAccount(props) {
-  const mode = props.useSurface ? props.useSurface((value) => value.mode) : "bot";
-  if (mode !== "agent") return null;
-  return (0, import_react35.createElement)("span", { className: "bt-foot-account" }, (0, import_react35.createElement)(AccountLauncher, { ...props, place: "footer" }));
+function FooterAccount() {
+  return null;
 }
 function BotReturn({ useSurface, useRoster, actions }) {
   const mode = useSurface((value) => value.mode);
