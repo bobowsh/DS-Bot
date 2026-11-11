@@ -11,7 +11,7 @@
 // Every resolved version must match the manifest, so a drifted folder cannot ship.
 import { spawn } from 'node:child_process'
 import { cp, mkdir, readFile, rm } from 'node:fs/promises'
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
@@ -26,6 +26,22 @@ export function factoryRegistry() {
 
 /** The root of the shipped data directory (a DSH home layout). */
 export const bundledDataDir = appDir => join(appDir, 'build', 'data')
+
+/**
+ * The npm command the build runs, and how it is started.
+ *
+ * On Windows `npm` is a `.cmd` shim. `spawn` cannot start a `.cmd` directly — Node refuses it
+ * with EINVAL, and the bare name is not found at all — so the call goes through a shell.
+ * Every argument here is fixed by this module: the package name and version come from the
+ * factory manifest, and the registry is a build constant. The shell sees no input of its own.
+ */
+export function npmCommand() {
+  return 'npm'
+}
+
+export function npmSpawnOptions() {
+  return process.platform === 'win32' ? { shell: true } : {}
+}
 
 /** The directory the installer ships the factory plugins and their list in. */
 const nodeModulesDir = appDir => join(bundledDataDir(appDir), 'profiles', PROFILE, 'node_modules')
@@ -129,7 +145,12 @@ export async function registryReachable(registry, timeoutMs = 2500) {
 async function sourceOf(appDir, entry, pluginsDev, useRegistry) {
   const registry = factoryRegistry()
   if (useRegistry) {
-    const staged = await packFromRegistry(entry, registry).catch(() => undefined)
+    // The reason a registry pull failed is worth printing: a build that silently falls back
+    // to the development folder ships a different plugin than the manifest promises.
+    const staged = await packFromRegistry(entry, registry).catch(error => {
+      console.log(`LinkHarness: ${entry.name}@${entry.version} could not be pulled from ${registry} (${error.message}), falling back to ${pluginsDev}`)
+      return undefined
+    })
     if (staged !== undefined) return { ...staged, via: 'registry' }
     console.log(`LinkHarness: ${entry.name}@${entry.version} is not on the registry, falling back to ${pluginsDev}`)
   }
@@ -156,7 +177,7 @@ function packFromRegistry(entry, registry) {
   return new Promise((resolve, reject) => {
     const staging = mkdtempSync(join(tmpdir(), 'ds-bot-registry-'))
     const spec = `${entry.name}@${entry.version}`
-    const child = spawn('npm', ['pack', spec, '--registry', registry, '--pack-destination', staging, '--silent'], { stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(npmCommand(), ['pack', spec, '--registry', registry, '--pack-destination', staging, '--silent'], { ...npmSpawnOptions(), stdio: ['ignore', 'pipe', 'pipe'] })
     let settled = false
     const done = error => { if (!settled) { settled = true; clearTimeout(timer); error === undefined ? resolveActual() : reject(error) } }
     const timer = setTimeout(() => { child.kill(); done(new Error(`npm pack ${spec} timed out`)) }, 20000)
@@ -167,6 +188,8 @@ function packFromRegistry(entry, registry) {
         const archive = actual?.trim().split('\n').pop()
         if (archive === undefined || archive === '') throw new Error(`npm pack ${spec} printed no archive name`)
         const unpacked = join(staging, 'unpacked')
+        // `tar -C` needs the target to exist; without it the unpack fails with exit 1.
+        mkdirSync(unpacked, { recursive: true })
         const tar = spawn('tar', ['-xzf', join(staging, archive), '-C', unpacked], { stdio: 'ignore' })
         tar.on('exit', code => {
           if (code !== 0) { reject(new Error(`tar could not unpack ${archive} (exit ${code})`)); return }
