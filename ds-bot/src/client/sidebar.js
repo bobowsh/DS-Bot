@@ -1063,11 +1063,14 @@ const NO_SNAPSHOT = () => null
 // The classic page shows the account in the shell; the Bot page shows it in our
 // own column, because the shell's sidebar is a rail there and holds nothing.
 // So exactly one of them draws it — the place decides, not the others' flags.
+//
+// The shell's footer stands down in the classic page: the shell's own settings row
+// already carries the account there, and two gears on one page read as two.
 export function AccountLauncher({ place = 'column', settingsOpen, openSettings, openOnboarding, actions, useSurface }) {
   const [open, setOpen] = useState(false)
   // The surface mode is the only thing that decides who draws the account.
   const mode = useSurface ? useSurface(value => value.mode) : 'bot'
-  const shown = place === 'column' ? mode === 'bot' : mode === 'agent'
+  const shown = place === 'column' ? mode === 'bot' : mode === 'agent' && place === 'shell'
   const [box, setBox] = useState(null)
   const button = useRef(null)
   const menuRef = useRef(null)
@@ -1321,13 +1324,12 @@ function useLandOnMainBot(roster, useSessions, actions) {
   }, [mainView, roster])
 }
 
-// The account menu in the host's own footer. The classic page shows the account
-// there; the Bot page shows it in our own column instead, so this one stands
-// down there — the place decides, not a flag the other place sets.
-export function FooterAccount(props) {
-  const mode = props.useSurface ? props.useSurface(value => value.mode) : 'bot'
-  if (mode !== 'agent') return null
-  return h('span', { className: 'bt-foot-account' }, h(AccountLauncher, { ...props, place: 'footer' }))
+// The account menu in the host's own footer. It stands down: the classic page
+// already carries the account in the shell's own settings row, and the Bot page
+// carries it in our own column. A third copy in the footer would put a second
+// gear on the classic page.
+export function FooterAccount() {
+  return null
 }
 
 // The only entry registered in every mode: in Agent mode the whole Bot surface is
