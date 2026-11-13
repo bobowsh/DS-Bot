@@ -772,6 +772,64 @@ export function Nothing() { return null }
 
 export { CellEmpty }
 
+// 测试用的出口：看一眼轮次尾部收到的回复库。
+export function relaySnapshot() {
+  return Object.fromEntries([...relayRows].map(([key, value]) => [key, value]))
+}
+
+// 测试用的出口：清空回复库，让每个用例从空的状态开始。
+export function relayReset() {
+  relayRows.clear()
+  relayVersion += 1
+  for (const watch of relayWatchers) watch()
+}
+
+// 步骤1：群聊一轮的成员气泡，在轮次尾部（流程块之外）按身份/时间/顺序画一次。
+// 这个组件只在群聊挂载（roster.roomsById 命中），顺手给会话容器打标记，
+// 让 CSS 只隐藏群视图的工具状态行、不碰单聊。
+export function RelayTail({ turn: location, sessionId, useRoster, actions, useUi, batches: given }) {
+  const roster = useRoster?.(value => value)
+  const turn = location?.turn
+  const [, force] = useState(0)
+  // 群视图标记：RelayTail 在群聊和单聊的轮次尾部都会挂载，按 roomsById 精确设置/清除。
+  // 单聊必须清掉，否则切会话后标记残留会把单聊的工具块也一起隐藏。
+  useEffect(() => {
+    const conv = document.querySelector?.('[data-conversation-session]')
+    if (roster?.roomsById?.[sessionId]) conv?.setAttribute('data-bt-group-chat', '')
+    else conv?.removeAttribute('data-bt-group-chat')
+  }, [roster, sessionId])
+  useEffect(() => {
+    const watch = () => force(value => value + 1)
+    relayWatchers.add(watch)
+    return () => { relayWatchers.delete(watch) }
+  }, [])
+  void relayVersion
+  const batches = given ?? relayRows.get(relayKeyOf(sessionId, turn))
+  if (roster === undefined || turn === undefined || !batches || batches.length === 0) return null
+  const room = roster.roomsById[sessionId]
+  return h('div', { className: 'bt-group-replies' },
+    batches.flatMap((batch, batchIndex) => stackReplies(batch.rows).map(({ reply, index, texts, time, duration }) => {
+      const bot = roster.byId[reply.botId] ?? { id: reply.botId, name: reply.name ?? t('a Bot'), color: reply.color ?? 'gray' }
+      const key = `relay-${batchIndex}-${reply.botId ?? reply.kind ?? 'row'}-${index}`
+      if (reply.kind === 'user') {
+        return h('div', { key, className: 'bt-urow' },
+          h('div', { className: 'bt-ububble' }, h(MarkdownText, { text: reply.text, labels: mdLabels(), variant: 'compact' })),
+          (reply.via !== undefined || Number.isFinite(time)) ? h('div', { key: 'utime', className: 'bt-utime', title: clockLabel(time) }, ...(reply.via !== undefined ? [h(ViaTag, { key: 'via', via: reply.via })] : []), Number.isFinite(time) ? messageClock(time) : null) : null)
+      }
+      if (reply.kind === 'goal') {
+        return h('div', { key, className: 'bt-event', title: reply.text || undefined },
+          h('span', { className: 'bt-event-ico', 'aria-hidden': true }, h(GoalIcon)), goalEventText(reply))
+      }
+      if (reply.kind !== undefined) {
+        return h(RelayEvent, { key, reply, bot, sessionId, actions })
+      }
+      return h(GroupMessage, {
+        key, bot, texts, room, roster, actions,
+        msgKey: `${sessionId}:relay:${turn}:${batchIndex}:${index}`, useUi, time, duration,
+      })
+    })))
+}
+
 // A pause longer than this splits the transcript with a time separator.
 const SEPARATOR_GAP_MS = 30 * 60 * 1000
 function nextTurnStart(turns, turn) {
@@ -965,7 +1023,35 @@ function RelayEvent({ reply, bot, sessionId, actions }) {
   return null
 }
 
-function GroupReplies({ sessionId, callId, done, content, roster, actions, useUi, useWork }) {
+// 群聊一轮的成员回复：tool 行读到 group_relay 结果后按下标存起来，轮次尾部画到流程块外。
+// 座位归属由宿主决定（tool-call 座位一定在流程块里），所以气泡只能画在座位之外。
+const relayRows = new Map()
+const relayWatchers = new Set()
+let relayVersion = 0
+const relayKeyOf = (sessionId, turn) => `${sessionId}:${turn}`
+// 一轮里可能有多个 group_relay（嵌套调用时），按 callId 分开记，各按先后排列。
+const relayPut = (sessionId, turn, callId, rows) => {
+  if (turn === null || turn === undefined) return
+  const key = relayKeyOf(sessionId, turn)
+  const batches = relayRows.get(key) ?? []
+  // 空结果不覆盖已经收到的回复：一次被裁剪的调用不该把这一轮的回复抹掉。
+  if (rows === null || rows === undefined || rows.length === 0) {
+    if (batches.length === 0) return
+    relayRows.set(key, batches)
+    return
+  }
+  // 同一个 callId 重画时覆盖它那一份；不同的 callId 按先后追加。
+  const at = batches.findIndex(batch => batch.callId === callId)
+  const merged = at >= 0
+    ? batches.map((batch, index) => index === at ? { callId, rows } : batch)
+    : [...batches, { callId, rows }]
+  if (JSON.stringify(merged) === JSON.stringify(batches)) return
+  relayRows.set(key, merged)
+  relayVersion += 1
+  for (const watch of relayWatchers) watch()
+}
+
+function GroupReplies({ sessionId, callId, callTurn, done, content, roster, actions, useWork }) {
   const [live, setLive] = useState({ replies: [], speaking: [] })
   useEffect(() => {
     if (done) return undefined
@@ -997,29 +1083,25 @@ function GroupReplies({ sessionId, callId, done, content, roster, actions, useUi
     const tool = work.bots?.[id]?.tool
     return tool ? [tool, workPhrase(work.bots[id])] : []
   }))) ?? '[]')
+  // 成员气泡交给轮次尾部（流程块之外）。轮次优先取这次调用自己的 turn；
+  // 拿不到时从座位祖先的 data-chat-turn 取（CDP 已验证两者一一对应）。
+  // 不用「整页第一个 toolview」兜底——那样只有第一轮对得上。
+  const hostRef = useRef(null)
+  useLayoutEffect(() => {
+    const node = hostRef.current
+    const callSeat = node?.closest?.('[data-chat-call-id]')
+    if (callSeat && callId !== undefined && callSeat.getAttribute('data-chat-call-id') !== callId) return
+    const seatTurn = callSeat?.closest?.('[data-chat-turn]')?.getAttribute('data-chat-turn') ?? null
+    const turn = callTurn === undefined || callTurn === null ? seatTurn : String(callTurn)
+    relayPut(sessionId, turn, callId, replies.length ? replies : null)
+  })
   if (replies.length === 0 && pending.length === 0) {
     // A pruned tool result left nothing to draw; keep a marker row instead of an
     // empty turn, which reads as a blank gap on a narrow first paint.
-    return broken ? h('div', { className: 'bt-group-replies' }, h('div', { className: 'bt-event' }, t('The group replies could not be shown'))) : h(CellEmpty)
+    return broken ? h('div', { className: 'bt-group-replies', ref: hostRef }, h('div', { className: 'bt-event' }, t('The group replies could not be shown'))) : h(CellEmpty)
   }
-  const room = roster.roomsById[sessionId]
-  return h('div', { className: 'bt-group-replies' },
-    stackReplies(replies).map(({ reply, index, texts, time, duration }) => {
-      const bot = roster.byId[reply.botId] ?? { id: reply.botId, name: reply.name, color: reply.color ?? 'gray' }
-      if (reply.kind === 'user') {
-        return h('div', { key: `user-${index}`, className: 'bt-urow' },
-          h('div', { className: 'bt-ububble' }, h(MarkdownText, { text: reply.text, labels: mdLabels(), variant: 'compact' })),
-          (reply.via !== undefined || Number.isFinite(time)) ? h('div', { className: 'bt-utime', title: clockLabel(time) }, ...(reply.via !== undefined ? [h(ViaTag, { key: 'via', via: reply.via })] : []), Number.isFinite(time) ? messageClock(time) : null) : null)
-      }
-      if (reply.kind !== undefined) {
-        return h(RelayEvent, { key: `${reply.botId ?? reply.kind}-${index}`, reply, bot, sessionId, actions })
-      }
-      if (reply.kind === 'goal') {
-        return h('div', { key: `goal-${index}`, className: 'bt-event', title: reply.text || undefined },
-          h('span', { className: 'bt-event-ico', 'aria-hidden': true }, h(GoalIcon)), goalEventText(reply))
-      }
-      return h(GroupMessage, { key: `${reply.botId}-${index}`, bot, texts, room, roster, actions, msgKey: callId ? `${sessionId}:${callId}:${index}` : undefined, useUi, time, duration })
-    }),
+  // 工具行里只留「正在输入」，气泡由轮次尾部画，不再重复。
+  return h('div', { className: 'bt-group-replies', ref: hostRef },
     pending.map((id, at) => {
       const bot = roster.byId[id]
       if (!bot) return null
@@ -1092,7 +1174,6 @@ export function TeamToolView(props) {
   if (isHiddenTurn(roster, sessionId, call.turn)) return h(CellEmpty)
   const actions = props.actions ?? {}
   const heldCards = props.useHeldCards?.(state => state[sessionId])
-  const useUi = props.useUi
   const useWork = props.useWork
   const hooks = { useBrowserHolds: props.useBrowserHolds, useBrowserTabs: props.useBrowserTabs, useBrowserPages: props.useBrowserPages }
   const self = roster.byId[sessionId]
@@ -1124,7 +1205,7 @@ export function TeamToolView(props) {
       return done && target ? h(EventLine, { prefix: t('Updated'), bots: [target], onOpen: bot => actions.openSession(bot.id) }) : h(CellEmpty)
     }
     case 'group_relay':
-      return h(GroupReplies, { sessionId, callId: call.callId, done, content: call.content, roster, actions, useUi, useWork })
+      return h(GroupReplies, { sessionId, callId: call.callId, callTurn: call.turn, done, content: call.content, roster, actions, useWork })
     case 'create_group':
     case 'update_group':
     case 'delete_group':

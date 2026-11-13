@@ -1090,6 +1090,12 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 [class*="_scroll"]>[class*="_column"]::before{content:var(--bt-first-sep,none);display:block;flex:none;height:28px;margin:17px 0 12px;font-size:12px;line-height:28px;text-align:center;color:var(--bt-ink-2);white-space:nowrap}
 .bt-activity{display:flex;align-items:center;gap:10px;margin:8px 0 4px 2px;font-size:14px;color:var(--bt-ink-2)}
 .bt-group-replies{display:contents}
+/* 群聊只显示对话：group_relay 的回复已由轮次尾部画在流程块外，
+   工具流程块自身塌成 0 高，这里再去掉「已完成，用时…」状态行与空座位。
+   标记由 GroupReplies 按 roomsById 命中后写到会话容器，单聊不挂标记、不受影响。 */
+[data-conversation-session][data-bt-group-chat] [data-chat-flow-kind="turn-process"]{display:none!important}
+[data-conversation-session][data-bt-group-chat] [data-step-process]{display:none!important}
+[data-conversation-session][data-bt-group-chat] [data-chat-flow-kind="tool-call"]{display:none!important}
 /* The work-details mode is the Host's own setting, and it decides what a finished
    turn folds away. The team follows it: the Host draws the header and the fold, and the
    rules below only take the empty seats away. */

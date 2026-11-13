@@ -4217,6 +4217,12 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 [class*="_scroll"]>[class*="_column"]::before{content:var(--bt-first-sep,none);display:block;flex:none;height:28px;margin:17px 0 12px;font-size:12px;line-height:28px;text-align:center;color:var(--bt-ink-2);white-space:nowrap}
 .bt-activity{display:flex;align-items:center;gap:10px;margin:8px 0 4px 2px;font-size:14px;color:var(--bt-ink-2)}
 .bt-group-replies{display:contents}
+/* 群聊只显示对话：group_relay 的回复已由轮次尾部画在流程块外，
+   工具流程块自身塌成 0 高，这里再去掉「已完成，用时…」状态行与空座位。
+   标记由 GroupReplies 按 roomsById 命中后写到会话容器，单聊不挂标记、不受影响。 */
+[data-conversation-session][data-bt-group-chat] [data-chat-flow-kind="turn-process"]{display:none!important}
+[data-conversation-session][data-bt-group-chat] [data-step-process]{display:none!important}
+[data-conversation-session][data-bt-group-chat] [data-chat-flow-kind="tool-call"]{display:none!important}
 /* The work-details mode is the Host's own setting, and it decides what a finished
    turn folds away. The team follows it: the Host draws the header and the fold, and the
    rules below only take the empty seats away. */
@@ -14688,6 +14694,74 @@ function NewDivider() {
 function Nothing() {
   return null;
 }
+function relaySnapshot() {
+  return Object.fromEntries([...relayRows].map(([key, value]) => [key, value]));
+}
+function relayReset() {
+  relayRows.clear();
+  relayVersion += 1;
+  for (const watch of relayWatchers) watch();
+}
+function RelayTail({ turn: location2, sessionId, useRoster, actions, useUi, batches: given }) {
+  const roster = useRoster?.((value) => value);
+  const turn = location2?.turn;
+  const [, force] = (0, import_react33.useState)(0);
+  (0, import_react33.useEffect)(() => {
+    const conv = document.querySelector?.("[data-conversation-session]");
+    if (roster?.roomsById?.[sessionId]) conv?.setAttribute("data-bt-group-chat", "");
+    else conv?.removeAttribute("data-bt-group-chat");
+  }, [roster, sessionId]);
+  (0, import_react33.useEffect)(() => {
+    const watch = () => force((value) => value + 1);
+    relayWatchers.add(watch);
+    return () => {
+      relayWatchers.delete(watch);
+    };
+  }, []);
+  void relayVersion;
+  const batches = given ?? relayRows.get(relayKeyOf(sessionId, turn));
+  if (roster === void 0 || turn === void 0 || !batches || batches.length === 0) return null;
+  const room2 = roster.roomsById[sessionId];
+  return (0, import_react33.createElement)(
+    "div",
+    { className: "bt-group-replies" },
+    batches.flatMap((batch, batchIndex) => stackReplies(batch.rows).map(({ reply, index, texts: texts2, time, duration }) => {
+      const bot = roster.byId[reply.botId] ?? { id: reply.botId, name: reply.name ?? t("a Bot"), color: reply.color ?? "gray" };
+      const key = `relay-${batchIndex}-${reply.botId ?? reply.kind ?? "row"}-${index}`;
+      if (reply.kind === "user") {
+        return (0, import_react33.createElement)(
+          "div",
+          { key, className: "bt-urow" },
+          (0, import_react33.createElement)("div", { className: "bt-ububble" }, (0, import_react33.createElement)(import_dsh_client_ui_primitives.MarkdownText, { text: reply.text, labels: mdLabels3(), variant: "compact" })),
+          reply.via !== void 0 || Number.isFinite(time) ? (0, import_react33.createElement)("div", { key: "utime", className: "bt-utime", title: clockLabel(time) }, ...reply.via !== void 0 ? [(0, import_react33.createElement)(ViaTag, { key: "via", via: reply.via })] : [], Number.isFinite(time) ? messageClock(time) : null) : null
+        );
+      }
+      if (reply.kind === "goal") {
+        return (0, import_react33.createElement)(
+          "div",
+          { key, className: "bt-event", title: reply.text || void 0 },
+          (0, import_react33.createElement)("span", { className: "bt-event-ico", "aria-hidden": true }, (0, import_react33.createElement)(GoalIcon)),
+          goalEventText(reply)
+        );
+      }
+      if (reply.kind !== void 0) {
+        return (0, import_react33.createElement)(RelayEvent, { key, reply, bot, sessionId, actions });
+      }
+      return (0, import_react33.createElement)(GroupMessage, {
+        key,
+        bot,
+        texts: texts2,
+        room: room2,
+        roster,
+        actions,
+        msgKey: `${sessionId}:relay:${turn}:${batchIndex}:${index}`,
+        useUi,
+        time,
+        duration
+      });
+    }))
+  );
+}
 var SEPARATOR_GAP_MS = 30 * 60 * 1e3;
 function nextTurnStart(turns, turn) {
   let next;
@@ -14881,7 +14955,27 @@ function RelayEvent({ reply, bot, sessionId, actions }) {
   }
   return null;
 }
-function GroupReplies({ sessionId, callId, done, content, roster, actions, useUi, useWork }) {
+var relayRows = /* @__PURE__ */ new Map();
+var relayWatchers = /* @__PURE__ */ new Set();
+var relayVersion = 0;
+var relayKeyOf = (sessionId, turn) => `${sessionId}:${turn}`;
+var relayPut = (sessionId, turn, callId, rows2) => {
+  if (turn === null || turn === void 0) return;
+  const key = relayKeyOf(sessionId, turn);
+  const batches = relayRows.get(key) ?? [];
+  if (rows2 === null || rows2 === void 0 || rows2.length === 0) {
+    if (batches.length === 0) return;
+    relayRows.set(key, batches);
+    return;
+  }
+  const at = batches.findIndex((batch) => batch.callId === callId);
+  const merged = at >= 0 ? batches.map((batch, index) => index === at ? { callId, rows: rows2 } : batch) : [...batches, { callId, rows: rows2 }];
+  if (JSON.stringify(merged) === JSON.stringify(batches)) return;
+  relayRows.set(key, merged);
+  relayVersion += 1;
+  for (const watch of relayWatchers) watch();
+};
+function GroupReplies({ sessionId, callId, callTurn, done, content, roster, actions, useWork }) {
   const [live, setLive] = (0, import_react33.useState)({ replies: [], speaking: [] });
   (0, import_react33.useEffect)(() => {
     if (done) return void 0;
@@ -14917,36 +15011,21 @@ function GroupReplies({ sessionId, callId, done, content, roster, actions, useUi
     const tool = work.bots?.[id]?.tool;
     return tool ? [tool, workPhrase(work.bots[id])] : [];
   }))) ?? "[]");
+  const hostRef = (0, import_react33.useRef)(null);
+  (0, import_react33.useLayoutEffect)(() => {
+    const node = hostRef.current;
+    const callSeat = node?.closest?.("[data-chat-call-id]");
+    if (callSeat && callId !== void 0 && callSeat.getAttribute("data-chat-call-id") !== callId) return;
+    const seatTurn = callSeat?.closest?.("[data-chat-turn]")?.getAttribute("data-chat-turn") ?? null;
+    const turn = callTurn === void 0 || callTurn === null ? seatTurn : String(callTurn);
+    relayPut(sessionId, turn, callId, replies.length ? replies : null);
+  });
   if (replies.length === 0 && pending.length === 0) {
-    return broken ? (0, import_react33.createElement)("div", { className: "bt-group-replies" }, (0, import_react33.createElement)("div", { className: "bt-event" }, t("The group replies could not be shown"))) : (0, import_react33.createElement)(CellEmpty);
+    return broken ? (0, import_react33.createElement)("div", { className: "bt-group-replies", ref: hostRef }, (0, import_react33.createElement)("div", { className: "bt-event" }, t("The group replies could not be shown"))) : (0, import_react33.createElement)(CellEmpty);
   }
-  const room2 = roster.roomsById[sessionId];
   return (0, import_react33.createElement)(
     "div",
-    { className: "bt-group-replies" },
-    stackReplies(replies).map(({ reply, index, texts: texts2, time, duration }) => {
-      const bot = roster.byId[reply.botId] ?? { id: reply.botId, name: reply.name, color: reply.color ?? "gray" };
-      if (reply.kind === "user") {
-        return (0, import_react33.createElement)(
-          "div",
-          { key: `user-${index}`, className: "bt-urow" },
-          (0, import_react33.createElement)("div", { className: "bt-ububble" }, (0, import_react33.createElement)(import_dsh_client_ui_primitives.MarkdownText, { text: reply.text, labels: mdLabels3(), variant: "compact" })),
-          reply.via !== void 0 || Number.isFinite(time) ? (0, import_react33.createElement)("div", { className: "bt-utime", title: clockLabel(time) }, ...reply.via !== void 0 ? [(0, import_react33.createElement)(ViaTag, { key: "via", via: reply.via })] : [], Number.isFinite(time) ? messageClock(time) : null) : null
-        );
-      }
-      if (reply.kind !== void 0) {
-        return (0, import_react33.createElement)(RelayEvent, { key: `${reply.botId ?? reply.kind}-${index}`, reply, bot, sessionId, actions });
-      }
-      if (reply.kind === "goal") {
-        return (0, import_react33.createElement)(
-          "div",
-          { key: `goal-${index}`, className: "bt-event", title: reply.text || void 0 },
-          (0, import_react33.createElement)("span", { className: "bt-event-ico", "aria-hidden": true }, (0, import_react33.createElement)(GoalIcon)),
-          goalEventText(reply)
-        );
-      }
-      return (0, import_react33.createElement)(GroupMessage, { key: `${reply.botId}-${index}`, bot, texts: texts2, room: room2, roster, actions, msgKey: callId ? `${sessionId}:${callId}:${index}` : void 0, useUi, time, duration });
-    }),
+    { className: "bt-group-replies", ref: hostRef },
     pending.map((id, at) => {
       const bot = roster.byId[id];
       if (!bot) return null;
@@ -15018,7 +15097,6 @@ function TeamToolView(props) {
   if (isHiddenTurn(roster, sessionId, call2.turn)) return (0, import_react33.createElement)(CellEmpty);
   const actions = props.actions ?? {};
   const heldCards = props.useHeldCards?.((state) => state[sessionId]);
-  const useUi = props.useUi;
   const useWork = props.useWork;
   const hooks = { useBrowserHolds: props.useBrowserHolds, useBrowserTabs: props.useBrowserTabs, useBrowserPages: props.useBrowserPages };
   const self = roster.byId[sessionId];
@@ -15047,7 +15125,7 @@ function TeamToolView(props) {
       return done && target ? (0, import_react33.createElement)(EventLine, { prefix: t("Updated"), bots: [target], onOpen: (bot) => actions.openSession(bot.id) }) : (0, import_react33.createElement)(CellEmpty);
     }
     case "group_relay":
-      return (0, import_react33.createElement)(GroupReplies, { sessionId, callId: call2.callId, done, content: call2.content, roster, actions, useUi, useWork });
+      return (0, import_react33.createElement)(GroupReplies, { sessionId, callId: call2.callId, callTurn: call2.turn, done, content: call2.content, roster, actions, useWork });
     case "create_group":
     case "update_group":
     case "delete_group":
@@ -30090,6 +30168,7 @@ function apply(ctx) {
     // own tools keep their rows through the host's keyed tool view slot.
     // DSH's own turn tail stays, so what other plugins add there shows, such as the
     // cards of the files a turn delivered; its copy and branch row is hidden.
+    () => shadow("conversation.chat.turnTail", { id: "bot-relay-tail", order: 900, priority: BOT_PRIORITY, inject: face }, RelayTail),
     () => shadow("conversation.chat.turnTail", { id: "bot-turn-separators", order: 1e3, inject: face }, TurnTailCell),
     // A side question is not a transcript row. After its snapshot turn closes it
     // sits on that turn's tail, ahead of the time separator.

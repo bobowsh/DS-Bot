@@ -25,7 +25,7 @@ import { AnsweredReply, WidgetDock, WIDGET_CSS } from './widget-cell.js'
 import { HandoffDock, HANDOFF_CSS } from './handoff-card.js'
 import { AppAccessDock, ComputerHandoffDock, ComputerIndicator, COMPUTER_CSS } from './computer.js'
 import { installHeaderNavigation } from './header-navigation.js'
-import { AssistantCell, TriggerCell, Nothing, CellEmpty, TurnTailCell, TEAM_TOOLS, TeamToolView } from './cells.js'
+import { AssistantCell, TriggerCell, Nothing, CellEmpty, TurnTailCell, TEAM_TOOLS, TeamToolView, RelayTail } from './cells.js'
 import { Overlays } from './overlays.js'
 import { createBotBrowsers, serveBrowserReads } from './bot-browsers.js'
 import { BROWSER_CSS } from './browser-pane.js'
@@ -1145,6 +1145,7 @@ export function apply(ctx) {
     // own tools keep their rows through the host's keyed tool view slot.
     // DSH's own turn tail stays, so what other plugins add there shows, such as the
     // cards of the files a turn delivered; its copy and branch row is hidden.
+    () => shadow('conversation.chat.turnTail', { id: 'bot-relay-tail', order: 900, priority: BOT_PRIORITY, inject: face }, RelayTail),
     () => shadow('conversation.chat.turnTail', { id: 'bot-turn-separators', order: 1000, inject: face }, TurnTailCell),
     // A side question is not a transcript row. After its snapshot turn closes it
     // sits on that turn's tail, ahead of the time separator.

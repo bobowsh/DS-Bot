@@ -9,7 +9,7 @@ import { build } from 'esbuild'
 const { outputFiles } = await build({
   stdin: {
     contents: [
-      "export { TeamToolView, TriggerCell, callTree, CellEmpty, Bubbles } from './src/client/cells.js'",
+      "export { TeamToolView, TriggerCell, callTree, CellEmpty, Bubbles, RelayTail, relaySnapshot, relayReset } from './src/client/cells.js'",
       "export { stackReplies } from './src/shared/group-replies.js'",
       "export { QuestionDock, SettledQuestion } from './src/client/questions.js'",
       "export { SecretDock } from './src/client/secret-card.js'",
@@ -54,7 +54,8 @@ class ClipboardItem {
 const module = { exports: {} }
 runInNewContext(outputFiles[0].text, {
   module, exports: module.exports,
-  document: { hidden: false }, TextEncoder, MutationObserver: FakeObserver,
+  document: { hidden: false, querySelector: () => null, addEventListener: () => {}, removeEventListener: () => {} }, TextEncoder, MutationObserver: FakeObserver,
+  window: { addEventListener: () => {}, removeEventListener: () => {}, innerWidth: 1200, innerHeight: 800, matchMedia: () => ({ matches: false }), getSelection: () => null, visualViewport: null, dispatchEvent: () => {} },
   navigator: { clipboard }, ClipboardItem, Blob,
   setTimeout: (fn) => { const timer = { fn }; timers.add(timer); return timer },
   clearTimeout: timer => timers.delete(timer),
@@ -70,7 +71,7 @@ runInNewContext(outputFiles[0].text, {
     throw new Error(`Unexpected platform module ${name}`)
   },
 })
-const { TeamToolView, TriggerCell, callTree, stackReplies, CellEmpty, Bubbles, QuestionDock, SettledQuestion, SecretDock, countCards, ViewMenuList, WidgetView, WidgetDock } = module.exports
+const { TeamToolView, TriggerCell, callTree, stackReplies, CellEmpty, Bubbles, RelayTail, relaySnapshot, relayReset, QuestionDock, SettledQuestion, SecretDock, countCards, ViewMenuList, WidgetView, WidgetDock } = module.exports
 
 // Runs the effects collected since the last render; returns the cleanups.
 const mount = () => {
@@ -155,7 +156,7 @@ test('a group reply shows its time, and how long its turn ran', () => {
     { botId: 'writer', text: 'Draft is up.', time: today, duration: 68_000 },
     { botId: 'chief', text: 'Looks good.', time: yesterday, duration: 2_000 },
   ]
-  const out = show(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
+  const out = showRelay(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
   const times = findAll(out, node => node.props?.className === 'bt-group-time')
   const tooks = findAll(out, node => node.props?.className === 'bt-group-took')
   assert.deepEqual(times.map(text), [clockOf(today), `Yesterday ${clockOf(yesterday)}`])
@@ -171,7 +172,7 @@ test('a user message inside a group relay shows its time', () => {
     { kind: 'user', text: 'hold on', time: today },
     { botId: 'writer', text: 'Draft is up.', time: at(0, 14, 6), duration: 1000 },
   ]
-  const out = show(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
+  const out = showRelay(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
   const times = findAll(out, node => node.props?.className === 'bt-utime')
   assert.deepEqual(times.map(text), [clockOf(today)])
   assert.deepEqual(times.map(node => node.props.title), [`Today ${clockOf(today)}`])
@@ -181,7 +182,7 @@ test('a user message inside a group relay shows its time', () => {
 // with nothing to press.
 test('an old paused round shows the pause as a plain line', () => {
   const replies = [{ kind: 'paused', names: ['Writer', 'Coder'], count: 6, time: at(0, 14, 5) }]
-  const out = show(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
+  const out = showRelay(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
   const events = findAll(out, node => node.props?.className === 'bt-event').map(text)
   assert.deepEqual(events, ['Paused after 6 Bot relays. Waiting: Writer and Coder'])
   assert.equal(find(out, node => node.type === 'button'), undefined)
@@ -191,7 +192,7 @@ test('an old paused round shows the pause as a plain line', () => {
 // and says what lets them go on.
 test('a round the idle guard paused names the Bots and how they go on', () => {
   const replies = [{ kind: 'paused', idle: true, botId: 'chief', name: 'Chief', names: ['Writer'], count: 6, limit: 6, time: at(0, 14, 5) }]
-  const out = show(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
+  const out = showRelay(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
   const events = findAll(out, node => node.props?.className === 'bt-event').map(text)
   assert.deepEqual(events, ['Chief and Writer went back and forth 6 times without progress and paused. Write here to go on'])
 })
@@ -200,7 +201,7 @@ test('a round the idle guard paused names the Bots and how they go on', () => {
 // notice, so the user sees why nothing was answered.
 test('a group whose admin passed alone shows the notice', () => {
   const replies = [{ kind: 'admin-passed', botId: 'chief', name: 'Chief', time: at(0, 14, 5) }]
-  const out = show(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
+  const out = showRelay(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
   const events = findAll(out, node => node.props?.className === 'bt-event').map(text)
   assert.deepEqual(events, ['Chief did not answer or call anyone; call a member with @Name'])
 })
@@ -268,6 +269,47 @@ const show = (root, options) => {
 }
 const shown = (root, options) => text(show(root, options))
 
+// 群聊的成员气泡不再画在工具行里：工具行把回复交给轮次尾部，由 RelayTail 画。
+// 这个辅助先渲染工具行并跑它的 effect（它把回复交给轮次尾部），再渲染尾部，把两者合起来看。
+const showRelay = (root, options = {}) => {
+  const roster = options.roster ?? team()
+  // 回复库是模块级的，每个用例从空的状态开始。
+  relayReset()
+  // 工具行：走整棵调用树，渲染后立刻跑 effect（工具行把回复交给轮次尾部）。
+  // 顺序按调用先后：每个工具行后面紧跟它自己那一份回复，和原来工具行内画气泡时一致。
+  const out = []
+  const seen = new Set()
+  const visit = call => {
+    if (call === undefined || call === null) return
+    const id = call.callId ?? call
+    if (seen.has(id)) return
+    seen.add(id)
+    if (isTeam(call)) {
+      out.push(expand(TeamToolView(props(call, { ...options, roster }))))
+      mount()
+      // 这一行自己的回复：只看它这次调用交上来的那一份（尾部在真实界面里按轮次汇总，
+      // 这里按调用拆开，顺序与原来「气泡画在工具行里」时一致）。
+      const own = relaySnapshot()[`${options.sessionId ?? chief.id}:${options.turn ?? 1}`] ?? []
+      const batch = own.find(entry => entry.callId === id)
+      if (batch !== undefined) {
+        out.push(expand(RelayTail({
+          turn: { turn: options.turn ?? 1 },
+          sessionId: options.sessionId ?? chief.id,
+          useRoster: select => select(roster),
+          actions: options.actions ?? {},
+          useUi: select => select({ reactions: {}, visits: {} }),
+          batches: [batch],
+        })))
+      }
+    }
+    for (const child of call.subCalls ?? []) visit(child)
+  }
+  visit(root)
+  effects = []
+  return out.flat()
+}
+const shownRelay = (root, options) => text(showRelay(root, options))
+
 // One finished call of every kind ToolCell draws, and what it shows.
 const BRANCHES = [
   ['message_bot', { args: { to: 'Writer' } }, /Messaged.*Writer/],
@@ -291,11 +333,13 @@ const rosterFor = callId => team({ questions: { chief: question(callId) }, secre
 test('every call ToolCell draws shows the same nested in a PTC program as on its own', () => {
   assert.equal(BRANCHES.length, 15)
   for (const [name, options, expected] of BRANCHES) {
-    const native = shown(call(name, 'direct', options), { roster: rosterFor('direct') })
+    // group_relay 的成员气泡现在由轮次尾部画，别的工具仍在自己的行里。
+    const render = name === 'group_relay' ? shownRelay : shown
+    const native = render(call(name, 'direct', options), { roster: rosterFor('direct') })
     assert.match(native, expected, `${name} on its own`)
-    const nested = shown(program([call(name, 'program:ptc:1', options)]), { roster: rosterFor('program:ptc:1') })
+    const nested = render(program([call(name, 'program:ptc:1', options)]), { roster: rosterFor('program:ptc:1') })
     assert.equal(nested, native, `${name} under run_code`)
-    const deep = shown(program([call('run_code', 'program:ptc:1', { subCalls: [call(name, 'program:ptc:1:ptc:1', options)] })]), { roster: rosterFor('program:ptc:1:ptc:1') })
+    const deep = render(program([call('run_code', 'program:ptc:1', { subCalls: [call(name, 'program:ptc:1:ptc:1', options)] })]), { roster: rosterFor('program:ptc:1:ptc:1') })
     assert.equal(deep, native, `${name} two programs deep`)
   }
 })
@@ -306,7 +350,7 @@ test('a program draws every known sub-call in dispatch order and each call once'
   const secret = call('request_secret', 'program:ptc:3', { args: { name: 'DEMO_TOKEN' } })
   const root = program([message, call('run_code', 'program:ptc:4', { subCalls: [relay, secret, message] }), relay, call('bash', 'program:ptc:5')])
   assert.deepEqual(JSON.parse(JSON.stringify(callTree(root).map(entry => entry.callId))), ['program', 'program:ptc:1', 'program:ptc:4', 'program:ptc:2', 'program:ptc:3', 'program:ptc:5'])
-  const out = shown(root, { roster: team({ secretRequests: { chief: [request('program:ptc:3')] } }) })
+  const out = shownRelay(root, { roster: team({ secretRequests: { chief: [request('program:ptc:3')] } }) })
   assert.match(out, /Messaged.*Writer.*Group reply\..*Chief needs a key/)
   assert.equal(count(out, 'Messaged'), 1)
   assert.equal(count(out, 'Group reply.'), 1)
@@ -316,7 +360,7 @@ test('a program draws every known sub-call in dispatch order and each call once'
 test('nested group relays keep their own replies in order, each once', () => {
   const first = call('group_relay', 'program:ptc:1:ptc:1', { content: { replies: [{ botId: 'writer', text: 'First reply.' }] } })
   const second = call('group_relay', 'program:ptc:1:ptc:2', { content: { replies: [{ botId: 'writer', text: 'Second reply.' }] } })
-  const out = shown(program([call('run_code', 'program:ptc:1', { subCalls: [first, second] }), first]), { sessionId: 'room' })
+  const out = shownRelay(program([call('run_code', 'program:ptc:1', { subCalls: [first, second] }), first]), { sessionId: 'room' })
   assert.match(out, /First reply\..*Second reply\./)
   assert.equal(count(out, 'First reply.'), 1)
 })
@@ -325,7 +369,7 @@ test('cards and replies still show when the program\'s own call head left the lo
   const roster = team({ questions: { chief: question('program:ptc:3') }, secretRequests: { chief: [request('program:ptc:1')] } })
   const relay = call('group_relay', 'program:ptc:2', { content: { replies: [{ botId: 'writer', text: 'Group reply.' }] } })
   const root = { ...program([call('request_secret', 'program:ptc:1', { args: { name: 'DEMO_TOKEN' } }), relay, call('ask_user', 'program:ptc:3')]), name: '', call: null }
-  assert.match(shown(root, { roster }), /Chief needs a key.*Group reply\..*Which draft\?/)
+  assert.match(shownRelay(root, { roster }), /Chief needs a key.*Group reply\..*Which draft\?/)
 })
 
 test('each sub-call shows its own state, not its program\'s', () => {
@@ -827,9 +871,9 @@ test('a secret in a hidden turn shows in the dock instead of nowhere', () => {
 // JSON — draw the replies that survived, or a marker row, never a blank turn.
 test('a pruned group relay still draws the replies that survived', () => {
   const pruned = '{"replies":[{"botId":"writer","text":"Still here."},{"botId":"chief","text":"[... tool result middle pruned ...'
-  const out = show(call('group_relay', 'direct', { content: pruned }), { sessionId: 'room' })
+  const out = showRelay(call('group_relay', 'direct', { content: pruned }), { sessionId: 'room' })
   assert.match(text(out), /Writer.*Still here\./)
-  const gone = show(call('group_relay', 'direct', { content: '{"replies":[{"botId":"writer","text":"cut' }), { sessionId: 'room' })
+  const gone = showRelay(call('group_relay', 'direct', { content: '{"replies":[{"botId":"writer","text":"cut' }), { sessionId: 'room' })
   assert.match(text(gone), /The group replies could not be shown/)
 })
 
@@ -837,10 +881,10 @@ test('a pruned group relay still draws the replies that survived', () => {
 // not hide the replies after it either.
 test('a group relay recovers replies after the prune marker', () => {
   const between = '{"replies":[{"botId":"writer","text":"First."}[... tool result middle pruned ...],{"botId":"chief","text":"Last."}]}'
-  const out = show(call('group_relay', 'direct', { content: between }), { sessionId: 'room' })
+  const out = showRelay(call('group_relay', 'direct', { content: between }), { sessionId: 'room' })
   assert.match(text(out), /Writer.*First\..*Chief.*Last\./)
   const inside = '{"replies":[{"botId":"writer","text":"First."},{"botId":"chief","text":"cut[... tool result middle pruned ...]{"botId":"writer","text":"Last."}]}'
-  const out2 = show(call('group_relay', 'direct', { content: inside }), { sessionId: 'room' })
+  const out2 = showRelay(call('group_relay', 'direct', { content: inside }), { sessionId: 'room' })
   assert.match(text(out2), /Writer.*First\..*Last\./)
 })
 
@@ -848,7 +892,7 @@ test('a group relay recovers replies after the prune marker', () => {
 // bracketed ellipsis stays whole.
 test('a reply quoting a bracketed ellipsis is not mistaken for a prune marker', () => {
   const quoted = '{"replies":[{"botId":"writer","text":"Step [... details ...] done."}[... tool result middle pruned ...]{"botId":"chief","text":"Last."}]}'
-  const out = show(call('group_relay', 'direct', { content: quoted }), { sessionId: 'room' })
+  const out = showRelay(call('group_relay', 'direct', { content: quoted }), { sessionId: 'room' })
   assert.match(text(out), /Step \[... details ...] done\..*Chief.*Last\./)
 })
 
@@ -856,10 +900,10 @@ test('a reply quoting a bracketed ellipsis is not mistaken for a prune marker', 
 test('a PTC group relay shows its replies from the sub-call, live and after reload', async () => {
   const replies = [{ botId: 'writer', text: 'Hello from Writer.' }, { botId: 'chief', text: 'Hello from Chief.' }]
   const finished = program([call('group_relay', 'call-1-1:ptc:1', { content: { replies } })])
-  const reloaded = shown(finished, { sessionId: 'room' })
+  const reloaded = shownRelay(finished, { sessionId: 'room' })
   assert.match(reloaded, /Writer.*Hello from Writer\..*Chief.*Admin.*Hello from Chief\./)
   const headless = { ...finished, name: '', call: null }
-  assert.equal(shown(headless, { sessionId: 'room' }), reloaded)
+  assert.equal(shownRelay(headless, { sessionId: 'room' }), reloaded)
 
   const progress = [{ callId: 'other', replies: [{ botId: 'chief', text: 'Not this round.' }] }, { callId: 'call-1-1:ptc:1', replies: replies.slice(0, 1), speaking: ['chief'] }]
   const asked = []
