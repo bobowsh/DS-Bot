@@ -25,7 +25,7 @@ import { AnsweredReply, WidgetDock, WIDGET_CSS } from './widget-cell.js'
 import { HandoffDock, HANDOFF_CSS } from './handoff-card.js'
 import { AppAccessDock, ComputerHandoffDock, ComputerIndicator, COMPUTER_CSS } from './computer.js'
 import { installHeaderNavigation } from './header-navigation.js'
-import { AssistantCell, TriggerCell, Nothing, CellEmpty, TurnTailCell, TEAM_TOOLS, TeamToolView, RelayTail } from './cells.js'
+import { AssistantCell, TriggerCell, TurnProcessCell, Nothing, CellEmpty, TurnTailCell, ToolCell, RelayTail } from './cells.js'
 import { Overlays } from './overlays.js'
 import { createBotBrowsers, serveBrowserReads } from './bot-browsers.js'
 import { BROWSER_CSS } from './browser-pane.js'
@@ -852,21 +852,6 @@ export function apply(ctx) {
     settingsShell = installSettingsShell(ctx, { face, actions, ui, held: settingsShellHeld })
     return () => { settingsShell?.dispose(); settingsShell = null; offStyles() }
   }, 'ds-bot: settings shell')
-  // The face a team tool view gets: the team's own state, plus the browser and
-  // computer hooks the handover cards read.
-  const teamToolFace = sessionId => ({
-    actions,
-    sessionId,
-    hooks: {
-      roster,
-      ui,
-      work,
-      heldCards,
-      browserPages,
-      browserTabs,
-      browserHolds,
-    },
-  })
   // The queue dock's per-session verbs, supplied the way the shell's own dock
   // injects them (the session facade and the conversation service).
   const queueFace = (sessionId) => ({
@@ -1057,20 +1042,15 @@ export function apply(ctx) {
     return () => { for (const off of offs) off() }
   }
 
-  // The team's own tools ride the host's tool view slot: the host draws every
-  // call as a folded row and dispatches it by wire name, so the team keeps its
-  // own rows while every other tool falls through to the host's.
+  // The team's own tool seat: the team draws the tool rows itself, so a plain
+  // tool call shows nothing and no tool detail reaches the transcript. The seat
+  // is the host's own key, taken at the team's priority, so the host's
+  // ToolCallTree does not draw it.
   //
   // The priority is what lets the team shadow a plugin that already registered
   // the same wire name: the host refuses a second entry for a key at the same
   // priority, and that refusal takes the whole shell group down with it, so the
   // team interface never comes up. A lower priority wins the key.
-  const installTeamTools = () => {
-    const disposers = TEAM_TOOLS.map(key => ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
-      name: 'tool.call.toolview', key, locale: 'conversation', priority: BOT_PRIORITY, inject: sessionId => teamToolFace(sessionId),
-    }, TeamToolView)))
-    return () => { for (const dispose of disposers) dispose() }
-  }
 
   // The shell group paints the team surface around the session; the conversation
   // group re-skins the session itself. Each step returns a disposer from slots.inject,
@@ -1112,8 +1092,6 @@ export function apply(ctx) {
   const installShell = () => [
     () => { shellSheets += 1; return () => { shellSheets -= 1 } },
     ...SHELL_SHEETS.map(([text, tag]) => () => installCompiledStyles(text, tag)),
-    // The team's own tool views ride the host's keyed tool view slot.
-    installTeamTools,
     () => installFrameWatch(frame),
     () => installFrameSync(),
     () => installTheme(),
@@ -1140,9 +1118,13 @@ export function apply(ctx) {
     installHeader,
     () => shadow('conversation.chat.node', { key: 'assistant-step', priority: BOT_PRIORITY, locale: 'chat', inject: assistantFace }, AssistantCell),
     () => shadow('conversation.chat.node', { key: 'turn-trigger', priority: BOT_PRIORITY, locale: 'chat', inject: face }, TriggerCell),
-    // The tool rows are the host's own: DSH's tool tree draws every call as a
-    // folded row with its arguments, its result and how long it took. The team's
-    // own tools keep their rows through the host's keyed tool view slot.
+    // The team's own tool seat: the team draws the tool rows itself, so a plain
+    // tool call shows nothing and no tool detail reaches the transcript. The
+    // group's member replies and its "is typing" notice draw in this seat.
+    () => shadow('conversation.chat.node', { key: 'tool-call', priority: BOT_PRIORITY, locale: 'chat', inject: face }, ToolCell),
+    // The turn's own process seat: the team keeps the fold open, so a Bot chat
+    // is flat in every work-details mode.
+    () => shadow('conversation.chat.node', { key: 'turn-process', priority: BOT_PRIORITY, locale: 'chat', inject: face }, TurnProcessCell),
     // DSH's own turn tail stays, so what other plugins add there shows, such as the
     // cards of the files a turn delivered; its copy and branch row is hidden.
     () => shadow('conversation.chat.turnTail', { id: 'bot-relay-tail', order: 900, priority: BOT_PRIORITY, inject: face }, RelayTail),

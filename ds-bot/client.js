@@ -4217,12 +4217,13 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 [class*="_scroll"]>[class*="_column"]::before{content:var(--bt-first-sep,none);display:block;flex:none;height:28px;margin:17px 0 12px;font-size:12px;line-height:28px;text-align:center;color:var(--bt-ink-2);white-space:nowrap}
 .bt-activity{display:flex;align-items:center;gap:10px;margin:8px 0 4px 2px;font-size:14px;color:var(--bt-ink-2)}
 .bt-group-replies{display:contents}
-/* 群聊只显示对话：group_relay 的回复已由轮次尾部画在流程块外，
-   工具流程块自身塌成 0 高，这里再去掉「已完成，用时…」状态行与空座位。
-   标记由 GroupReplies 按 roomsById 命中后写到会话容器，单聊不挂标记、不受影响。 */
-[data-conversation-session][data-bt-group-chat] [data-chat-flow-kind="turn-process"]{display:none!important}
-[data-conversation-session][data-bt-group-chat] [data-step-process]{display:none!important}
-[data-conversation-session][data-bt-group-chat] [data-chat-flow-kind="tool-call"]{display:none!important}
+/* 一个 Bot 聊天在所有 work-details 模式下都是平的，不改用户自己的模式
+   （那是 DSH 的全局设置）：步骤组藏掉折叠标题、正文强制平铺展开，一轮结束后
+   被模式折起来的内容也照样显示。TurnProcessCell 也会打开那个折叠，
+   这几条规则负责第一帧。 */
+[data-step-process]>div:first-child{display:none!important}
+[data-step-process]>[data-step-process-body]{display:block!important;content-visibility:visible!important;max-height:none!important;overflow:visible!important;mask-image:none!important;scrollbar-gutter:auto!important}
+:is([data-step-process],[data-turn-process-hidden])[hidden]{content-visibility:visible!important}
 /* The work-details mode is the Host's own setting, and it decides what a finished
    turn folds away. The team follows it: the Host draws the header and the fold, and the
    rules below only take the empty seats away. */
@@ -14694,73 +14695,14 @@ function NewDivider() {
 function Nothing() {
   return null;
 }
-function relaySnapshot() {
-  return Object.fromEntries([...relayRows].map(([key, value]) => [key, value]));
-}
-function relayReset() {
-  relayRows.clear();
-  relayVersion += 1;
-  for (const watch of relayWatchers) watch();
-}
-function RelayTail({ turn: location2, sessionId, useRoster, actions, useUi, batches: given }) {
+function RelayTail({ sessionId, useRoster }) {
   const roster = useRoster?.((value) => value);
-  const turn = location2?.turn;
-  const [, force] = (0, import_react33.useState)(0);
   (0, import_react33.useEffect)(() => {
     const conv = document.querySelector?.("[data-conversation-session]");
     if (roster?.roomsById?.[sessionId]) conv?.setAttribute("data-bt-group-chat", "");
     else conv?.removeAttribute("data-bt-group-chat");
   }, [roster, sessionId]);
-  (0, import_react33.useEffect)(() => {
-    const watch = () => force((value) => value + 1);
-    relayWatchers.add(watch);
-    return () => {
-      relayWatchers.delete(watch);
-    };
-  }, []);
-  void relayVersion;
-  const batches = given ?? relayRows.get(relayKeyOf(sessionId, turn));
-  if (roster === void 0 || turn === void 0 || !batches || batches.length === 0) return null;
-  const room2 = roster.roomsById[sessionId];
-  return (0, import_react33.createElement)(
-    "div",
-    { className: "bt-group-replies" },
-    batches.flatMap((batch, batchIndex) => stackReplies(batch.rows).map(({ reply, index, texts: texts2, time, duration }) => {
-      const bot = roster.byId[reply.botId] ?? { id: reply.botId, name: reply.name ?? t("a Bot"), color: reply.color ?? "gray" };
-      const key = `relay-${batchIndex}-${reply.botId ?? reply.kind ?? "row"}-${index}`;
-      if (reply.kind === "user") {
-        return (0, import_react33.createElement)(
-          "div",
-          { key, className: "bt-urow" },
-          (0, import_react33.createElement)("div", { className: "bt-ububble" }, (0, import_react33.createElement)(import_dsh_client_ui_primitives.MarkdownText, { text: reply.text, labels: mdLabels3(), variant: "compact" })),
-          reply.via !== void 0 || Number.isFinite(time) ? (0, import_react33.createElement)("div", { key: "utime", className: "bt-utime", title: clockLabel(time) }, ...reply.via !== void 0 ? [(0, import_react33.createElement)(ViaTag, { key: "via", via: reply.via })] : [], Number.isFinite(time) ? messageClock(time) : null) : null
-        );
-      }
-      if (reply.kind === "goal") {
-        return (0, import_react33.createElement)(
-          "div",
-          { key, className: "bt-event", title: reply.text || void 0 },
-          (0, import_react33.createElement)("span", { className: "bt-event-ico", "aria-hidden": true }, (0, import_react33.createElement)(GoalIcon)),
-          goalEventText(reply)
-        );
-      }
-      if (reply.kind !== void 0) {
-        return (0, import_react33.createElement)(RelayEvent, { key, reply, bot, sessionId, actions });
-      }
-      return (0, import_react33.createElement)(GroupMessage, {
-        key,
-        bot,
-        texts: texts2,
-        room: room2,
-        roster,
-        actions,
-        msgKey: `${sessionId}:relay:${turn}:${batchIndex}:${index}`,
-        useUi,
-        time,
-        duration
-      });
-    }))
-  );
+  return null;
 }
 var SEPARATOR_GAP_MS = 30 * 60 * 1e3;
 function nextTurnStart(turns, turn) {
@@ -14955,27 +14897,7 @@ function RelayEvent({ reply, bot, sessionId, actions }) {
   }
   return null;
 }
-var relayRows = /* @__PURE__ */ new Map();
-var relayWatchers = /* @__PURE__ */ new Set();
-var relayVersion = 0;
-var relayKeyOf = (sessionId, turn) => `${sessionId}:${turn}`;
-var relayPut = (sessionId, turn, callId, rows2) => {
-  if (turn === null || turn === void 0) return;
-  const key = relayKeyOf(sessionId, turn);
-  const batches = relayRows.get(key) ?? [];
-  if (rows2 === null || rows2 === void 0 || rows2.length === 0) {
-    if (batches.length === 0) return;
-    relayRows.set(key, batches);
-    return;
-  }
-  const at = batches.findIndex((batch) => batch.callId === callId);
-  const merged = at >= 0 ? batches.map((batch, index) => index === at ? { callId, rows: rows2 } : batch) : [...batches, { callId, rows: rows2 }];
-  if (JSON.stringify(merged) === JSON.stringify(batches)) return;
-  relayRows.set(key, merged);
-  relayVersion += 1;
-  for (const watch of relayWatchers) watch();
-};
-function GroupReplies({ sessionId, callId, callTurn, done, content, roster, actions, useWork }) {
+function GroupReplies({ sessionId, callId, done, content, roster, actions, useUi, useWork }) {
   const [live, setLive] = (0, import_react33.useState)({ replies: [], speaking: [] });
   (0, import_react33.useEffect)(() => {
     if (done) return void 0;
@@ -15011,21 +14933,47 @@ function GroupReplies({ sessionId, callId, callTurn, done, content, roster, acti
     const tool = work.bots?.[id]?.tool;
     return tool ? [tool, workPhrase(work.bots[id])] : [];
   }))) ?? "[]");
-  const hostRef = (0, import_react33.useRef)(null);
-  (0, import_react33.useLayoutEffect)(() => {
-    const node = hostRef.current;
-    const callSeat = node?.closest?.("[data-chat-call-id]");
-    if (callSeat && callId !== void 0 && callSeat.getAttribute("data-chat-call-id") !== callId) return;
-    const seatTurn = callSeat?.closest?.("[data-chat-turn]")?.getAttribute("data-chat-turn") ?? null;
-    const turn = callTurn === void 0 || callTurn === null ? seatTurn : String(callTurn);
-    relayPut(sessionId, turn, callId, replies.length ? replies : null);
-  });
   if (replies.length === 0 && pending.length === 0) {
-    return broken ? (0, import_react33.createElement)("div", { className: "bt-group-replies", ref: hostRef }, (0, import_react33.createElement)("div", { className: "bt-event" }, t("The group replies could not be shown"))) : (0, import_react33.createElement)(CellEmpty);
+    return broken ? (0, import_react33.createElement)("div", { className: "bt-group-replies" }, (0, import_react33.createElement)("div", { className: "bt-event" }, t("The group replies could not be shown"))) : (0, import_react33.createElement)(CellEmpty);
   }
+  const room2 = roster.roomsById[sessionId];
   return (0, import_react33.createElement)(
     "div",
-    { className: "bt-group-replies", ref: hostRef },
+    { className: "bt-group-replies" },
+    stackReplies(replies).map(({ reply, index, texts: texts2, time, duration }) => {
+      const bot = roster.byId[reply.botId] ?? { id: reply.botId, name: reply.name, color: reply.color ?? "gray" };
+      if (reply.kind === "user") {
+        return (0, import_react33.createElement)(
+          "div",
+          { key: `user-${index}`, className: "bt-urow" },
+          (0, import_react33.createElement)("div", { className: "bt-ububble" }, (0, import_react33.createElement)(import_dsh_client_ui_primitives.MarkdownText, { text: reply.text, labels: mdLabels3(), variant: "compact" })),
+          reply.via !== void 0 || Number.isFinite(time) ? (0, import_react33.createElement)("div", { key: "utime", className: "bt-utime", title: clockLabel(time) }, ...reply.via !== void 0 ? [(0, import_react33.createElement)(ViaTag, { key: "via", via: reply.via })] : [], Number.isFinite(time) ? messageClock(time) : null) : null
+        );
+      }
+      if (reply.kind === "goal") {
+        return (0, import_react33.createElement)(
+          "div",
+          { key: `goal-${index}`, className: "bt-event", title: reply.text || void 0 },
+          (0, import_react33.createElement)("span", { className: "bt-event-ico", "aria-hidden": true }, (0, import_react33.createElement)(GoalIcon)),
+          goalEventText(reply)
+        );
+      }
+      if (reply.kind !== void 0) {
+        return (0, import_react33.createElement)(RelayEvent, { key: `${reply.botId ?? reply.kind}-${index}`, reply, bot, sessionId, actions });
+      }
+      return (0, import_react33.createElement)(GroupMessage, {
+        key: `${reply.botId}-${index}`,
+        bot,
+        texts: texts2,
+        room: room2,
+        roster,
+        actions,
+        msgKey: callId ? `${sessionId}:${callId}:${index}` : void 0,
+        useUi,
+        time,
+        duration
+      });
+    }),
     pending.map((id, at) => {
       const bot = roster.byId[id];
       if (!bot) return null;
@@ -15039,7 +14987,7 @@ function GroupReplies({ sessionId, callId, callTurn, done, content, roster, acti
     })
   );
 }
-var TEAM_TOOLS = [
+var DRAWN = /* @__PURE__ */ new Set([
   "message_bot",
   "stop_bot",
   "create_bot",
@@ -15060,7 +15008,7 @@ var TEAM_TOOLS = [
   "read_group_chat",
   "remember",
   "forget"
-];
+]);
 var isComputerCall = (name) => name === "cua" || name?.startsWith("cua_driver_native__") === true;
 var CARDS = /* @__PURE__ */ new Set(["ask_user", "request_secret", "request_connector", "mail_send", "show_view", "browser_handoff", "computer_handoff"]);
 function callTree(root) {
@@ -15085,20 +15033,12 @@ function useShownCards(actions, sessionId, callIds) {
     return () => actions.noteCards(sessionId, ids, -1);
   }, [sessionId, key]);
 }
-var blockOf = (props) => props.block;
-function TeamToolView(props) {
-  const { toolName: tool, phase } = props;
-  const call2 = blockOf(props);
-  const done = phase === "result";
+function renderTeamCall(call2, env) {
+  const { sessionId, roster, actions, useUi, useWork, heldCards, hooks } = env;
+  if (roster === void 0 || isHiddenTurn(roster, sessionId, call2.turn)) return (0, import_react33.createElement)(CellEmpty);
+  const tool = toolName(call2);
+  const done = call2.kind === "tool-result";
   const { text: arg, value: argValue } = toolArgs(call2);
-  const sessionId = props.sessionId;
-  const roster = props.useRoster?.((value) => value);
-  if (roster === void 0) return (0, import_react33.createElement)(CellEmpty);
-  if (isHiddenTurn(roster, sessionId, call2.turn)) return (0, import_react33.createElement)(CellEmpty);
-  const actions = props.actions ?? {};
-  const heldCards = props.useHeldCards?.((state) => state[sessionId]);
-  const useWork = props.useWork;
-  const hooks = { useBrowserHolds: props.useBrowserHolds, useBrowserTabs: props.useBrowserTabs, useBrowserPages: props.useBrowserPages };
   const self = roster.byId[sessionId];
   const findBot = (nameOrId) => roster.byId[nameOrId] ?? roster.bots.find((bot) => bot.name.toLowerCase() === String(nameOrId ?? "").toLowerCase());
   useShownCards(actions, sessionId, CARDS.has(tool) && call2.callId ? [call2.callId] : []);
@@ -15125,7 +15065,7 @@ function TeamToolView(props) {
       return done && target ? (0, import_react33.createElement)(EventLine, { prefix: t("Updated"), bots: [target], onOpen: (bot) => actions.openSession(bot.id) }) : (0, import_react33.createElement)(CellEmpty);
     }
     case "group_relay":
-      return (0, import_react33.createElement)(GroupReplies, { sessionId, callId: call2.callId, callTurn: call2.turn, done, content: call2.content, roster, actions, useWork });
+      return (0, import_react33.createElement)(GroupReplies, { sessionId, callId: call2.callId, done, content: call2.content, roster, actions, useUi, useWork });
     case "create_group":
     case "update_group":
     case "delete_group":
@@ -15200,6 +15140,42 @@ function TeamToolView(props) {
       }
       return (0, import_react33.createElement)(CellEmpty);
   }
+}
+function ToolCell({ node, sessionId, useRoster, useUi, useWork, useHeldCards, useBrowserHolds, useBrowserTabs, useBrowserPages, useComputer, actions }) {
+  const roster = useRoster((value) => value);
+  const heldCards = useHeldCards?.((state) => state[sessionId]);
+  const root = node.data.root;
+  const turn = node.location?.turn?.turn ?? root.turn;
+  const hidden = isHiddenTurn(roster, sessionId, turn);
+  const findBot = (nameOrId) => roster.byId[nameOrId] ?? roster.bots.find((bot) => bot.name.toLowerCase() === String(nameOrId ?? "").toLowerCase());
+  const closed = roster.closedCards?.[sessionId];
+  const calls = hidden ? callTree(root).filter((call2) => (toolName(call2) === "ask_user" || toolName(call2) === "show_view") && call2.callId && closed?.[call2.callId] !== void 0) : callTree(root);
+  const drawn = calls.filter((call2) => DRAWN.has(toolName(call2)) || isComputerCall(toolName(call2)));
+  const running = root.kind === "tool-result" ? void 0 : calls.findLast((call2) => call2.kind !== "tool-result");
+  const note = running ? toolActivity(toolName(running), toolArgs(running).text, findBot, roster.byId[sessionId]) : null;
+  useLiveNote(actions, sessionId, `tool:${root.callId ?? node.key}`, note);
+  useShownCards(actions, sessionId, drawn.filter((call2) => (CARDS.has(toolName(call2)) || isComputerCall(toolName(call2))) && call2.callId).map((call2) => call2.callId));
+  if (drawn.length === 0) return (0, import_react33.createElement)(CellEmpty);
+  const env = { sessionId, roster, actions, useUi, useWork, findBot, heldCards, hooks: { useBrowserHolds, useBrowserTabs, useBrowserPages, useComputer } };
+  return (0, import_react33.createElement)(import_react33.Fragment, null, drawn.map((call2, index) => (0, import_react33.createElement)(import_react33.Fragment, { key: call2.callId ?? index }, renderTeamCall(call2, env))));
+}
+function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTurnClock, actions }) {
+  const open = turnProcess === void 0 || !turnProcess.foldable || turnProcess.open;
+  (0, import_react33.useEffect)(() => {
+    if (!open) turnProcess.setOpen(true);
+  }, [open, turnProcess]);
+  const turn = node?.location?.turn?.turn ?? node?.data?.turn;
+  const start = node?.location?.turn?.start?.time;
+  const hidden = useRoster((roster) => isHiddenTurn(roster, sessionId, turn));
+  (0, import_react33.useEffect)(() => {
+    actions.noteTurnTime(sessionId, turn, "first", start);
+  }, [sessionId, turn, start]);
+  const visit = useUi((state) => state.visits?.[sessionId]);
+  const fresh = useTurnClock((state) => {
+    const own = state[sessionId]?.[turn];
+    return !hidden && typeof visit?.seen === "number" && own?.first !== void 0 && own.first <= visit.seen && own?.end !== void 0 && own.end > visit.seen && own.end <= visit.entered;
+  });
+  return fresh ? (0, import_react33.createElement)(NewDivider) : (0, import_react33.createElement)(CellEmpty);
 }
 
 // src/client/activity-row.js
@@ -29900,19 +29876,6 @@ function apply(ctx) {
       offStyles();
     };
   }, "ds-bot: settings shell");
-  const teamToolFace = (sessionId) => ({
-    actions,
-    sessionId,
-    hooks: {
-      roster,
-      ui: ui2,
-      work,
-      heldCards,
-      browserPages,
-      browserTabs,
-      browserHolds
-    }
-  });
   const queueFace = (sessionId) => ({
     ...face(),
     updateQueue: async (itemId, action) => await ctx.sessions.binding(sessionId)?.session?.updateQueue(itemId, action) ?? { ok: false },
@@ -30082,18 +30045,6 @@ function apply(ctx) {
       for (const off of offs) off();
     };
   };
-  const installTeamTools = () => {
-    const disposers = TEAM_TOOLS.map((key) => ctx.slots.inject("tool.call.toolview", () => ctx.slots.register({
-      name: "tool.call.toolview",
-      key,
-      locale: "conversation",
-      priority: BOT_PRIORITY,
-      inject: (sessionId) => teamToolFace(sessionId)
-    }, TeamToolView)));
-    return () => {
-      for (const dispose of disposers) dispose();
-    };
-  };
   const SHELL_SHEETS = [
     [SHELL_CSS, "shell"],
     [SIDEBAR_CSS, "sidebar"],
@@ -30136,8 +30087,6 @@ function apply(ctx) {
       };
     },
     ...SHELL_SHEETS.map(([text, tag]) => () => installCompiledStyles(text, tag)),
-    // The team's own tool views ride the host's keyed tool view slot.
-    installTeamTools,
     () => installFrameWatch(frame),
     () => installFrameSync(),
     () => installTheme(),
@@ -30163,9 +30112,13 @@ function apply(ctx) {
     installHeader,
     () => shadow("conversation.chat.node", { key: "assistant-step", priority: BOT_PRIORITY, locale: "chat", inject: assistantFace }, AssistantCell),
     () => shadow("conversation.chat.node", { key: "turn-trigger", priority: BOT_PRIORITY, locale: "chat", inject: face }, TriggerCell),
-    // The tool rows are the host's own: DSH's tool tree draws every call as a
-    // folded row with its arguments, its result and how long it took. The team's
-    // own tools keep their rows through the host's keyed tool view slot.
+    // The team's own tool seat: the team draws the tool rows itself, so a plain
+    // tool call shows nothing and no tool detail reaches the transcript. The
+    // group's member replies and its "is typing" notice draw in this seat.
+    () => shadow("conversation.chat.node", { key: "tool-call", priority: BOT_PRIORITY, locale: "chat", inject: face }, ToolCell),
+    // The turn's own process seat: the team keeps the fold open, so a Bot chat
+    // is flat in every work-details mode.
+    () => shadow("conversation.chat.node", { key: "turn-process", priority: BOT_PRIORITY, locale: "chat", inject: face }, TurnProcessCell),
     // DSH's own turn tail stays, so what other plugins add there shows, such as the
     // cards of the files a turn delivered; its copy and branch row is hidden.
     () => shadow("conversation.chat.turnTail", { id: "bot-relay-tail", order: 900, priority: BOT_PRIORITY, inject: face }, RelayTail),
