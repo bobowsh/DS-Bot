@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { build } from 'esbuild'
 
@@ -191,4 +192,31 @@ test('the reply library keeps one entry per session and turn', () => {
   assert.deepEqual(Object.keys(snapshot), ['room:1'])
   assert.equal(snapshot['room:1'][0].callId, 'c1')
   assert.equal(snapshot['room:1'][0].rows[0].text, 'Draft is up.')
+})
+
+// 群视图里藏掉的都是「非对话」的东西：轮次状态行、工具流程块、工具调用座位。
+// 成员名、角色、时间、气泡、事件行、错误提示行都留着——它们画在轮次尾部，
+// 不在那些被藏的座位里。
+test('the group styles hide the status row, the tool block and the tool seats', () => {
+  const styles = readFileSync(fileURLToPath(new URL('../src/client/styles.js', import.meta.url)), 'utf8')
+  const hides = styles.split('\n').filter(line => line.includes('[data-bt-group-chat]') && line.includes('display:none'))
+  assert.ok(hides.length > 0, '群视图的样式规则不见了')
+  assert.ok(hides.some(line => line.includes('[data-step-process]')), '工具流程块应被隐藏')
+  assert.ok(hides.some(line => line.includes('[data-chat-flow-kind="tool-call"]')), '工具调用座位应被隐藏')
+  assert.ok(hides.some(line => line.includes('[data-chat-flow-kind="turn-process"]')), '轮次状态行应被隐藏')
+})
+
+// 保留项都在轮次尾部画，因此不在被隐藏的座位里：它们由 RelayTail 渲染，
+// 而 RelayTail 挂在 conversation.chat.turnTail 插槽上，不在工具座位里。
+test('the kept rows live in the turn tail, not in a hidden tool seat', () => {
+  relayReset()
+  const replies = [{ botId: 'writer', text: 'Draft is up.', time: 1700000000000 }]
+  expand(TeamToolView(toolProps(relayCall('c1', replies))))
+  mount()
+  const tail = tailOf('room', 1)
+  assert.equal(findAll(tail, node => node.props?.className === 'bt-group-msg').length, 1)
+  assert.equal(findAll(tail, node => node.props?.className === 'bt-group-name').length, 1)
+  assert.equal(findAll(tail, node => node.props?.className === 'bt-group-time').length, 1)
+  // 尾部本身是一个 turn-tail 座位，不是工具座位。
+  assert.match(text(tail), /Writer.*Draft is up\./)
 })

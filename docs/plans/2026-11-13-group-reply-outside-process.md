@@ -50,6 +50,25 @@ PR #44 把文字当成成员私聊里 `assistant-step` 渲染的内容，去改 
 3. **群视图标记**：`RelayTail` 按 `roster.roomsById[sessionId]` 精确设置/清除会话容器上的 `data-bt-group-chat`（单聊必须主动清除，否则切会话后标记残留会把单聊工具块也藏掉——这个 bug 在验收时真实出现过，已修）。
 4. **CSS 兜底**：只对带 `data-bt-group-chat` 的容器隐藏 `[data-step-process]`、`[data-chat-flow-kind="turn-process"]`、`[data-chat-flow-kind="tool-call"]`。单聊不挂标记，完全不受影响。
 
+### 最终口径（用户逐项点名，2026-11-14）
+
+| 群视图里的东西 | 处理 |
+|---|---|
+| 轮次状态行「已完成，用时 N 秒」 | **隐藏** |
+| 工具流程块「已调用工具」 | **隐藏** |
+| 工具调用座位 | **隐藏** |
+| 成员名、角色（管理员等） | 保留 |
+| 消息时间 | 保留 |
+| 成员气泡 | 保留，且画在流程块之外 |
+| 事件行（paused / admin-passed 等） | 保留 |
+| 错误提示行 | 保留 |
+
+保留项都随成员气泡一起画在轮次尾部（`conversation.chat.turnTail`），因此隐藏工具座位不影响它们。
+
+### 已知限制
+
+**卡片（ask_user / show_view）在群视图会随 tool-call 座位一起隐藏。** 转录里的卡片由 `TeamToolView` 画在 `tool-call` 座位内（`cells.js` 的 `case 'ask_user'` → `.bt-q-inline`），而群视图隐藏了这个座位。实测群聊走 `group_relay` 路径时**不产生这类卡片**（成员在群里不会发 ask_user），所以目前没有实际损失；若将来群里出现卡片，需要把它像成员回复一样搬到轮次尾部。输入框上方的 dock（`conversation.input.dock`）不在座位内，不受影响。
+
 ## 验收标准
 
 1. 群聊页面里没有「已调用工具」块、没有工具行、没有「已完成，用时」状态行。
