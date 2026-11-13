@@ -9,7 +9,7 @@ import { build } from 'esbuild'
 const { outputFiles } = await build({
   stdin: {
     contents: [
-      "export { TeamToolView, TriggerCell, callTree, CellEmpty, Bubbles, RelayTail, relaySnapshot, relayReset } from './src/client/cells.js'",
+      "export { renderTeamCall, ToolCell, TriggerCell, callTree, CellEmpty, Bubbles, RelayTail } from './src/client/cells.js'",
       "export { stackReplies } from './src/shared/group-replies.js'",
       "export { QuestionDock, SettledQuestion } from './src/client/questions.js'",
       "export { SecretDock } from './src/client/secret-card.js'",
@@ -71,7 +71,7 @@ runInNewContext(outputFiles[0].text, {
     throw new Error(`Unexpected platform module ${name}`)
   },
 })
-const { TeamToolView, TriggerCell, callTree, stackReplies, CellEmpty, Bubbles, RelayTail, relaySnapshot, relayReset, QuestionDock, SettledQuestion, SecretDock, countCards, ViewMenuList, WidgetView, WidgetDock } = module.exports
+const { renderTeamCall, ToolCell, TriggerCell, callTree, stackReplies, CellEmpty, Bubbles, QuestionDock, SettledQuestion, SecretDock, countCards, ViewMenuList, WidgetView, WidgetDock } = module.exports
 
 // Runs the effects collected since the last render; returns the cleanups.
 const mount = () => {
@@ -224,18 +224,24 @@ test('a group post drawn from its trigger shows the time it came in', () => {
   effects = []
 })
 
-// #1: the host draws the tool rows and dispatches each call to the view
-// registered under its wire name. The team's tools register there, so the test
-// drives that view the way the host does.
+// 上游式：团队自己注册 tool-call 座位，用自己的 ToolCell 画团队的工具行。
+// 这个测试直接驱动那个渲染：团队的调用画出来，别的调用不画。
 const props = (root, { sessionId = chief.id, roster = team(), actions = {}, turn = 1, held = {} } = {}) => ({
   sessionId,
-  toolName: root?.name ?? root?.call?.name ?? '',
-  phase: root?.kind === 'tool-result' ? 'result' : 'start',
-  block: root?.kind === 'tool-result'
-    ? { ...root, turn: root.turn ?? turn }
-    : { phase: 'start', name: root?.name ?? root?.call?.name ?? '', callId: root?.callId, argsRaw: root?.argsRaw ?? root?.call?.argsRaw ?? '', subCalls: root?.subCalls ?? [], turn: root?.turn ?? turn },  useRoster: select => select(roster), useUi: select => select({ reactions: {}, visits: {} }), actions,
-  useHeldCards: select => select(held),
+  turn,
+  roster,
+  actions: { noteLive: () => {}, ...actions },
+  useUi: select => select({ reactions: {}, visits: {} }),
+  useWork: select => select({ bots: {} }),
+  heldCards: held[sessionId],
+  hooks: {},
 })
+// 一次调用：宿主交给座位的东西（准备中或已定的结果）。
+const blockOf = (root, turn) => root?.kind === 'tool-result'
+  ? { ...root, turn: root.turn ?? turn }
+  : { phase: 'start', name: root?.name ?? root?.call?.name ?? '', callId: root?.callId, argsRaw: root?.argsRaw ?? root?.call?.argsRaw ?? '', subCalls: root?.subCalls ?? [], turn: root?.turn ?? turn }
+// 团队的工具行：渲染一次调用。
+const teamRow = (root, options = {}) => expand(renderTeamCall(blockOf(root, options.turn ?? 1), props(root, options)))
 
 // The host walks the call tree and dispatches every call to the view under its
 // wire name. The team has a view for its own tools and none for the rest, so
@@ -260,7 +266,7 @@ const show = (root, options) => {
     const id = call.callId ?? call
     if (seen.has(id)) return
     seen.add(id)
-    if (isTeam(call)) out.push(expand(TeamToolView(props(call, options))))
+    if (isTeam(call)) out.push(teamRow(call, options))
     for (const child of call.subCalls ?? []) visit(child)
   }
   visit(root)
@@ -269,46 +275,10 @@ const show = (root, options) => {
 }
 const shown = (root, options) => text(show(root, options))
 
-// 群聊的成员气泡不再画在工具行里：工具行把回复交给轮次尾部，由 RelayTail 画。
-// 这个辅助先渲染工具行并跑它的 effect（它把回复交给轮次尾部），再渲染尾部，把两者合起来看。
-const showRelay = (root, options = {}) => {
-  const roster = options.roster ?? team()
-  // 回复库是模块级的，每个用例从空的状态开始。
-  relayReset()
-  // 工具行：走整棵调用树，渲染后立刻跑 effect（工具行把回复交给轮次尾部）。
-  // 顺序按调用先后：每个工具行后面紧跟它自己那一份回复，和原来工具行内画气泡时一致。
-  const out = []
-  const seen = new Set()
-  const visit = call => {
-    if (call === undefined || call === null) return
-    const id = call.callId ?? call
-    if (seen.has(id)) return
-    seen.add(id)
-    if (isTeam(call)) {
-      out.push(expand(TeamToolView(props(call, { ...options, roster }))))
-      mount()
-      // 这一行自己的回复：只看它这次调用交上来的那一份（尾部在真实界面里按轮次汇总，
-      // 这里按调用拆开，顺序与原来「气泡画在工具行里」时一致）。
-      const own = relaySnapshot()[`${options.sessionId ?? chief.id}:${options.turn ?? 1}`] ?? []
-      const batch = own.find(entry => entry.callId === id)
-      if (batch !== undefined) {
-        out.push(expand(RelayTail({
-          turn: { turn: options.turn ?? 1 },
-          sessionId: options.sessionId ?? chief.id,
-          useRoster: select => select(roster),
-          actions: options.actions ?? {},
-          useUi: select => select({ reactions: {}, visits: {} }),
-          batches: [batch],
-        })))
-      }
-    }
-    for (const child of call.subCalls ?? []) visit(child)
-  }
-  visit(root)
-  effects = []
-  return out.flat()
-}
-const shownRelay = (root, options) => text(showRelay(root, options))
+// 群聊的成员气泡就地画在团队的工具行里（上游式），所以它跟别的工具一样走
+// showRelay 这个辅助。
+const showRelay = show
+const shownRelay = shown
 
 // One finished call of every kind ToolCell draws, and what it shows.
 const BRANCHES = [
@@ -384,15 +354,27 @@ test('each sub-call shows its own state, not its program\'s', () => {
   assert.match(shown(program([refused, posted])), /Couldn't post in the group.*Posted in.*Ops/)
 })
 
+// 团队自己的工具座位（上游式）：座位里只画团队的工具，别的工具一个都不画，
+// 所以群里看不到工具名、参数与输出。
+const seatOf = (root, options = {}) => expand(ToolCell({
+  node: { data: { root: blockOf(root, options.turn ?? 1) }, location: { turn: { turn: options.turn ?? 1 } } },
+  sessionId: options.sessionId ?? chief.id,
+  useRoster: select => select(options.roster ?? team()),
+  useUi: select => select({ reactions: {}, visits: {} }),
+  useWork: select => select({ bots: {} }),
+  useHeldCards: select => select(options.held ?? {}),
+  actions: { noteLive: () => {}, ...options.actions },
+}))
+
 // #1: the host draws every tool call, so a program is a container and its own
 // row is the host's generic one; the tools it dispatched are the host's rows.
 // The team draws only its own tools.
 test('the host draws the ordinary tools, and the team draws only its own', () => {
-  // An ordinary tool is not the team's, so the team has no view for it.
-  assert.ok(emptied(TeamToolView(props(call('bash', 'direct')))))
+  // An ordinary tool is not the team's, so the team draws nothing for it.
+  assert.ok(emptied(seatOf(call('bash', 'direct'))))
   // A program is a container: its sub-calls are the rows, not the program.
-  assert.ok(emptied(TeamToolView(props(program([])))))
-  assert.ok(emptied(TeamToolView(props(program([call('bash', 'program:ptc:1')])))))
+  assert.ok(emptied(seatOf(program([]))))
+  assert.ok(emptied(seatOf(program([call('bash', 'program:ptc:1')]))))
   effects = []
 })
 
@@ -424,7 +406,7 @@ test('every call that draws nothing leaves only the empty mark, so its seat can 
     call('ask_user_question', 'aq-call', { args: { questions: [{ question: 'Ship it?' }] }, running: true }),
     call('remember', 'm-call', { running: true }),
   ]) {
-    assert.ok(onlyMarks(TeamToolView(props(root, { roster, held }))), `${root.name} leaves only marks`)
+    assert.ok(onlyMarks(teamRow(root, { roster, held })), `${root.name} leaves only marks`)
     effects = []
   }
 })
@@ -451,15 +433,15 @@ const slotOf = (out) => {
 test('a node holding a visible event next to a mark is not emptied', () => {
   const actions = { noteLive() {}, noteCards() {} }
   // Marks alone: emptied, so the row or seat wrapping the slot may hide.
-  const alone = slotOf(TeamToolView(props(call('ask_user', 'direct'), { actions })))
+  const alone = slotOf(teamRow(call('ask_user', 'direct'), { actions }))
   mount()
   assert.equal(alone.dataset.btEmptied, '')
 
   // The host's tree holds "Messaged Writer" and an answered question's mark:
   // the event stays, so the node is not emptied.
   const mixed = slotOf([
-    expand(TeamToolView(props(call('message_bot', 'program:ptc:1', { args: { to: 'Writer' } }), { actions }))),
-    expand(TeamToolView(props(call('ask_user', 'program:ptc:2'), { actions }))),
+    teamRow(call('message_bot', 'program:ptc:1', { args: { to: 'Writer' } }), { actions }),
+    teamRow(call('ask_user', 'program:ptc:2'), { actions }),
   ])
   mount()
   assert.ok(mixed.childNodes.some(kid => kid.hasAttribute('data-bt-empty')), 'the answered question marks itself')
@@ -635,7 +617,7 @@ const notes = (root, options = {}) => {
     const id = call.callId ?? call
     if (seen.has(id)) return
     seen.add(id)
-    if (isTeam(call)) TeamToolView(props(call, { ...options, actions }))
+    if (isTeam(call)) renderTeamCall(blockOf(call, options.turn ?? 1), props(call, { ...options, actions }))
     for (const child of call.subCalls ?? []) visit(child)
   }
   visit(root)
@@ -681,7 +663,7 @@ const draw = (root, store, options = {}) => {
     if (seen.has(id)) return
     seen.add(id)
     if (isTeam(call)) {
-      TeamToolView(props(call, { ...options, actions: { noteCards: store.noteCards } }))
+      renderTeamCall(blockOf(call, options.turn ?? 1), props(call, { ...options, actions: { noteCards: store.noteCards } }))
       unmounts.push(mount())
     }
     for (const child of call.subCalls ?? []) visit(child)
@@ -910,7 +892,7 @@ test('a PTC group relay shows its replies from the sub-call, live and after relo
   const actions = { roomProgress: async (id) => { asked.push(id); return progress } }
   const running = program([call('group_relay', 'call-1-1:ptc:1', { running: true })], { running: true })
   // The host dispatches the relay sub-call itself, not the program around it.
-  const relay = find(TeamToolView(props(running.subCalls[0], { sessionId: 'room', actions })), node => node.type?.name === 'GroupReplies')
+  const relay = find(renderTeamCall(blockOf(running.subCalls[0], 1), props(running.subCalls[0], { sessionId: 'room', actions })), node => node.type?.name === 'GroupReplies')
   effects = []
   sets.length = 0
   relay.type(relay.props)
