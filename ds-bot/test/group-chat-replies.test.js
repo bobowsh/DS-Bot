@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { build } from 'esbuild'
 
@@ -191,4 +192,17 @@ test('the reply library keeps one entry per session and turn', () => {
   assert.deepEqual(Object.keys(snapshot), ['room:1'])
   assert.equal(snapshot['room:1'][0].callId, 'c1')
   assert.equal(snapshot['room:1'][0].rows[0].text, 'Draft is up.')
+})
+
+// 群视图只藏工具调用明细：轮次状态行「已完成，用时 N 秒」是提示信息，要留着。
+test('the group styles hide the tool rows but keep the turn status row', () => {
+  const styles = readFileSync(fileURLToPath(new URL('../src/client/styles.js', import.meta.url)), 'utf8')
+  const groupRules = styles.split('\n').filter(line => line.includes('[data-bt-group-chat]'))
+  assert.ok(groupRules.length > 0, '群视图的样式规则不见了')
+  const hides = groupRules.filter(line => line.includes('display:none'))
+  // 工具流程块与工具调用座位：藏。
+  assert.ok(hides.some(line => line.includes('[data-step-process]')))
+  assert.ok(hides.some(line => line.includes('[data-chat-flow-kind="tool-call"]')))
+  // 轮次状态行：不藏——用户反馈丢了提示信息。
+  assert.ok(!hides.some(line => line.includes('[data-chat-flow-kind="turn-process"]')))
 })
