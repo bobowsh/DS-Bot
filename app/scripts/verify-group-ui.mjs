@@ -198,6 +198,43 @@ try {
   await shot('04-final.png')
   writeFileSync(join(out, 'dom.json'), JSON.stringify({ firstNotice, firstBubble, afterBubble, finalDom }, null, 2))
 
+  // 单聊：工具过程照旧显示（折叠标题仍由宿主画、正文平铺，但团队自己的行在）。
+  const openedChat = await evaluate(`(() => {
+    const row = document.querySelector('.bt-row[data-bot-id="${writer.id}"]')
+    if (!row) return 'no-row'
+    row.click()
+    return 'clicked'
+  })()`)
+  console.log('verify: open private chat =', openedChat)
+  await sleep(2500)
+  // 让它调一次团队自己的工具（remember 在白名单里），这样单聊里就有 tool-call 座位，
+  // 能看出团队的行走的是我们自绘的 ToolCell。
+  await api('send', { sessionId: writer.id, text: '记住 单聊工具行测试' })
+  await sleep(8000)
+  const privateDom = JSON.parse(await evaluate(`(() => {
+    const conv = document.querySelector('[data-conversation-session]')
+    const header = document.querySelector('[data-step-process] > div:first-child')
+    const body = document.querySelector('[data-step-process] > [data-step-process-body]')
+    const seat = document.querySelector('[data-chat-flow-kind="tool-call"]')
+    const text = conv?.innerText ?? ''
+    return JSON.stringify({
+      groupMarked: conv?.hasAttribute('data-bt-group-chat') ?? null,
+      toolSeat: seat ? seat.getAttribute('data-chat-flow-kind') : null,
+      toolSeatCount: document.querySelectorAll('[data-chat-flow-kind="tool-call"]').length,
+      foldHeaderPresent: header !== null,
+      foldHeaderVisible: header ? getComputedStyle(header).display !== 'none' : null,
+      bodyDisplay: body ? getComputedStyle(body).display : null,
+      // 团队自己的行（事件行 / 成员气泡）还在不在
+      events: document.querySelectorAll('.bt-event').length,
+      bubbles: document.querySelectorAll('.bt-group-msg').length,
+      hasToolHeaderText: text.includes('已调用工具') || text.includes('Called tools'),
+      text: text.slice(0, 800),
+    })
+  })()`))
+  console.log('verify: 单聊 DOM =', JSON.stringify(privateDom))
+  await shot('05-private-chat.png')
+  writeFileSync(join(out, 'dom-private.json'), JSON.stringify(privateDom, null, 2))
+
   dev.close()
   void child.kill()
   mock.kill()
