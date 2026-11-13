@@ -1,3 +1,22 @@
+// The host calls a Turn's answer the step it ends on, and only when that step has
+// reply text and no tool call left (ui-chat's latestAnswer). A Turn that ends on a
+// tool call — every group round ends on group_relay — therefore has no answer: the
+// host shows `answerStep` as null and files every step into the process block, so
+// the reader's only copy of the reply sits folded with the tools.
+//
+// A Turn without an answer still has something to show: its last step that is
+// reply text and nothing else. That step is the reply paragraph the Bot wrote
+// before its final call, and it reads as one here rather than staying in the fold.
+export function answerlessReply(steps, turnProcess) {
+  const spec = turnProcess?.spec
+  if (spec === undefined || spec.answerStep !== null) return undefined
+  return steps.findLast(step => texts(step).length > 0 && !hasToolCall(step))
+}
+
+// Whether the step called a tool. A step's blocks are the assistant message's own,
+// so a call still in flight keeps the step out of the reply paragraph.
+const hasToolCall = step => (step.blocks ?? []).some(block => block.kind === 'tool-call')
+
 // Settled and live reasoning of every loaded step in a Turn, shown once on the last
 // step that has reasoning: only steps with reasoning get a reasoning part to render
 // it. Sitting under the Turn's tool lines keeps the row directly above the reply.

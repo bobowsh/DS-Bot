@@ -13176,6 +13176,12 @@ var CONNECTOR_CSS = `
 `;
 
 // src/client/turn-reasoning.js
+function answerlessReply(steps, turnProcess) {
+  const spec = turnProcess?.spec;
+  if (spec === void 0 || spec.answerStep !== null) return void 0;
+  return steps.findLast((step) => texts(step).length > 0 && !hasToolCall(step));
+}
+var hasToolCall = (step) => (step.blocks ?? []).some((block) => block.kind === "tool-call");
 function turnReasoning(steps, current) {
   const members = steps.length ? steps : [current];
   if (members.findLast((step) => stepReasoning(step) !== "")?.step !== current.step) return "";
@@ -14212,6 +14218,8 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
   const members = steps.length ? steps : [data];
   const shown = thinkingShown(roster.prefs, useWorkDetails?.((value) => value));
   const folded = roster.prefs?.processShown === false || turnProcess !== void 0 && turnProcess.foldable && !turnProcess.open;
+  const answer = answerlessReply(steps, turnProcess);
+  const answers = answer !== void 0 && answer.step === data.step;
   const reasoning = groupPart === "response" || !shown ? "" : turnReasoning(steps, data);
   const thinking = groupPart === "response" || !shown ? void 0 : thinkingStep(members);
   const ms = useThinkingMs({ sessionId, turn: data.turn, settledSteps: members.filter((step) => step.status !== "running").length, skip: hidden || reasoning === "" });
@@ -14219,6 +14227,9 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
   if (hidden) return (0, import_react33.createElement)(CellEmpty);
   const relays = relayPart(data, groupPart) ? relaysBefore(contexts, steps, data) : [];
   const activity = groupPart === "response" ? [] : stepActivity(data);
+  if (answers && texts2.length > 0) {
+    return (0, import_react33.createElement)(Bubbles, { texts: texts2, roster, selfId: roster.byId[sessionId]?.id ?? sessionId, actions, streaming: running, sessionId, msgKey: `${sessionId}:${data.turn}:${node.key ?? data.seq ?? ""}`, useUi, mentions, fold: FOLD_HUGE });
+  }
   if (texts2.length === 0 && !reasoning && relays.length === 0 && activity.length === 0) return (0, import_react33.createElement)(CellEmpty);
   const selfId = roster.byId[sessionId]?.id ?? sessionId;
   const speaker = layoutOf(roster.prefs) === "flat" ? roster.byId[sessionId] : void 0;

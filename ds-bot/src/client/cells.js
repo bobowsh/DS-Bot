@@ -17,7 +17,7 @@ import { AppAccessCall, ComputerCallRow, ComputerHandoffCall } from './computer.
 import { t } from './i18n.js'
 import { call } from './api.js'
 import { failureLabel } from './diagnostics.js'
-import { turnReasoning, thinkingStep, opensReply, stepActivity } from './turn-reasoning.js'
+import { turnReasoning, thinkingStep, opensReply, stepActivity, answerlessReply } from './turn-reasoning.js'
 import { parseReplies, stackReplies } from '../shared/group-replies.js'
 import { FOLD_AT, FOLD_HUGE, stripLongNote, useFold } from './fold.js'
 import { noHover, useViewport, viewBottom } from './motion.js'
@@ -283,6 +283,11 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   // not drawn at all, whatever the host's own mode says.
   const folded = roster.prefs?.processShown === false
     || (turnProcess !== undefined && turnProcess.foldable && !turnProcess.open)
+  // A Turn the host called answerless keeps its reply in the process block with its
+  // tools; the reply paragraph stands as its own row instead, the way the host shows
+  // a Turn's answer when it ends on one (turn-reasoning.js: answerlessReply).
+  const answer = answerlessReply(steps, turnProcess)
+  const answers = answer !== undefined && answer.step === data.step
   // The host folds a finished turn's process rows behind the turn's own control, except in
   // the fully expanded mode. The team draws the rows itself, so it makes the same decision
   // here: a turn that is still running keeps its rows, a finished one folds them and leaves
@@ -300,6 +305,12 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   // once, in the step's first cell.
   const relays = relayPart(data, groupPart) ? relaysBefore(contexts, steps, data) : []
   const activity = groupPart === 'response' ? [] : stepActivity(data)
+  // The reply of an answerless Turn is its own row: the host files every step of such
+  // a Turn into the process block, so this bubble is what keeps the reply out of the
+  // fold and in the chat as one paragraph.
+  if (answers && texts.length > 0) {
+    return h(Bubbles, { texts, roster, selfId: roster.byId[sessionId]?.id ?? sessionId, actions, streaming: running, sessionId, msgKey: `${sessionId}:${data.turn}:${node.key ?? data.seq ?? ''}`, useUi, mentions, fold: FOLD_HUGE })
+  }
   if (texts.length === 0 && !reasoning && relays.length === 0 && activity.length === 0) return h(CellEmpty)
   const selfId = roster.byId[sessionId]?.id ?? sessionId
   // The flat layout heads a reply with who speaks, once per Turn: in the step that opens
