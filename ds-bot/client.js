@@ -14987,7 +14987,7 @@ function GroupReplies({ sessionId, callId, done, content, roster, actions, useUi
     })
   );
 }
-var DRAWN = /* @__PURE__ */ new Set([
+var TEAM_TOOLS = [
   "message_bot",
   "stop_bot",
   "create_bot",
@@ -15008,7 +15008,8 @@ var DRAWN = /* @__PURE__ */ new Set([
   "read_group_chat",
   "remember",
   "forget"
-]);
+];
+var DRAWN = new Set(TEAM_TOOLS);
 var isComputerCall = (name) => name === "cua" || name?.startsWith("cua_driver_native__") === true;
 var CARDS = /* @__PURE__ */ new Set(["ask_user", "request_secret", "request_connector", "mail_send", "show_view", "browser_handoff", "computer_handoff"]);
 function callTree(root) {
@@ -15033,6 +15034,7 @@ function useShownCards(actions, sessionId, callIds) {
     return () => actions.noteCards(sessionId, ids, -1);
   }, [sessionId, key]);
 }
+var blockOf = (props) => props.block;
 function renderTeamCall(call2, env) {
   const { sessionId, roster, actions, useUi, useWork, heldCards, hooks } = env;
   if (roster === void 0 || isHiddenTurn(roster, sessionId, call2.turn)) return (0, import_react33.createElement)(CellEmpty);
@@ -15158,6 +15160,23 @@ function ToolCell({ node, sessionId, useRoster, useUi, useWork, useHeldCards, us
   if (drawn.length === 0) return (0, import_react33.createElement)(CellEmpty);
   const env = { sessionId, roster, actions, useUi, useWork, findBot, heldCards, hooks: { useBrowserHolds, useBrowserTabs, useBrowserPages, useComputer } };
   return (0, import_react33.createElement)(import_react33.Fragment, null, drawn.map((call2, index) => (0, import_react33.createElement)(import_react33.Fragment, { key: call2.callId ?? index }, renderTeamCall(call2, env))));
+}
+function TeamToolView(props) {
+  const call2 = blockOf(props);
+  const sessionId = props.sessionId;
+  const roster = props.useRoster?.((value) => value);
+  if (roster === void 0) return (0, import_react33.createElement)(CellEmpty);
+  if (isHiddenTurn(roster, sessionId, call2.turn)) return (0, import_react33.createElement)(CellEmpty);
+  const env = {
+    sessionId,
+    roster,
+    actions: props.actions ?? {},
+    useUi: props.useUi,
+    useWork: props.useWork,
+    heldCards: props.useHeldCards?.((state) => state[sessionId]),
+    hooks: { useBrowserHolds: props.useBrowserHolds, useBrowserTabs: props.useBrowserTabs, useBrowserPages: props.useBrowserPages, useComputer: props.useComputer }
+  };
+  return renderTeamCall(call2, env);
 }
 function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTurnClock, actions }) {
   const open = turnProcess === void 0 || !turnProcess.foldable || turnProcess.open;
@@ -29876,6 +29895,20 @@ function apply(ctx) {
       offStyles();
     };
   }, "ds-bot: settings shell");
+  const teamToolFace = (sessionId) => ({
+    actions,
+    sessionId,
+    hooks: {
+      roster,
+      ui: ui2,
+      work,
+      heldCards,
+      browserPages,
+      browserTabs,
+      browserHolds,
+      computer
+    }
+  });
   const queueFace = (sessionId) => ({
     ...face(),
     updateQueue: async (itemId, action) => await ctx.sessions.binding(sessionId)?.session?.updateQueue(itemId, action) ?? { ok: false },
@@ -30045,6 +30078,18 @@ function apply(ctx) {
       for (const off of offs) off();
     };
   };
+  const installTeamTools = () => {
+    const disposers = TEAM_TOOLS.map((key) => ctx.slots.inject("tool.call.toolview", () => ctx.slots.register({
+      name: "tool.call.toolview",
+      key,
+      locale: "conversation",
+      priority: BOT_PRIORITY,
+      inject: (sessionId) => teamToolFace(sessionId)
+    }, TeamToolView)));
+    return () => {
+      for (const dispose of disposers) dispose();
+    };
+  };
   const SHELL_SHEETS = [
     [SHELL_CSS, "shell"],
     [SIDEBAR_CSS, "sidebar"],
@@ -30087,6 +30132,8 @@ function apply(ctx) {
       };
     },
     ...SHELL_SHEETS.map(([text, tag]) => () => installCompiledStyles(text, tag)),
+    // The team's own tool views ride the host's keyed tool view slot.
+    installTeamTools,
     () => installFrameWatch(frame),
     () => installFrameSync(),
     () => installTheme(),
@@ -30110,12 +30157,18 @@ function apply(ctx) {
     () => installMentions(),
     () => installAtMenu(),
     installHeader,
+    // The team's own tools ride the host's tool view slot: the host's tree draws
+    // every call as a folded row and dispatches it by wire name, so the team
+    // keeps its own rows for its own tools while every other tool falls through
+    // to the host's own view. The host's tree stays in charge of the seat, so
+    // a plain tool call shows in a private chat exactly as the host shows it.
+    //
+    // The priority is what lets the team shadow a plugin that already registered
+    // the same wire name: the host refuses a second entry for a key at the same
+    // priority, and that refusal takes the whole shell group down with it, so the
+    // team interface never comes up. A lower priority wins the key.
     () => shadow("conversation.chat.node", { key: "assistant-step", priority: BOT_PRIORITY, locale: "chat", inject: assistantFace }, AssistantCell),
     () => shadow("conversation.chat.node", { key: "turn-trigger", priority: BOT_PRIORITY, locale: "chat", inject: face }, TriggerCell),
-    // The team's own tool seat: the team draws the tool rows itself, so a plain
-    // tool call shows nothing and no tool detail reaches the transcript. The
-    // group's member replies and its "is typing" notice draw in this seat.
-    () => shadow("conversation.chat.node", { key: "tool-call", priority: BOT_PRIORITY, locale: "chat", inject: face }, ToolCell),
     // The turn's own process seat: the team keeps the fold open, so a Bot chat
     // is flat in every work-details mode.
     () => shadow("conversation.chat.node", { key: "turn-process", priority: BOT_PRIORITY, locale: "chat", inject: face }, TurnProcessCell),

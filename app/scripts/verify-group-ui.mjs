@@ -80,7 +80,7 @@ function devtools(url) {
     pending.set(id, { resolve: done, reject })
     socket.send(JSON.stringify({ id, method, params }))
   })
-  return { opened, call, close: () => socket.close() }
+  return { opened, call, socket, close: () => socket.close() }
 }
 
 const probe = expression => `(() => {
@@ -113,12 +113,26 @@ const probe = expression => `(() => {
 try {
   const page = await appPage(Date.now() + 120_000)
   const dev = devtools(page.webSocketDebuggerUrl)
+  const socket = dev.socket
   await dev.opened
   const evaluate = async (expression) => {
     const { result, exceptionDetails } = await dev.call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })
     if (exceptionDetails) throw new Error(`verify: ${exceptionDetails.text} ${exceptionDetails.exception?.description ?? ''}`)
     return result.value
   }
+  // 浏览器控制台与未捕获异常：席位被顶掉时这里会有线索。
+  const consoleLines = []
+  dev.call('Runtime.enable').catch(() => undefined)
+  dev.call('Log.enable').catch(() => undefined)
+  const onEvent = (data) => {
+    try {
+      const message = JSON.parse(String(data))
+      if (message.method === 'Runtime.consoleAPICalled' || message.method === 'Runtime.exceptionThrown' || message.method === 'Log.entryAdded') {
+        consoleLines.push(JSON.stringify(message.params).slice(0, 400))
+      }
+    } catch { /* not our message */ }
+  }
+  socket.addEventListener('message', onEvent)
   const shot = async (name) => {
     const { data } = await dev.call('Page.captureScreenshot', { format: 'png' })
     writeFileSync(join(out, name), Buffer.from(data, 'base64'))
@@ -198,7 +212,7 @@ try {
   await shot('04-final.png')
   writeFileSync(join(out, 'dom.json'), JSON.stringify({ firstNotice, firstBubble, afterBubble, finalDom }, null, 2))
 
-  // 单聊：工具过程照旧显示（折叠标题仍由宿主画、正文平铺，但团队自己的行在）。
+  // 单聊：普通工具交给宿主自己的视图画（形态2）。
   const openedChat = await evaluate(`(() => {
     const row = document.querySelector('.bt-row[data-bot-id="${writer.id}"]')
     if (!row) return 'no-row'
@@ -207,16 +221,18 @@ try {
   })()`)
   console.log('verify: open private chat =', openedChat)
   await sleep(2500)
-  // 让它调一次团队自己的工具（remember 在白名单里），这样单聊里就有 tool-call 座位，
-  // 能看出团队的行走的是我们自绘的 ToolCell。
-  await api('send', { sessionId: writer.id, text: '记住 单聊工具行测试' })
-  await sleep(8000)
+  // 让它调一次普通工具（假模型在「长任务」这句下会真的调一次 list_bots，
+  // 那不是团队工具，宿主树会把它派给宿主自己的视图），单聊里应当画出来。
+  await api('send', { sessionId: writer.id, text: '长任务 2' })
+  await sleep(12000)
   const privateDom = JSON.parse(await evaluate(`(() => {
     const conv = document.querySelector('[data-conversation-session]')
     const header = document.querySelector('[data-step-process] > div:first-child')
     const body = document.querySelector('[data-step-process] > [data-step-process-body]')
     const seat = document.querySelector('[data-chat-flow-kind="tool-call"]')
     const text = conv?.innerText ?? ''
+    // 宿主工具视图的行：宿主给它的容器带 data-chat-call-id。
+    const hostRows = [...document.querySelectorAll('[data-chat-call-id]')]
     return JSON.stringify({
       groupMarked: conv?.hasAttribute('data-bt-group-chat') ?? null,
       toolSeat: seat ? seat.getAttribute('data-chat-flow-kind') : null,
@@ -227,13 +243,27 @@ try {
       // 团队自己的行（事件行 / 成员气泡）还在不在
       events: document.querySelectorAll('.bt-event').length,
       bubbles: document.querySelectorAll('.bt-group-msg').length,
+      // 宿主工具视图画的行：带 data-chat-call-id 的容器
+      hostToolRows: hostRows.length,
+      hostToolRowText: hostRows.map(n => n.innerText.slice(0, 120)),
       hasToolHeaderText: text.includes('已调用工具') || text.includes('Called tools'),
-      text: text.slice(0, 800),
+      text: text.slice(0, 900),
     })
   })()`))
   console.log('verify: 单聊 DOM =', JSON.stringify(privateDom))
+  console.log('verify: 控制台 =', consoleLines.slice(0, 12).join('\n  '))
   await shot('05-private-chat.png')
   writeFileSync(join(out, 'dom-private.json'), JSON.stringify(privateDom, null, 2))
+
+  // 展开那一行，给用户看展开态（参数与输出）。
+  await evaluate(`(() => {
+    const row = [...document.querySelectorAll('[data-chat-call-id]')].find(n => n.querySelector('details'))
+    const details = row?.querySelector('details')
+    if (details) { details.open = true; details.dispatchEvent(new Event('toggle')) }
+    return details !== undefined
+  })()`)
+  await sleep(1200)
+  await shot('06-private-chat-expanded.png')
 
   dev.close()
   void child.kill()

@@ -11,7 +11,7 @@ import { build } from 'esbuild'
 const { outputFiles } = await build({
   stdin: {
     contents: [
-      "export { ToolCell, RelayTail } from './src/client/cells.js'",
+      "export { ToolCell, TeamToolView, RelayTail } from './src/client/cells.js'",
     ].join('\n'),
     resolveDir: fileURLToPath(new URL('..', import.meta.url)),
   },
@@ -69,7 +69,7 @@ runInNewContext(outputFiles[0].text, {
     throw new Error(`Unexpected platform module ${name}`)
   },
 })
-const { ToolCell, RelayTail } = module.exports
+const { ToolCell, TeamToolView, RelayTail } = module.exports
 
 const expand = (node) => {
   if (node === null || node === undefined || typeof node === 'boolean') return null
@@ -123,7 +123,19 @@ const cellProps = (root, { sessionId = 'room', roster = team(), actions = {} } =
   useHeldCards: select => select({}),
   actions: { noteLive: () => {}, ...actions },
 })
-// 一个普通工具调用：团队在自己的座位里不画它，所以群里没有工具明细。
+// 宿主交给工具视图的东西：调用的身份、它的阶段与它的 block。
+const toolProps = (block, { sessionId = 'room', roster = team() } = {}) => ({
+  sessionId,
+  toolName: block.name,
+  phase: block.kind === 'tool-result' ? 'result' : 'start',
+  block,
+  useRoster: select => select(roster),
+  useUi: select => select({ reactions: {}, visits: {} }),
+  useWork: select => select({ bots: {} }),
+  useHeldCards: select => select({}),
+  actions: { noteLive: () => {} },
+})
+// 一个普通工具调用：群里不画它，单聊里交给宿主自己的工具视图画。
 const plainCall = (callId = 'bash') => ({
   kind: 'tool-result', name: callId, callId, turn: 1,
   call: { name: callId, argsRaw: '{"command":"ls"}' },
@@ -140,8 +152,18 @@ test('the group reply draws in the tool-call seat, with the member name and the 
   assert.match(text(cell), /Writer.*Draft is up\./)
 })
 
-// 普通工具在同一个座位里不画：群里没有工具名、参数与输出。
-test('an ordinary tool draws nothing in the team seat, so no tool detail shows', () => {
+// 团队的工具走宿主已声明的 tool.call.toolview 子槽：宿主树画每个调用，
+// 按工具名派发；团队的工具由团队的视图画，其余工具落到宿主自己的视图。
+test('a team tool draws through the host tool view, with the member name and the text', () => {
+  const replies = [{ botId: 'writer', text: 'Draft is up.' }]
+  const cell = expand(TeamToolView(toolProps(relayCall('c1', replies))))
+  mount()
+  assert.equal(findAll(cell, node => node.props?.className === 'bt-group-msg').length, 1)
+  assert.match(text(cell), /Writer.*Draft is up\./)
+})
+
+// 普通工具不由团队画：宿主树把它派给宿主自己的视图，群里无工具明细。
+test('an ordinary tool is not the team\'s, so the team draws nothing for it', () => {
   const cell = expand(ToolCell(cellProps(plainCall())))
   mount()
   assert.equal(findAll(cell, node => node.props?.className === 'bt-group-msg').length, 0)
