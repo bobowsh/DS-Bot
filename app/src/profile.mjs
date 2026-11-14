@@ -21,13 +21,22 @@ const RETIRED_BUNDLES = [LEGACY_ENGINE, 'dsbot-engine']
 // graph, resolves bundles there first, and keeps the bundles it names as direct dependencies from removal.
 export const INSTALL_ANCHOR = fileURLToPath(new URL('../package.json', import.meta.url))
 
-// The intranet registries the factory plugins and skills are distributed from. DSHM_REGISTRY_URL
-// is read by the dshmarket plugin from the Host's environment; the other two are written into the
-// profile by loadAppProfile(). All three are constants of this installation, not user settings.
+// The intranet registries the factory plugins and skills are distributed from: the npm registry
+// (written into the profile as .npmrc) and the SkillHub catalog (written as a --patch overlay).
+// Both are constants of this installation, not user settings.
+//
+// The plugin market's catalog is deliberately NOT named here. dshmarket already carries its own
+// catalog source list (its official domain, with the published `dsh-plugin-catalog` npm package as
+// a fallback), and setting DSHM_REGISTRY_URL REPLACES that whole list rather than heading it
+// (dshmarket lib/regions.js routesFor). Pointing it at an intranet address therefore costs the
+// market its own sources, and while that intranet service is down the market has no catalog at
+// all. Leaving the variable unset keeps the market on its own routing, and keeps us from having
+// to track dshmarket's sources as it updates them.
+//
+// The intranet catalog is still used by our own factory plugin auto-update (factory-update.mjs,
+// which has its own CATALOG_URL) — that is a different line from the public market.
 export const NPM_REGISTRY = 'http://192.168.1.10:3000/api/packages/dshplugin/npm/'
-export const CATALOG_URL = 'http://192.168.1.10:3000/dshplugin/dsh-catalog/raw/branch/main/plugins.json'
 export const SKILLHUB_REGISTRY = 'http://192.168.1.10:8081'
-export const DSHM_REGISTRY_URL = CATALOG_URL
 
 const FACTORY_PATCH_NAME = 'factory-registry.patch.yml'
 const FACTORY_PATCH_ROWS = [

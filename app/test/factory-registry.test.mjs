@@ -1,19 +1,26 @@
-// The intranet registry wiring in the profile: .npmrc, the SkillHub config overlay, and the
-// addresses the Host passes to the dshmarket plugin.
+// The intranet registry wiring in the profile: .npmrc and the SkillHub config overlay.
+// The plugin market's catalog is not ours to name — see the comment in src/profile.mjs.
 import assert from 'node:assert/strict'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
-import { CATALOG_URL, NPM_REGISTRY, SKILLHUB_REGISTRY, DSHM_REGISTRY_URL, writeFactoryNpmrc, writeFactoryRegistryPatch } from '../src/profile.mjs'
+import * as profile from '../src/profile.mjs'
+import { NPM_REGISTRY, SKILLHUB_REGISTRY, writeFactoryNpmrc, writeFactoryRegistryPatch } from '../src/profile.mjs'
 import { parse } from 'yaml'
 
 describe('the intranet registry addresses', () => {
-  test('npm, catalog and SkillHub all point at the intranet', () => {
+  test('npm and SkillHub point at the intranet', () => {
     assert.equal(NPM_REGISTRY, 'http://192.168.1.10:3000/api/packages/dshplugin/npm/')
-    assert.equal(CATALOG_URL, 'http://192.168.1.10:3000/dshplugin/dsh-catalog/raw/branch/main/plugins.json')
     assert.equal(SKILLHUB_REGISTRY, 'http://192.168.1.10:8081')
-    assert.equal(DSHM_REGISTRY_URL, CATALOG_URL)
+  })
+
+  test('the plugin market keeps its own catalog sources: no DSHM_REGISTRY_URL from the app', () => {
+    // Setting it REPLACES dshmarket's whole source list (lib/regions.js routesFor), so an
+    // intranet address here costs the market its official domain and its npm fallback. While
+    // that intranet service was down, the market could not read any catalog at all.
+    assert.equal('DSHM_REGISTRY_URL' in profile, false)
+    assert.equal('CATALOG_URL' in profile, false)
   })
 })
 
