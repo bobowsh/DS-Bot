@@ -14,7 +14,9 @@ import { fileURLToPath } from 'node:url'
 const [outDir = 'tmp/group-ui'] = process.argv.slice(2)
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const repo = resolve(root, '..')
-const out = resolve(outDir)
+// The screenshots land outside app/: the builder ships app/tmp inside the asar, and
+// a verification run is not part of the product.
+const out = resolve(repo, outDir)
 mkdirSync(out, { recursive: true })
 const electron = createRequire(import.meta.url)('electron')
 const port = 9600 + Math.floor(Math.random() * 300)
