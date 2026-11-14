@@ -1703,6 +1703,15 @@ const HOST_ZH = {
   'Stop {name}': '停止 {name}',
   '{name} · foreground': '{name} · 前台',
   '{name} waits for the computer': '{name} 等你停手',
+  // The turn's status row: the host writes these, and the team writes the same
+  // words now that it owns the seat the host used to draw it in.
+  'Turn stopped': '已停止',
+  'Turn failed': '处理失败',
+  'Turn done': '已完成',
+  'Turn took {duration}': '已完成，用时 {duration}',
+  '{n} second': '{n} 秒',
+  '{n} minute': '{n} 分',
+  '{n} hour': '{n} 小时',
 }
 Object.assign(ZH, HOST_ZH)
 

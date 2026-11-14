@@ -1090,6 +1090,10 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 [class*="_scroll"]>[class*="_column"]::before{content:var(--bt-first-sep,none);display:block;flex:none;height:28px;margin:17px 0 12px;font-size:12px;line-height:28px;text-align:center;color:var(--bt-ink-2);white-space:nowrap}
 .bt-activity{display:flex;align-items:center;gap:10px;margin:8px 0 4px 2px;font-size:14px;color:var(--bt-ink-2)}
 .bt-group-replies{display:contents}
+/* The turn's status row — "已完成，用时 3 秒". It says how long the turn took and
+   nothing about the tools it ran, so it stays in a group chat too. It reads like
+   the host's own row: quiet grey text, centred. */
+.bt-turn-status{display:flex;justify-content:center;align-items:center;gap:2px;min-height:24px;margin:2px 0;font-size:12px;line-height:16px;color:var(--bt-ink-2);flex-wrap:wrap}
 /* 一个 Bot 聊天在所有 work-details 模式下都是平的，不改用户自己的模式
    （那是 DSH 的全局设置）：步骤组藏掉折叠标题、正文强制平铺展开，一轮结束后
    被模式折起来的内容也照样显示。TurnProcessCell 也会打开那个折叠，

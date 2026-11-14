@@ -1746,7 +1746,16 @@ var HOST_ZH = {
   "You control the computer": "你在操控电脑",
   "Stop {name}": "停止 {name}",
   "{name} · foreground": "{name} · 前台",
-  "{name} waits for the computer": "{name} 等你停手"
+  "{name} waits for the computer": "{name} 等你停手",
+  // The turn's status row: the host writes these, and the team writes the same
+  // words now that it owns the seat the host used to draw it in.
+  "Turn stopped": "已停止",
+  "Turn failed": "处理失败",
+  "Turn done": "已完成",
+  "Turn took {duration}": "已完成，用时 {duration}",
+  "{n} second": "{n} 秒",
+  "{n} minute": "{n} 分",
+  "{n} hour": "{n} 小时"
 };
 Object.assign(ZH, HOST_ZH);
 var fill = (text, params) => params ? text.replace(/\{(\w+)\}/g, (match, name) => name in params ? String(params[name]) : match) : text;
@@ -4217,6 +4226,10 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 [class*="_scroll"]>[class*="_column"]::before{content:var(--bt-first-sep,none);display:block;flex:none;height:28px;margin:17px 0 12px;font-size:12px;line-height:28px;text-align:center;color:var(--bt-ink-2);white-space:nowrap}
 .bt-activity{display:flex;align-items:center;gap:10px;margin:8px 0 4px 2px;font-size:14px;color:var(--bt-ink-2)}
 .bt-group-replies{display:contents}
+/* The turn's status row — "已完成，用时 3 秒". It says how long the turn took and
+   nothing about the tools it ran, so it stays in a group chat too. It reads like
+   the host's own row: quiet grey text, centred. */
+.bt-turn-status{display:flex;justify-content:center;align-items:center;gap:2px;min-height:24px;margin:2px 0;font-size:12px;line-height:16px;color:var(--bt-ink-2);flex-wrap:wrap}
 /* 一个 Bot 聊天在所有 work-details 模式下都是平的，不改用户自己的模式
    （那是 DSH 的全局设置）：步骤组藏掉折叠标题、正文强制平铺展开，一轮结束后
    被模式折起来的内容也照样显示。TurnProcessCell 也会打开那个折叠，
@@ -15194,7 +15207,32 @@ function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTu
     const own = state[sessionId]?.[turn];
     return !hidden && typeof visit?.seen === "number" && own?.first !== void 0 && own.first <= visit.seen && own?.end !== void 0 && own.end > visit.seen && own.end <= visit.entered;
   });
-  return fresh ? (0, import_react33.createElement)(NewDivider) : (0, import_react33.createElement)(CellEmpty);
+  if (fresh) return (0, import_react33.createElement)(NewDivider);
+  const row = turnStatusRow(node);
+  return row === void 0 ? (0, import_react33.createElement)(CellEmpty) : (0, import_react33.createElement)("div", { className: "bt-turn-status" }, row);
+}
+function turnStatusRow(node) {
+  const location2 = node?.location;
+  const turn = location2?.kind === "turn" || location2?.kind === "step" ? location2.turn : void 0;
+  if (turn?.status !== "closed") return void 0;
+  const reason = turn.end?.data?.reason?.kind;
+  const stopped = reason === "aborted" || reason === "interrupted";
+  const elapsed = turn.start === void 0 || turn.end === void 0 ? void 0 : Math.max(1e3, turn.end.time - turn.start.time);
+  if (stopped) return t("Turn stopped");
+  if (reason === "error") return t("Turn failed");
+  if (elapsed === void 0) return t("Turn done");
+  return t("Turn took {duration}", { duration: turnDurationLabel(elapsed) });
+}
+function turnDurationLabel(ms) {
+  const total = Math.max(0, Math.floor(ms / 1e3));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor(total / 60) % 60;
+  const seconds = total % 60;
+  const parts = [];
+  if (hours > 0) parts.push(`${t("{n} hour", { n: hours })}`);
+  if (total >= 60) parts.push(`${t("{n} minute", { n: minutes })}`);
+  parts.push(`${t("{n} second", { n: seconds })}`);
+  return parts.join(" ");
 }
 
 // src/client/activity-row.js

@@ -11,7 +11,7 @@ import { build } from 'esbuild'
 const { outputFiles } = await build({
   stdin: {
     contents: [
-      "export { ToolCell, TeamToolView, RelayTail } from './src/client/cells.js'",
+      "export { ToolCell, TeamToolView, RelayTail, TurnProcessCell } from './src/client/cells.js'",
     ].join('\n'),
     resolveDir: fileURLToPath(new URL('..', import.meta.url)),
   },
@@ -69,7 +69,7 @@ runInNewContext(outputFiles[0].text, {
     throw new Error(`Unexpected platform module ${name}`)
   },
 })
-const { ToolCell, TeamToolView, RelayTail } = module.exports
+const { ToolCell, TeamToolView, RelayTail, TurnProcessCell } = module.exports
 
 const expand = (node) => {
   if (node === null || node === undefined || typeof node === 'boolean') return null
@@ -224,4 +224,34 @@ test('the styles hide the fold header and lay the process body flat', () => {
   // 团队自己的座位不再被藏：回复与提示都要看得见。
   assert.equal(styles.includes('[data-chat-flow-kind="tool-call"]{display:none!important}'), false)
   assert.equal(styles.includes('[data-chat-flow-kind="turn-process"]{display:none!important}'), false)
+})
+
+// 轮次状态行「已完成，用时 N 秒」：团队占了这个座位，得自己画——
+// 它只说这一轮花了多久，不含任何工具明细，所以群聊里也留着。
+test('the turn status row says how long the turn took', () => {
+  const node = {
+    location: {
+      kind: 'turn',
+      turn: {
+        turn: 1,
+        status: 'closed',
+        start: { time: 1_700_000_000_000 },
+        end: { time: 1_700_000_003_400 },
+      },
+    },
+  }
+  const cell = expand(TurnProcessCell({
+    node,
+    sessionId: 'room',
+    turnProcess: { foldable: false, open: true, setOpen: () => {} },
+    useRoster: select => select(team()),
+    useUi: select => select({ visits: {} }),
+    useTurnClock: select => select({}),
+    actions: { noteTurnTime: () => {} },
+  }))
+  mount()
+  const rows = findAll(cell, node2 => node2.props?.className === 'bt-turn-status')
+  assert.equal(rows.length, 1, '应有轮次状态行')
+  // 这个 React 桩没有装中文 locale，所以文案是英文源：时长以「3 秒」写。
+  assert.match(text(rows[0]), /Turn took 3 second/)
 })
