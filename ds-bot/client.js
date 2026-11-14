@@ -15198,7 +15198,8 @@ function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTu
   }, [open, turnProcess]);
   const turn = node?.location?.turn?.turn ?? node?.data?.turn;
   const start = node?.location?.turn?.start?.time;
-  const hidden = useRoster((roster) => isHiddenTurn(roster, sessionId, turn));
+  const roster = useRoster((value) => value);
+  const hidden = useRoster((roster2) => isHiddenTurn(roster2, sessionId, turn));
   (0, import_react33.useEffect)(() => {
     actions.noteTurnTime(sessionId, turn, "first", start);
   }, [sessionId, turn, start]);
@@ -15208,6 +15209,7 @@ function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTu
     return !hidden && typeof visit?.seen === "number" && own?.first !== void 0 && own.first <= visit.seen && own?.end !== void 0 && own.end > visit.seen && own.end <= visit.entered;
   });
   if (fresh) return (0, import_react33.createElement)(NewDivider);
+  if (roster?.roomsById?.[sessionId] !== void 0) return (0, import_react33.createElement)(CellEmpty);
   const row = turnStatusRow(node);
   return row === void 0 ? (0, import_react33.createElement)(CellEmpty) : (0, import_react33.createElement)("div", { className: "bt-turn-status" }, row);
 }

@@ -1271,6 +1271,10 @@ export function TeamToolView(props) {
 // fold over the turn's process. The team owns the seat, so it draws that row
 // itself — with the host's own wording and shape — and keeps the fold open so a
 // Bot chat is flat in every work-details mode.
+//
+// A group chat shows only the conversation: the members' bubbles and the "is
+// typing" notice. It has no tool rows and no turn status row either, so the row
+// is drawn in a private chat only.
 export function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTurnClock, actions }) {
   const open = turnProcess === undefined || !turnProcess.foldable || turnProcess.open
   useEffect(() => {
@@ -1278,6 +1282,7 @@ export function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi
   }, [open, turnProcess])
   const turn = node?.location?.turn?.turn ?? node?.data?.turn
   const start = node?.location?.turn?.start?.time
+  const roster = useRoster(value => value)
   const hidden = useRoster(roster => isHiddenTurn(roster, sessionId, turn))
   // Exchange turns hide their replies but still show their trigger chip, so their start
   // counts for separators too.
@@ -1292,8 +1297,9 @@ export function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi
       && own?.end !== undefined && own.end > visit.seen && own.end <= visit.entered
   })
   if (fresh) return h(NewDivider)
-  // The turn's status row: how long the turn took, in the host's wording. It says
-  // nothing about the tools the turn ran, so it stays in a group chat too.
+  // A group chat shows only the conversation: no turn status row there.
+  if (roster?.roomsById?.[sessionId] !== undefined) return h(CellEmpty)
+  // The turn's status row: how long the turn took, in the host's wording.
   const row = turnStatusRow(node)
   return row === undefined ? h(CellEmpty) : h('div', { className: 'bt-turn-status' }, row)
 }

@@ -227,8 +227,9 @@ test('the styles hide the fold header and lay the process body flat', () => {
 })
 
 // 轮次状态行「已完成，用时 N 秒」：团队占了这个座位，得自己画——
-// 它只说这一轮花了多久，不含任何工具明细，所以群聊里也留着。
-test('the turn status row says how long the turn took', () => {
+// 它只说这一轮花了多久，不含任何工具明细，所以单聊里留着。
+// 群聊只要对话内容：成员气泡 + 正在输入提示，不要工具块，也不要状态行。
+test('the turn status row is in a private chat and not in a group chat', () => {
   const node = {
     location: {
       kind: 'turn',
@@ -240,18 +241,24 @@ test('the turn status row says how long the turn took', () => {
       },
     },
   }
-  const cell = expand(TurnProcessCell({
+  const props = (roster) => ({
     node,
     sessionId: 'room',
     turnProcess: { foldable: false, open: true, setOpen: () => {} },
-    useRoster: select => select(team()),
+    useRoster: select => select(roster),
     useUi: select => select({ visits: {} }),
     useTurnClock: select => select({}),
     actions: { noteTurnTime: () => {} },
-  }))
+  })
+  // 单聊：状态行在。
+  const priv = expand(TurnProcessCell(props(team({ roomsById: {} }))))
   mount()
-  const rows = findAll(cell, node2 => node2.props?.className === 'bt-turn-status')
-  assert.equal(rows.length, 1, '应有轮次状态行')
+  const rows = findAll(priv, node2 => node2.props?.className === 'bt-turn-status')
+  assert.equal(rows.length, 1, '单聊里应有轮次状态行')
   // 这个 React 桩没有装中文 locale，所以文案是英文源：时长以「3 秒」写。
   assert.match(text(rows[0]), /Turn took 3 second/)
+  // 群聊：状态行不在。
+  const group = expand(TurnProcessCell(props(team())))
+  mount()
+  assert.equal(findAll(group, node2 => node2.props?.className === 'bt-turn-status').length, 0, '群聊里不应有状态行')
 })
