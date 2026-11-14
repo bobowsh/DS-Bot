@@ -1,12 +1,12 @@
 // The intranet registry wiring in the profile: .npmrc and the SkillHub config overlay.
 // The plugin market's catalog is not ours to name — see the comment in src/profile.mjs.
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import * as profile from '../src/profile.mjs'
-import { NPM_REGISTRY, SKILLHUB_REGISTRY, writeFactoryNpmrc, writeFactoryRegistryPatch } from '../src/profile.mjs'
+import { NPM_REGISTRY, SKILLHUB_REGISTRY, alignMarketRegion, writeFactoryNpmrc, writeFactoryRegistryPatch } from '../src/profile.mjs'
 import { parse } from 'yaml'
 
 describe('the intranet registry addresses', () => {
@@ -73,15 +73,64 @@ describe('the SkillHub config overlay', () => {
   })
   after(() => { rmSync(root, { recursive: true, force: true }) })
 
-  test('it sets registryUrl on the skillhub-dsh loader row and reports it for patchFiles', () => {
+  test('it sets registryUrl on the skillhub-dsh row and pins the market download region', () => {
     const files = writeFactoryRegistryPatch(profile)
     assert.equal(files.length, 1)
     assert.equal(files[0], join(dirname(profile.dir), 'factory-registry.patch.yml'))
     const rows = parse(readFileSync(files[0], 'utf8'))
-    assert.equal(rows.length, 1)
+    assert.equal(rows.length, 2)
+
     assert.equal(rows[0].id, 'astron-skillhub')
     assert.equal(rows[0].name, '@astron-team/skillhub-dsh')
     assert.deepEqual(rows[0].config, { registryUrl: SKILLHUB_REGISTRY })
+
+    // The market's catalog source order comes from its region: the `global` order asks the
+    // project's own domain first, which this network serves at ~10 KB/s for a 15 MB catalog.
+    assert.equal(rows[1].id, 'dsh-market')
+    assert.deepEqual(rows[1].config, { region: 'china' })
     assert.ok(existsSync(files[0]))
+  })
+})
+
+describe('the market region on an existing profile', () => {
+  let root
+  let dir
+  before(() => {
+    root = mkdtempSync(join(tmpdir(), 'ds-bot-market-region-'))
+    dir = join(root, 'profiles', 'ds-bot')
+  })
+  after(() => { rmSync(root, { recursive: true, force: true }) })
+
+  const writeState = value => {
+    mkdirSync(join(dir, '.dsh-market'), { recursive: true })
+    writeFileSync(join(dir, '.dsh-market', 'state.json'), `${JSON.stringify(value, undefined, 2)}\n`, 'utf8')
+  }
+  const readState = () => JSON.parse(readFileSync(join(dir, '.dsh-market', 'state.json'), 'utf8'))
+
+  test('a profile with no market state needs nothing', () => {
+    assert.equal(alignMarketRegion(join(root, 'profiles', 'missing')), 'absent')
+  })
+
+  test('a region the probe picked is moved to the pinned one', () => {
+    writeState({ region: 'global', notes: { keep: 'me' } })
+    // The probe records that it chose the region; that is what may be replaced.
+    writeState({ region: 'global', regionAuto: true, notes: { keep: 'me' } })
+    assert.equal(alignMarketRegion(dir), 'updated')
+    const state = readState()
+    assert.equal(state.region, 'china')
+    assert.equal(state.regionAuto, false)
+    // The rest of the user's state is carried over untouched.
+    assert.deepEqual(state.notes, { keep: 'me' })
+  })
+
+  test('a region the user picked is left alone', () => {
+    writeState({ region: 'global', regionAuto: false })
+    assert.equal(alignMarketRegion(dir), 'kept')
+    assert.equal(readState().region, 'global')
+  })
+
+  test('a second launch changes nothing', () => {
+    writeState({ region: 'china', regionAuto: false })
+    assert.equal(alignMarketRegion(dir), 'kept')
   })
 })
