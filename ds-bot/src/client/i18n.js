@@ -1,6 +1,12 @@
-// Interface copy follows the DSH language. Keys are the English text; `zh` maps them.
-// Copy is looked up at render time and every slot outlet re-renders on a language
-// switch, so nothing caches a translated string.
+// Interface copy follows the DSH language. Keys are the English text; `zh`, `zh-TW`,
+// `ja`, `ko`, `es`, `fr` and `de` map them. Copy is looked up at render time and every
+// slot outlet re-renders on a language switch, so nothing caches a translated string.
+import { convertDict, convertHostErrors, toTraditional } from './locales/zh-tw.js'
+import { DSH_JA, HOST_ERRORS_JA, JA } from './locales/ja.js'
+import { DSH_KO, HOST_ERRORS_KO, KO } from './locales/ko.js'
+import { DSH_ES, HOST_ERRORS_ES, ES } from './locales/es.js'
+import { DSH_FR, HOST_ERRORS_FR, FR } from './locales/fr.js'
+import { DSH_DE, HOST_ERRORS_DE, DE } from './locales/de.js'
 
 export const NAMESPACE = 'ds-bot'
 
@@ -215,6 +221,7 @@ const ZH = {
   'Only “Full details” keeps the process rows of a finished turn.': '只有「完全展开」会保留已完成轮次的过程行。',
   'Bot mode': 'Bot 模式',
   'Switch': '切换',
+  'Back to DS Bot': '返回 DS Bot',
   '{model} is not available anymore. Pick another model for me.': '{model} 已经不可用了。给我换一个模型吧。',
   '{provider} API key': '{provider} API key',
   'Enter the API key': '请填入 API key',
@@ -596,6 +603,28 @@ const ZH = {
   Unknown: '未解析',
   'Back to Bots': '返回 Bot 列表',
   'Close settings': '关闭设置',
+
+  // Phone
+  Phone: '手机',
+  'Off. Phones cannot reach this computer.': '已关闭。手机连不上这台电脑。',
+  'On. Paired phones can use DS Bot here.': '已开启。配对过的手机可以用这台电脑上的 DS Bot。',
+  'Cannot reach the Server. Trying again…': '连不上服务器，正在重试…',
+  'Phone access': '手机访问',
+  'Beta': '测试版',
+  'Phone app': '手机 App',
+  'Android beta': 'Android 测试版',
+  Server: '服务器',
+  'The Relay Server that passes encrypted messages between your phone and this computer. It cannot read them.': '在手机和这台电脑之间转发加密消息的中转服务器。它读不到消息内容。',
+  'Pair a phone': '配对手机',
+  'Scan this code with the DS Bot app on your phone.': '用手机上的 DS Bot App 扫这个码。',
+  'The code works once. It stops working in {count} min.': '这个码只能用一次，{count} 分钟后失效。',
+  'Show a QR code': '显示二维码',
+  'Your phone scans it once. After that it connects by itself.': '手机扫一次就行，以后会自动连接。',
+  'Turn on phone access first': '请先打开手机访问',
+  Phones: '手机',
+  'No phones yet': '还没有配对的手机',
+  'Paired on {date}': '{date} 配对',
+
   'Mark as Unread': '标为未读',
   'Rename Bot': '重命名 Bot',
   'Group settings': '群设置',
@@ -607,6 +636,7 @@ const ZH = {
   'Remove DSH Agent': '移除 DSH Agent',
   'New session': '新会话',
   'Session actions': '会话操作',
+  Plugins: '插件',
   'Plain dsh session': '原生 dsh 会话',
   'just now': '刚刚',
   '{n} min': '{n} 分钟',
@@ -1470,6 +1500,7 @@ const ZH = {
   'Finish signing in in your browser.': '在浏览器里完成登录。',
   'Open again': '重新打开',
   'Did not come back here?': '登录后没有回到这里？',
+  'Copied to clipboard': '已复制到剪贴板',
   'Paste the code on {host} and authorize.': '在 {host} 粘贴这个码并授权。',
   'Add another': '再添加一个',
   'QQ, 163, 126, Gmail, iCloud, and other IMAP mail': 'QQ、163、126、Gmail、iCloud 等 IMAP 邮箱',
@@ -1640,6 +1671,46 @@ const HOST_ERRORS = [
   [/^Memory cannot change now: [\s\S]*$/, '现在不能修改记忆：另一个 dsh 正在使用这个 Bot 团队'],
 ]
 const HOST_ZH = {
+  'The Server address must start with ws:// or wss://': '服务器地址必须以 ws:// 或 wss:// 开头',
+  'Enter the Server address first': '请先填服务器地址',
+  'Turn on phone access first': '请先打开手机访问',
+  'This phone is not paired': '这台手机没有配对',
+  'Another dsh has this Bot team open, so phones connect to that one': '另一个 dsh 打开了这个 Bot 团队，手机会连到那一个',
+  'This dsh runs on a Node without WebSocket': '这个 dsh 用的 Node 不支持 WebSocket',
+  'Phones are paired and removed on the computer': '配对和删除手机只能在电脑上做',
+  'Request failed': '请求失败',
+  'Permissions are not available in this DeepSeek Harness': '这个 DeepSeek Harness 不支持权限设置',
+  'Avatar images must be PNG, JPEG, WebP, or GIF': '头像图片必须是 PNG、JPEG、WebP 或 GIF',
+  'Avatar image is too large': '头像图片太大了',
+  'A Bot needs a name': 'Bot 需要一个名字',
+  'A Bot name cannot contain @, ` or a line break': 'Bot 名字里不能有 @、` 或换行',
+  'Unknown Bot': '找不到这个 Bot',
+  'Unknown conversation': '找不到这个对话',
+  'A group chat needs at least two Bots': '群聊至少要两个 Bot',
+  'The admin must be a member of the group': '管理员必须是群成员',
+  'Unknown group chat': '找不到这个群聊',
+  'No Bot is left in this group chat': '这个群聊里已经没有 Bot 了',
+  'That group chat has been deleted': '这个群聊已经删除了',
+  'Hand the admin role to another member instead of leaving the group without one': '请把管理员交给其他成员，不要让群聊没有管理员',
+  'Hand the admin role to another member before leaving the group': '离开群聊前，请先把管理员交给其他成员',
+  'The team needs at least one Main Bot': '团队至少要有一个主 Bot',
+  'Only a Main Bot can be replaced': '只能替换主 Bot',
+  'A Main Bot cannot be deleted; remove its Main Bot role first': '主 Bot 不能删除，请先取消它的主 Bot 身份',
+  'Unknown theme': '未知主题',
+  'Accent must be a #rrggbb color': '强调色必须是 #rrggbb 格式',
+  'Type the key first': '请先输入密钥',
+  'Choose every Bot or a list of Bots': '请选择所有 Bot 或指定的 Bot',
+  'This request is gone': '这个请求已经不存在了',
+  'This request was already answered': '这个请求已经处理过了',
+  'A name uses capitals, digits, and underscores, and starts with a letter': '名字只能用大写字母、数字和下划线，并以字母开头',
+  'No such key': '没有这个密钥',
+  'Type a question or a change first': '请先输入问题或要改的内容',
+  'No model is available. Add one in Settings > Models.': '没有可用的模型，请先在 设置 → 模型 里添加。',
+  'Memory is turned off on this host': '这台主机关闭了记忆功能',
+  'The model wrote nothing': '模型没有输出内容',
+  'Write the entry to save.': '请写下要保存的内容。',
+  'This DeepSeek Harness has no folder chooser': '这个 DeepSeek Harness 没有文件夹选择窗口',
+  'This DeepSeek Harness cannot list folders': '这个 DeepSeek Harness 不能列出文件夹',
   "Side chat is only available in a Bot's private chat.": '侧边对话只在 Bot 的私聊里可用。',
   'Write a question.': '写上问题。',
   'Write a question after /side.': '在 /side 后面写上问题。',
@@ -1715,6 +1786,65 @@ const HOST_ZH = {
 }
 Object.assign(ZH, HOST_ZH)
 
+const ZH_TW = convertDict(ZH)
+const HOST_ERRORS_ZH_TW = convertHostErrors(HOST_ERRORS)
+
+export const LANGUAGES = [
+  { id: 'zh-TW', label: '繁體中文', fallback: 'zh' },
+  { id: 'ja', label: '日本語', fallback: 'en' },
+  { id: 'ko', label: '한국어', fallback: 'en' },
+  { id: 'es', label: 'Español', fallback: 'en' },
+  { id: 'fr', label: 'Français', fallback: 'en' },
+  { id: 'de', label: 'Deutsch', fallback: 'en' },
+]
+
+export const DICTIONARY = {
+  zh: ZH,
+  'zh-TW': ZH_TW,
+  ja: JA,
+  ko: KO,
+  es: ES,
+  fr: FR,
+  de: DE,
+}
+
+const HOST_ERROR_TABLE = {
+  zh: HOST_ERRORS,
+  'zh-TW': HOST_ERRORS_ZH_TW,
+  ja: HOST_ERRORS_JA,
+  ko: HOST_ERRORS_KO,
+  es: HOST_ERRORS_ES,
+  fr: HOST_ERRORS_FR,
+  de: HOST_ERRORS_DE,
+}
+
+const DSH_LOCALE_PACKS = {
+  ja: DSH_JA,
+  ko: DSH_KO,
+  es: ES && DSH_ES,
+  fr: DSH_FR,
+  de: DSH_DE,
+}
+
+const DATE_LOCALES = {
+  zh: 'zh-CN',
+  'zh-TW': 'zh-TW',
+  ja: 'ja-JP',
+  ko: 'ko-KR',
+  es: 'es-ES',
+  fr: 'fr-FR',
+  de: 'de-DE',
+  en: 'en-US',
+}
+
+function resolveLangKey(tag) {
+  const lower = String(tag ?? '').toLowerCase()
+  if (lower === 'zh-tw' || lower === 'zh-hk' || lower === 'zh-mo' || lower.startsWith('zh-hant')) return 'zh-TW'
+  if (lower.startsWith('zh')) return 'zh'
+  const primary = lower.split('-')[0]
+  return Object.hasOwn(DICTIONARY, primary) ? primary : 'en'
+}
+
 const fill = (text, params) => (params
   ? text.replace(/\{(\w+)\}/g, (match, name) => (name in params ? String(params[name]) : match))
   : text)
@@ -1727,10 +1857,68 @@ export function installLocale(locale) {
   if (!locale || typeof locale.register !== 'function' || typeof locale.bind !== 'function') return () => {}
   service = locale
   bound = locale.bind(NAMESPACE)
-  const off = locale.register(NAMESPACE, 'zh', ZH)
+  const offs = []
+  const pushOff = (fn) => { if (typeof fn === 'function') offs.push(fn) }
+
+  if (typeof locale.addLanguage === 'function') {
+    const existing = new Set((locale.getLocale?.()?.locales ?? []).map(item => String(item.id).toLowerCase()))
+    for (const def of LANGUAGES) {
+      if (!existing.has(def.id.toLowerCase())) {
+        try { pushOff(locale.addLanguage(def)) } catch { /* already added */ }
+      }
+    }
+  }
+
+  for (const [langId, dict] of Object.entries(DICTIONARY)) {
+    pushOff(locale.register(NAMESPACE, langId, dict))
+  }
+
+  // Register DSH settings/common namespace translations only after each owning DSH plugin registers its namespace.
+  let syncing = false
+  let disposed = false
+  const syncDshNamespaces = () => {
+    if (disposed || syncing || !(locale.dicts instanceof Map)) return
+    syncing = true
+    try {
+      for (const [langId, namespaces] of Object.entries(DSH_LOCALE_PACKS)) {
+        for (const [ns, dict] of Object.entries(namespaces ?? {})) {
+          const map = locale.dicts.get(ns)
+          if (!map || map.has(langId.toLowerCase())) continue
+          try { pushOff(locale.register(ns, langId, dict)) } catch { /* already registered */ }
+        }
+      }
+      for (const [ns, map] of locale.dicts.entries()) {
+        if (ns === NAMESPACE || map.has('zh-tw')) continue
+        const zhDict = map.get('zh')
+        if (zhDict) {
+          try { pushOff(locale.register(ns, 'zh-TW', convertDict(zhDict))) } catch { /* ignore */ }
+        }
+      }
+    } finally {
+      syncing = false
+    }
+  }
+  syncDshNamespaces()
+  if (typeof locale.subscribe === 'function') {
+    pushOff(locale.subscribe(syncDshNamespaces))
+  }
+
+  const origResolveText = typeof locale.resolveText === 'function' ? locale.resolveText.bind(locale) : null
+  if (origResolveText) {
+    locale.resolveText = (text) => {
+      const resolved = origResolveText(text)
+      if (resolveLangKey(language()) === 'zh-TW' && typeof text === 'object' && text !== null && !('zh-tw' in text)) {
+        return toTraditional(resolved)
+      }
+      return resolved
+    }
+    offs.push(() => { locale.resolveText = origResolveText })
+  }
+
   return () => {
+    disposed = true
     if (service === locale) { service = null; bound = null }
-    if (typeof off === 'function') off()
+    for (let i = offs.length - 1; i >= 0; i--) offs[i]()
   }
 }
 
@@ -1740,9 +1928,10 @@ export function t(key, params) {
 
 // A message from the host, in the interface language.
 export function hostText(message) {
-  if (!language().startsWith('zh')) return message
+  const lang = resolveLangKey(language())
+  if (lang === 'en') return message
   if (Object.hasOwn(ZH, message)) return t(message)
-  for (const [pattern, template] of HOST_ERRORS) {
+  for (const [pattern, template] of HOST_ERROR_TABLE[lang] ?? []) {
     if (pattern.test(message)) return message.replace(pattern, template)
   }
   return message
@@ -1754,7 +1943,4 @@ export function language() {
   return typeof active === 'string' ? active : 'en'
 }
 
-export const dateLocale = () => (language().startsWith('zh') ? 'zh-CN' : 'en-US')
-
-// Translations for the tests: the Chinese dictionary itself.
-export const DICTIONARY = { zh: ZH }
+export const dateLocale = () => DATE_LOCALES[resolveLangKey(language())] ?? 'en-US'

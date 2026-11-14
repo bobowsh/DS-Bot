@@ -18,7 +18,7 @@ import { t } from './i18n.js'
 import { call } from './api.js'
 import { failureLabel } from './diagnostics.js'
 import { turnReasoning, thinkingStep, opensReply, stepActivity } from './turn-reasoning.js'
-import { parseReplies, stackReplies } from '../shared/group-replies.js'
+import { parseReplies, relayRange, stackReplies } from '../shared/group-replies.js'
 import { FOLD_AT, FOLD_HUGE, stripLongNote, useFold } from './fold.js'
 import { noHover, useViewport, viewBottom } from './motion.js'
 import { heldCardKey } from './sources.js'
@@ -550,13 +550,14 @@ function EarlierParts({ sessionId, roster, actions }) {
       setView(current => ({ ...current, loading: false, failed: true }))
     })
   }
+  const closedEarlier = JSON.stringify((roster.byId[sessionId]?.parts ?? []).map(part => roster.closedCards?.[part] ?? null))
   useEffect(() => {
     generation.current += 1
     busy.current = false
     setView({ pages: [], cursor: undefined, loading: true, failed: false, startedAt: null })
     load(undefined)
     return () => { generation.current += 1 }
-  }, [sessionId])
+  }, [sessionId, closedEarlier])
   useLayoutEffect(() => {
     const pending = restore.current
     restore.current = null
@@ -981,6 +982,11 @@ function RelayEvent({ reply, bot, sessionId, actions }) {
 
 // 群聊一轮的成员回复：成员气泡与「正在输入」提示都原地画在工具座位里
 // （上游式：藏掉折叠标题、正文平铺展开），所以回复不再搬到轮次尾部。
+// 结算后的那一轮，上游改为从群的账本（ledger）里按行号区间读回整段，
+// 这段逻辑与形态2 的原地绘制不冲突，两段并存。
+// Rows a later call closed do not change: each is read from the group's book once per page.
+const settledRows = new Map()
+
 function GroupReplies({ sessionId, callId, done, content, roster, actions, useUi, useWork }) {
   const [live, setLive] = useState({ replies: [], speaking: [] })
   useEffect(() => {
@@ -999,16 +1005,49 @@ function GroupReplies({ sessionId, callId, done, content, roster, actions, useUi
     void tick()
     return () => { stop = true; clearTimeout(timer) }
   }, [done, sessionId, callId])
+  // A settled round names where its rows are in the group's book; one from before
+  // the ledger carries them in its result.
+  const resultText = done ? contentText(content) : ''
+  const range = done ? relayRange(resultText) : undefined
+  const rowsKey = range === undefined ? undefined : `${sessionId}:${range.from}:${range.to ?? ''}:${range.anchor ?? ''}`
+  const [view, setView] = useState(() => (rowsKey === undefined ? null : settledRows.get(rowsKey) ?? null))
+  // An open cell that is quiet is read again when the team changes, not on a clock.
+  const quietKey = view?.open === true && view.active !== true ? roster.revision : undefined
+  useEffect(() => {
+    if (rowsKey === undefined) return undefined
+    const known = settledRows.get(rowsKey)
+    if (known !== undefined) { setView(known); return undefined }
+    // The newest call's rows grow while the group works: they are read every second then,
+    // and once when the group is quiet, until the next call closes them.
+    let stop = false
+    let timer
+    let seen = ''
+    const tick = async () => {
+      const next = await actions.groupRows(sessionId, range.from, range.to, range.anchor)
+      if (stop) return
+      if (next !== null && Array.isArray(next?.rows)) {
+        if (!next.open) settledRows.set(rowsKey, next)
+        const key = JSON.stringify(next)
+        if (key !== seen) { seen = key; setView(next) }
+        if (!next.open || next.active !== true) return
+      }
+      timer = setTimeout(tick, document.hidden ? 5000 : 1000)
+    }
+    void tick()
+    return () => { stop = true; clearTimeout(timer) }
+  }, [rowsKey, quietKey])
   let replies = live.replies
   let broken = false
-  if (done) {
-    const parsed = parseReplies(contentText(content))
+  if (range !== undefined) {
+    replies = view?.rows ?? live.replies
+  } else if (done) {
+    const parsed = parseReplies(resultText)
     replies = parsed.replies.length ? parsed.replies : live.replies
     broken = parsed.broken
   }
   // Every member answering in the round is typing; what each is doing comes as text,
   // so the cell redraws only when that changes.
-  const pending = done ? [] : live.speaking
+  const pending = range !== undefined ? (view?.open ? view.speaking ?? [] : []) : done ? [] : live.speaking
   const doing = JSON.parse(useWork?.(work => JSON.stringify(pending.map((id) => {
     const tool = work.bots?.[id]?.tool
     return tool ? [tool, workPhrase(work.bots[id])] : []
@@ -1108,8 +1147,16 @@ const blockOf = props => props.block
 // row says. `env` carries the session, the roster and the actions the row reads.
 export function renderTeamCall(call, env) {
   const { sessionId, roster, actions, useUi, useWork, heldCards, hooks } = env
-  // A Bot-to-Bot turn is the team's own business: it shows nowhere.
-  if (roster === undefined || isHiddenTurn(roster, sessionId, call.turn)) return h(CellEmpty)
+  // A Bot-to-Bot turn is the team's own business: it shows nowhere — except a
+  // question or view card the user dismissed or answered by message, which
+  // settles in the transcript where the call was made.
+  if (roster === undefined) return h(CellEmpty)
+  if (isHiddenTurn(roster, sessionId, call.turn)) {
+    const name = toolName(call)
+    const closed = roster.closedCards?.[sessionId]?.[call.callId]
+    const settles = (name === 'ask_user' || name === 'show_view') && call.callId && closed !== undefined
+    if (!settles) return h(CellEmpty)
+  }
   const tool = toolName(call)
   const done = call.kind === 'tool-result'
   const { text: arg, value: argValue } = toolArgs(call)
@@ -1164,7 +1211,7 @@ export function renderTeamCall(call, env) {
     }
     case 'ask_user': {
       const question = roster.questions?.[sessionId]
-      if (!question || question.callId !== call.callId) {
+      if (!question || (question.callSessionId ?? sessionId) !== sessionId || question.callId !== call.callId) {
         // Dismissed or answered by a message: the card stays here, read-only.
         // Answered on the card: its reply message carries it, so no gap here.
         const closed = roster.closedCards?.[sessionId]?.[call.callId]
