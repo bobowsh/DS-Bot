@@ -21,17 +21,39 @@ const RETIRED_BUNDLES = [LEGACY_ENGINE, 'dsbot-engine']
 // graph, resolves bundles there first, and keeps the bundles it names as direct dependencies from removal.
 export const INSTALL_ANCHOR = fileURLToPath(new URL('../package.json', import.meta.url))
 
-// The intranet registries the factory plugins and skills are distributed from. DSHM_REGISTRY_URL
-// is read by the dshmarket plugin from the Host's environment; the other two are written into the
-// profile by loadAppProfile(). All three are constants of this installation, not user settings.
+// The intranet registries the factory plugins and skills are distributed from: the npm registry
+// (written into the profile as .npmrc) and the SkillHub catalog (written as a --patch overlay).
+// Both are constants of this installation, not user settings.
+//
+// The plugin market's catalog is deliberately NOT named here. dshmarket already carries its own
+// catalog source list (its official domain, with the published `dsh-plugin-catalog` npm package as
+// a fallback), and setting DSHM_REGISTRY_URL REPLACES that whole list rather than heading it
+// (dshmarket lib/regions.js routesFor). Pointing it at an intranet address therefore costs the
+// market its own sources, and while that intranet service is down the market has no catalog at
+// all. Leaving the variable unset keeps the market on its own routing, and keeps us from having
+// to track dshmarket's sources as it updates them.
+//
+// The intranet catalog is still used by our own factory plugin auto-update (factory-update.mjs,
+// which has its own CATALOG_URL) — that is a different line from the public market.
 export const NPM_REGISTRY = 'http://192.168.1.10:3000/api/packages/dshplugin/npm/'
-export const CATALOG_URL = 'http://192.168.1.10:3000/dshplugin/dsh-catalog/raw/branch/main/plugins.json'
 export const SKILLHUB_REGISTRY = 'http://192.168.1.10:8081'
-export const DSHM_REGISTRY_URL = CATALOG_URL
 
 const FACTORY_PATCH_NAME = 'factory-registry.patch.yml'
+// The marketplace's download region, pinned here rather than left to its own probe.
+//
+// dshmarket tries its catalog sources in the region's order (lib/regions.js). The `global`
+// order asks the project's own domain FIRST — measured on this network: 15.3 MB at about
+// 10 KB/s, so the first source alone holds the market for minutes before it falls back. The
+// `china` order asks an npm mirror first, which serves the same catalog as a 5 MB package in
+// well under a second. Measured end to end with dshmarket's own code: global 355 s / 10,936
+// entries, china 0.9 s / 10,974 entries.
+//
+// It is a config-layer choice, not a patch to dshmarket: routes.js reads `config.region`, and
+// treats a region written into the profile as the operator's answer, so its probe stands down.
+const MARKET_REGION = 'china'
 const FACTORY_PATCH_ROWS = [
   { id: 'astron-skillhub', name: '@astron-team/skillhub-dsh', config: { registryUrl: SKILLHUB_REGISTRY } },
+  { id: 'dsh-market', config: { region: MARKET_REGION } },
 ]
 const npmrcMarker = '# managed by LinkHarness factory registries\n'
 const npmrcManaged = `${npmrcMarker}registry=${NPM_REGISTRY}\n`
@@ -52,6 +74,36 @@ export function writeFactoryNpmrc(dir) {
   }
   writeFileSync(file, npmrcManaged, 'utf8')
   return { written: true, kept: false }
+}
+
+/**
+ * Keep the marketplace's saved region in step with MARKET_REGION.
+ *
+ * The plugin keeps its own state (`<profile>/.dsh-market/state.json`), and a region written
+ * there wins over the composition's config (dshmarket lib/routes.js: it copies
+ * `marketState.region` over `config.region` before choosing sources). A machine that has been
+ * probed once therefore keeps the region the probe picked — `global` here, whose first catalog
+ * source is the slow one — and the patch alone would never take effect on it.
+ *
+ * Only an AUTO-picked region is replaced: `regionAuto` records that the probe chose it. A region
+ * the user picked themselves is left alone, which is what the flag is there to tell apart.
+ * @param {string} dir - the profile directory
+ * @returns {'updated' | 'kept' | 'absent'} what it did
+ */
+export function alignMarketRegion(dir) {
+  const file = join(dir, '.dsh-market', 'state.json')
+  let state
+  try {
+    state = JSON.parse(readFileSync(file, 'utf8'))
+  } catch {
+    // No state yet (a fresh profile): the patch's region is the only answer, nothing to align.
+    return 'absent'
+  }
+  if (state === null || typeof state !== 'object' || Array.isArray(state)) return 'kept'
+  if (state.region === MARKET_REGION && state.regionAuto !== true) return 'kept'
+  if (state.regionAuto !== true && state.region !== undefined) return 'kept'
+  writeFileSync(file, `${JSON.stringify({ ...state, region: MARKET_REGION, regionAuto: false }, undefined, 2)}\n`, 'utf8')
+  return 'updated'
 }
 
 /**
@@ -89,6 +141,7 @@ export function loadAppProfile() {
   initProfile(dir, BUNDLES)
   claimBundles(dir)
   writeFactoryNpmrc(dir)
+  alignMarketRegion(dir)
   return loadOwnBundles(dir, BUNDLES)
 }
 
