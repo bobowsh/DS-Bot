@@ -92,6 +92,7 @@ const probe = expression => `(() => {
   const body = document.querySelector('[data-step-process] > [data-step-process-body]')
   const bubbles = [...document.querySelectorAll('.bt-group-msg')]
   const notices = [...document.querySelectorAll('.bt-activity')]
+  const status = [...document.querySelectorAll('.bt-turn-status')]
   const all = [...document.querySelectorAll('.bt-activity, .bt-group-msg')]
   const i = all.findIndex(n => n.className === 'bt-activity')
   const j = all.findIndex(n => n.className === 'bt-group-msg')
@@ -105,6 +106,8 @@ const probe = expression => `(() => {
     bodyDisplay: body ? getComputedStyle(body).display : null,
     bubbles: bubbles.length,
     notices: notices.length,
+    turnStatusRows: status.length,
+    turnStatusText: status.map(n => n.innerText.trim()),
     noticeBeforeBubble: i >= 0 && j >= 0 ? i < j : null,
     bubbleNames: bubbles.map(n => n.querySelector('.bt-group-name')?.textContent ?? ''),
     hasToolHeaderText: text.includes('已调用工具') || text.includes('Called tools'),

@@ -1265,8 +1265,16 @@ export function TeamToolView(props) {
   return renderTeamCall(call, env)
 }
 
-// A turn's own process seat: the host draws the fold and the header; the team
-// keeps the fold open so a Bot chat is flat in every work-details mode.
+// A turn's own process seat.
+//
+// The host draws this seat: the turn's status row ("已完成，用时 3 秒") and the
+// fold over the turn's process. The team owns the seat, so it draws that row
+// itself — with the host's own wording and shape — and keeps the fold open so a
+// Bot chat is flat in every work-details mode.
+//
+// A group chat shows only the conversation: the members' bubbles and the "is
+// typing" notice. It has no tool rows and no turn status row either, so the row
+// is drawn in a private chat only.
 export function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTurnClock, actions }) {
   const open = turnProcess === undefined || !turnProcess.foldable || turnProcess.open
   useEffect(() => {
@@ -1274,6 +1282,7 @@ export function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi
   }, [open, turnProcess])
   const turn = node?.location?.turn?.turn ?? node?.data?.turn
   const start = node?.location?.turn?.start?.time
+  const roster = useRoster(value => value)
   const hidden = useRoster(roster => isHiddenTurn(roster, sessionId, turn))
   // Exchange turns hide their replies but still show their trigger chip, so their start
   // counts for separators too.
@@ -1287,5 +1296,40 @@ export function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi
     return !hidden && typeof visit?.seen === 'number' && own?.first !== undefined && own.first <= visit.seen
       && own?.end !== undefined && own.end > visit.seen && own.end <= visit.entered
   })
-  return fresh ? h(NewDivider) : h(CellEmpty)
+  if (fresh) return h(NewDivider)
+  // A group chat shows only the conversation: no turn status row there.
+  if (roster?.roomsById?.[sessionId] !== undefined) return h(CellEmpty)
+  // The turn's status row: how long the turn took, in the host's wording.
+  const row = turnStatusRow(node)
+  return row === undefined ? h(CellEmpty) : h('div', { className: 'bt-turn-status' }, row)
+}
+
+// The turn's status line, in the host's wording: "已完成，用时 3 秒" for a turn
+// that ran, "已完成" for one whose length is unknown, "处理失败" for a failed
+// turn, "已停止" for a stopped one. The host writes the same words, so the two
+// read the same.
+function turnStatusRow(node) {
+  const location = node?.location
+  const turn = location?.kind === 'turn' || location?.kind === 'step' ? location.turn : undefined
+  if (turn?.status !== 'closed') return undefined
+  const reason = turn.end?.data?.reason?.kind
+  const stopped = reason === 'aborted' || reason === 'interrupted'
+  const elapsed = turn.start === undefined || turn.end === undefined ? undefined : Math.max(1000, turn.end.time - turn.start.time)
+  if (stopped) return t('Turn stopped')
+  if (reason === 'error') return t('Turn failed')
+  if (elapsed === undefined) return t('Turn done')
+  return t('Turn took {duration}', { duration: turnDurationLabel(elapsed) })
+}
+
+// How long a turn took, in the host's own words: "3 秒", "1 分 5 秒", "2 小时 3 分".
+function turnDurationLabel(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor(total / 60) % 60
+  const seconds = total % 60
+  const parts = []
+  if (hours > 0) parts.push(`${t('{n} hour', { n: hours })}`)
+  if (total >= 60) parts.push(`${t('{n} minute', { n: minutes })}`)
+  parts.push(`${t('{n} second', { n: seconds })}`)
+  return parts.join(' ')
 }
