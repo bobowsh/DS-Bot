@@ -354,8 +354,7 @@ test('each sub-call shows its own state, not its program\'s', () => {
   assert.match(shown(program([refused, posted])), /Couldn't post in the group.*Posted in.*Ops/)
 })
 
-// 团队自己的工具座位（上游式）：座位里只画团队的工具，别的工具一个都不画，
-// 所以群里看不到工具名、参数与输出。
+// 团队的工具视图：宿主树按工具名派发到它，团队的工具由团队画。
 const seatOf = (root, options = {}) => expand(ToolCell({
   node: { data: { root: blockOf(root, options.turn ?? 1) }, location: { turn: { turn: options.turn ?? 1 } } },
   sessionId: options.sessionId ?? chief.id,

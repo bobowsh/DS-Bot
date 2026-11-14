@@ -1051,16 +1051,21 @@ function GroupReplies({ sessionId, callId, done, content, roster, actions, useUi
     }))
 }
 
-// The calls the team's own tool seat draws. Every other tool draws nothing there,
-// so the transcript shows the team's own rows and no tool detail. The computer
-// calls draw too: they are the team's own rows about a Bot's screen.
-export const DRAWN = new Set([
+// The team's own tools. The host's tree draws every call and dispatches it by
+// wire name; the team registers a view for each of its own, so those calls
+// carry the team's rows and every other tool falls through to the host's.
+export const TEAM_TOOLS = [
   'message_bot', 'stop_bot', 'create_bot', 'update_bot', 'group_relay',
   'create_group', 'update_group', 'delete_group', 'post_to_group', 'ask_user',
   'request_secret', 'request_connector', 'mail_send', 'ask_user_question',
   'show_view', 'browser_handoff', 'computer_handoff', 'read_group_chat',
   'remember', 'forget',
-])
+]
+
+// The calls the team's own tool seat draws. Every other tool draws nothing there,
+// so the transcript shows the team's own rows and no tool detail. The computer
+// calls draw too: they are the team's own rows about a Bot's screen.
+export const DRAWN = new Set(TEAM_TOOLS)
 
 // A PTC program (`run_code`) dispatches the real tools as its sub-calls, so a
 // call draws by its own name wherever it sits in the tree.
@@ -1094,6 +1099,10 @@ function useShownCards(actions, sessionId, callIds) {
     return () => actions.noteCards(sessionId, ids, -1)
   }, [sessionId, key])
 }
+
+// The call of one stage, as the host's tool view hands it over: a preparing or
+// dispatched call, or a settled result.
+const blockOf = props => props.block
 
 // One team tool's row. The host owns the row's shape; the team owns what the
 // row says. `env` carries the session, the roster and the actions the row reads.
@@ -1232,6 +1241,28 @@ export function ToolCell({ node, sessionId, useRoster, useUi, useWork, useHeldCa
   if (drawn.length === 0) return h(CellEmpty)
   const env = { sessionId, roster, actions, useUi, useWork, findBot, heldCards, hooks: { useBrowserHolds, useBrowserTabs, useBrowserPages, useComputer } }
   return h(Fragment, null, drawn.map((call, index) => h(Fragment, { key: call.callId ?? index }, renderTeamCall(call, env))))
+}
+
+// One team tool's row, as the host's tool view delivers it: the host hands over
+// the call's identity, its phase and its block. The host owns the row's shape;
+// the team owns what the row says.
+export function TeamToolView(props) {
+  const call = blockOf(props)
+  const sessionId = props.sessionId
+  const roster = props.useRoster?.(value => value)
+  if (roster === undefined) return h(CellEmpty)
+  // A Bot-to-Bot turn is the team's own business: it shows nowhere.
+  if (isHiddenTurn(roster, sessionId, call.turn)) return h(CellEmpty)
+  const env = {
+    sessionId,
+    roster,
+    actions: props.actions ?? {},
+    useUi: props.useUi,
+    useWork: props.useWork,
+    heldCards: props.useHeldCards?.(state => state[sessionId]),
+    hooks: { useBrowserHolds: props.useBrowserHolds, useBrowserTabs: props.useBrowserTabs, useBrowserPages: props.useBrowserPages, useComputer: props.useComputer },
+  }
+  return renderTeamCall(call, env)
 }
 
 // A turn's own process seat: the host draws the fold and the header; the team
