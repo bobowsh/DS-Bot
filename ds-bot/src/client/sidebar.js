@@ -4,7 +4,7 @@ import { FishLogo } from './dsh-primitives.js'
 import { inkFill } from './inks.js'
 import { isMainOf } from './sources.js'
 import { currentPart, previewOf, relativeShort } from './text.js'
-import { PlusIcon, SearchIcon, SidebarIcon, GaugeIcon, ClockIcon, GearIcon, PinMarkIcon, ConnectorIcon, CloudDownloadIcon, SignInIcon, SignOutIcon, SlidersIcon, SwitchIcon, ChevronRightIcon, DotsIcon, FolderIcon } from './icons.js'
+import { PlusIcon, SearchIcon, SidebarIcon, GaugeIcon, ClockIcon, GearIcon, PinMarkIcon, ConnectorIcon, CloudDownloadIcon, SignInIcon, SignOutIcon, SlidersIcon, SwitchIcon, PlugIcon, ChevronRightIcon, DotsIcon, FolderIcon } from './icons.js'
 import { AideButton } from './aide-button.js'
 import { watchAideWorkbench } from './aide-bridge.js'
 import { lookOf, MAIN_LOOK } from './characters.js'
@@ -826,12 +826,13 @@ export function TeamSidebar(props) {
   // the whole session view — opening the workbench would cost a full-screen rebuild.
   const toAide = h(AideButton, { label: t('AIDE workbench') })
   const foot = wideContent
-    ? h('div', { className: 'bt-leftcol-foot' }, toAgent, toAide, h(AccountLauncher, { place: 'column', useSurface: props.useSurface, actions }))
+    ? h('div', { className: 'bt-leftcol-foot' }, toAgent, toAide, h(AccountLauncher, { place: 'column', useSurface: props.useSurface, actions }), h(PluginsButton, { actions }))
     : h('div', { className: 'bt-leftcol-foot bt-leftcol-foot-rail' },
         h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: () => actions.openNewChat('new') }, h(PlusIcon)),
         toAgent,
         toAide,
-        h(AccountLauncher, { place: 'column', useSurface: props.useSurface, actions }))
+        h(AccountLauncher, { place: 'column', useSurface: props.useSurface, actions }),
+        h(PluginsButton, { actions }))
   const content = h('div', { className: wideContent ? 'bt-side' : 'bt-side bt-rail', onKeyDown: typeToSearch },
     top,
     wideContent && roster.readOnly ? h('div', { className: 'bt-hint bt-read-only', role: 'status' }, hostText(roster.readOnly)) : null,
@@ -1162,7 +1163,8 @@ export function AccountLauncher({ place = 'column', settingsOpen, openSettings, 
       [t('Automation tasks'), ClockIcon, () => actions.selectPanel('schedules')],
       [t('Settings'), GearIcon, () => actions.openSettings('general')],
     ].filter(Boolean),
-  ]
+    typeof actions.setSurface === 'function' ? [[t('Classic Agent mode'), SwitchIcon, () => actions.setSurface('agent')]] : null,
+  ].filter(Boolean)
   if (signedIn) groups.push([[accountT('signOut'), SignOutIcon, askSignOut, undefined, true]])
   else if (signedOut) groups.push([[t('Sign in to DeepSeek'), SignInIcon, () => actions.signIn()]])
   // A launcher that this surface does not show draws nothing at all — not a
@@ -1324,6 +1326,15 @@ function useLandOnMainBot(roster, useSessions, actions) {
   }, [mainView, roster])
 }
 
+// The Plugins icon beside the foot's account gear: it opens the shell's plugin
+// manager panel. Wherever that panel's navigation face is absent — such as a
+// profile the peer may not list bundles in — nothing renders.
+export function PluginsButton({ actions }) {
+  if (!actions.hasPlugins?.()) return null
+  return h('button', { type: 'button', className: 'bt-account', 'aria-label': t('Plugins'), title: t('Plugins'), onClick: () => actions.openPlugins() },
+    h('span', { className: 'bt-you', 'aria-hidden': true }, h(PlugIcon)))
+}
+
 // The account menu in the host's own footer. It stands down: the classic page
 // already carries the account in the shell's own settings row, and the Bot page
 // carries it in our own column. A third copy in the footer would put a second
@@ -1350,13 +1361,16 @@ export function BotReturn({ useSurface, useRoster, actions }) {
 // Bot mode offers the way in, Agent mode the way back — the same click, either way.
 // Agent mode has none of the shell-group styles, so the return button carries its own.
 export const RETURN_CSS = `
-.bt-return{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:0;border-radius:999px;background:none;color:inherit;font:inherit;font-size:14px;line-height:20px;cursor:pointer;transition:background-color .12s ease}
-.bt-return:hover{background:rgba(127,127,127,.14)}
+.bt-return{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:0;border-radius:999px;background:var(--bt-return-fill);color:inherit;font:inherit;font-size:14px;line-height:20px;cursor:pointer;transition:background-color .12s ease}
+.bt-return:hover{background:var(--bt-return-fill-hover)}
 .bt-return:active{transform:scale(.96)}
 .bt-return .bt-mark{display:inline-flex;flex:none;line-height:0}
 .bt-return .bt-mark svg{width:100%;height:100%;overflow:visible}
 /* Shell styles carry --bt-ink-deepseek and Agent mode withdraws them; pin it here. */
 .bt-return .bt-mark{--bt-ink-deepseek:#4D6BFE}
+.bt-return-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt-return-swap{display:inline-flex;flex:none;line-height:0;opacity:.55}
+.bt-return-swap svg{width:16px;height:16px}
 `
 
 // The host's own footer holds a row of entries: the account button, the AIDE button, the
