@@ -193,10 +193,75 @@ await handle.writeFile(content, { encoding: "utf8", ... })
 4. 错误路径明确可读（不是堆栈）。
 5. 门禁三项与基线对比不新增失败。
 
-## 九、要用户与队长拍板的开放问题
+## 九、给宿主的缺口材料（等用户点头再提交）
 
-1. **宿主接口**：走 C（请 DSH 补 `ctx.fs.writeBytes`），还是先在插件里自己实现字节版原子写（C'，代价高、且 Windows DACL 那套逻辑没法干净复制）？
-2. **要不要同时给上游提 issue**：2026-11-10 的文档就写了「对外互动要用户点头」。上游 `Fei2411/DS-Bot` 或 DSH 本体——要不要我起一份说明这个缺口的 issue？
-3. **编码清单**：先支持哪几个？现成的 `encoding.js` 已经支持 `utf-8` / `utf-8-bom` / `utf-16le` / `utf-16be` / `gb18030` / `gbk` / `big5`，建议就这七个。
-4. **自动识别**：要不要在 read 失败时自动猜编码（`chardet` 已就位）并提示「这看起来是 GBK，要按 GBK 读吗」？建议**只提示、不自动**——猜错会制造新的坑。
-5. **那条禁令**：用户 2026-11-08 的原话是「团队至今仍在用『禁止用 pwsh 写文件』这条禁令绕开编码问题，今天还因此写坏过测试文件」。他要的是**别再写坏**。「读对了」能避免一半（读到乱码就知道不对），但「写回不破坏原编码」才是根治——**这条禁令什么时候能撤，取决于上面第 1 题**。
+> 对外互动要用户点头。以下材料整理好了，用户说提交就提交（可提交给 DSH 本体，或上游 `Fei2411/DS-Bot`）。
+
+### 缺口位置
+
+| 位置 | 现状 |
+|---|---|
+| `@deepseek-ai/dsh-fs`（服务定义） | 只有 `writeText`；无 `writeBytes` |
+| `@deepseek-ai/dsh-fs-local/lib/index.js:917` | `async writeText(target, content, expected, signal)` —— `content` 是字符串 |
+| 同文件 `:535` `writeFileAtomic(...)` | 内部原子写，`await handle.writeFile(content, { encoding: "utf8" })` —— **写盘编码写死 utf8** |
+| 同文件 `:890` / `:896` | **已有** `readBytes(target, signal, maxBytes)` / `readByteRange(target, range, signal)`，返回原始字节 |
+
+**版本核实**：npm 上最新的 `@deepseek-ai/dsh-fs-local@0.2.2-rc.3`（本仓库钉 `0.2.2-rc.1`）**仍然没有 `writeBytes`**，方法列表为 `readText` / `streamText` / `readBytes` / `readByteRange` / `listDir` / `writeText` / `editText` / `patchText` / `deleteFile` / `moveFile`。
+
+### 期望的签名与语义
+
+```ts
+/**
+ * Write a whole regular file as raw bytes.
+ * @param target - the resolved file.
+ * @param bytes  - the complete content, written verbatim (no decoding, no
+ *                 newline normalization, no BOM handling).
+ * @param expected - the observed-state intent, same shape as writeText's.
+ * @param signal - aborts the write (FS_ABORTED).
+ */
+writeBytes(target: FsTarget, bytes: Uint8Array, expected?: WriteIntent, signal?: AbortSignal): Promise<WriteOutcome>
+```
+
+**语义要点**（与 `readBytes` 对称）：
+
+1. **原样落盘**：字节一个不改——不按 utf8 解码、不规范化换行、不加/去 BOM。
+2. **原子发布**：与 `writeText` 同一套机制（同目录临时文件 → 替换），Windows 上保留目标文件的 DACL。
+3. **沙箱围栏**：写入仍经由 `ctx.fs`，`read-only` 预设照样拦得住——这是**插件侧无法自行实现**的部分。
+4. **观察语义**：沿用现有的「先读后写」（`replaceIfVersion` / `createIfAbsent`），版本不符报 `FS_STALE_VERSION`。
+5. **上限**：与 `readBytes` 的 `maxBytes` 对称，超出报 `FS_TOO_LARGE`。
+6. **返回**：与 `writeText` 同形的 `WriteOutcome`（`operation` / `version` / `before` / `after`；字节写没有 `before`/`after` 文本形态时置空）。
+
+### 为什么插件侧不能自行实现
+
+| 做法 | 为什么不行 |
+|---|---|
+| 用 Node `fs` 直接写字节 | 绕过 `ctx.fs` → 绕过沙箱围栏。用户给 Bot 选「仅可查看」时它照样能写文件。**这是安全回归**（2026-11-10 那版实现就是这么栽的，已删除）。 |
+| 借 `writeText` 传字符串 | 非 UTF-8 的字节不是字符串；`writeFileAtomic` 写死 `encoding: "utf8"`，传 Buffer 会被当 UTF-8 字符串编码，字节全变。 |
+| 自己在插件里复刻原子写 | `dsh-fs-local` 的原子写不是导出物；它的 Windows DACL 保留、`ReplaceFileW` 调用、临时文件与清理逻辑与宿主版本绑定。复制一份既违反 AGENTS.md 第 3 条（需署名），也会随宿主升级腐坏。 |
+
+### 宿主补上之后我们的接入点
+
+| 我们的文件 | 改动 |
+|---|---|
+| `ds-bot/src/host/fs-encoding.js` | 加 `writeBytesThrough(fs, path, bytes)`：`fs.resolve(path)` → `fs.writeBytes(target, bytes)` |
+| `ds-bot/src/host/encoding.js` | 加 `encodeBytes(text, encoding)`（`iconv-lite` 的编码方向，现只有解码） |
+| `ds-bot/src/host/fs-write-tool.js`（新） | `writebytes` 工具定义与执行器 |
+| `ds-bot/src/host/constants.js` | `TEAM_TOOLS` 加 `writebytes` |
+| `ds-bot/src/client/cells.js` | 工具事件行认识 `writebytes` 的展示文案 |
+
+**读这一半不用再做**：影子 `read`（`fs-read-tool.js`）已经能按编码读出文本，带 `encoding` 参数。
+
+**新工具不改任何现有行为**：`writebytes` 是新增的独立工具，不给宿主 `read`/`write`/`edit` 加参数，老会话、老 prompt、老脚本零影响。
+
+## 十、已拍板与待办（2026-11-14 队长拍板）
+
+**已拍板**：
+
+1. **走 C** —— 请宿主补 `ctx.fs.writeBytes(target, bytes)`，与 `readBytes` 对称。**不要**在插件里自己做字节版原子写（绕过沙箱围栏，Windows DACL 那套也没法干净复制）。
+2. **不对外互动** —— 先不起上游 issue。缺口材料已整理进第九节，等用户说提交再提交。
+3. 「禁止用 pwsh 写文件」与本任务无关，作废，不再问。
+
+**我们这边要做的**：把工具形态（`file_path` + base64 的 `bytes` + 可选 `encoding` + `mode`；不传参时 `bytes` 即最终字节）落成方案文档，等宿主一补就能接。
+
+**仍待用户拍板**：用户那条「禁止用 pwsh 写文件」的纪律什么时候能撤——「读对了」只避免一半，**写回不破坏原编码才是根治**，这取决于宿主什么时候补 `writeBytes`。
+
