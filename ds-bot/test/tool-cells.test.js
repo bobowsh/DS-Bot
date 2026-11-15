@@ -9,12 +9,12 @@ import { build } from 'esbuild'
 const { outputFiles } = await build({
   stdin: {
     contents: [
-      "export { TeamToolView, TriggerCell, callTree, CellEmpty, Bubbles } from './src/client/cells.js'",
+      "export { renderTeamCall, ToolCell, TriggerCell, callTree, CellEmpty, Bubbles, RelayTail } from './src/client/cells.js'",
       "export { stackReplies } from './src/shared/group-replies.js'",
       "export { QuestionDock, SettledQuestion } from './src/client/questions.js'",
       "export { SecretDock } from './src/client/secret-card.js'",
       "export { countCards } from './src/client/sources.js'",
-      "export { ViewMenuList, WidgetView } from './src/client/widget-cell.js'",
+      "export { ViewMenuList, WidgetView, WidgetDock } from './src/client/widget-cell.js'",
     ].join('\n'),
     resolveDir: fileURLToPath(new URL('..', import.meta.url)),
   },
@@ -47,10 +47,16 @@ class FakeObserver {
 // The markdown the host's renderer is given, and what DS Bot's copy controls write.
 const markdownTexts = []
 const copiedTexts = []
+const clipboard = {}
+class ClipboardItem {
+  constructor(items) { this.getType = type => Promise.resolve(items[type]) }
+}
 const module = { exports: {} }
 runInNewContext(outputFiles[0].text, {
   module, exports: module.exports,
-  document: { hidden: false }, TextEncoder, MutationObserver: FakeObserver,
+  document: { hidden: false, querySelector: () => null, addEventListener: () => {}, removeEventListener: () => {} }, TextEncoder, MutationObserver: FakeObserver,
+  window: { addEventListener: () => {}, removeEventListener: () => {}, innerWidth: 1200, innerHeight: 800, matchMedia: () => ({ matches: false }), getSelection: () => null, visualViewport: null, dispatchEvent: () => {} },
+  navigator: { clipboard }, ClipboardItem, Blob,
   setTimeout: (fn) => { const timer = { fn }; timers.add(timer); return timer },
   clearTimeout: timer => timers.delete(timer),
   require: (name) => {
@@ -65,7 +71,7 @@ runInNewContext(outputFiles[0].text, {
     throw new Error(`Unexpected platform module ${name}`)
   },
 })
-const { TeamToolView, TriggerCell, callTree, stackReplies, CellEmpty, Bubbles, QuestionDock, SettledQuestion, SecretDock, countCards, ViewMenuList, WidgetView } = module.exports
+const { renderTeamCall, ToolCell, TriggerCell, callTree, stackReplies, CellEmpty, Bubbles, QuestionDock, SettledQuestion, SecretDock, countCards, ViewMenuList, WidgetView, WidgetDock } = module.exports
 
 // Runs the effects collected since the last render; returns the cleanups.
 const mount = () => {
@@ -150,7 +156,7 @@ test('a group reply shows its time, and how long its turn ran', () => {
     { botId: 'writer', text: 'Draft is up.', time: today, duration: 68_000 },
     { botId: 'chief', text: 'Looks good.', time: yesterday, duration: 2_000 },
   ]
-  const out = show(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
+  const out = showRelay(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
   const times = findAll(out, node => node.props?.className === 'bt-group-time')
   const tooks = findAll(out, node => node.props?.className === 'bt-group-took')
   assert.deepEqual(times.map(text), [clockOf(today), `Yesterday ${clockOf(yesterday)}`])
@@ -166,7 +172,7 @@ test('a user message inside a group relay shows its time', () => {
     { kind: 'user', text: 'hold on', time: today },
     { botId: 'writer', text: 'Draft is up.', time: at(0, 14, 6), duration: 1000 },
   ]
-  const out = show(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
+  const out = showRelay(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
   const times = findAll(out, node => node.props?.className === 'bt-utime')
   assert.deepEqual(times.map(text), [clockOf(today)])
   assert.deepEqual(times.map(node => node.props.title), [`Today ${clockOf(today)}`])
@@ -176,7 +182,7 @@ test('a user message inside a group relay shows its time', () => {
 // with nothing to press.
 test('an old paused round shows the pause as a plain line', () => {
   const replies = [{ kind: 'paused', names: ['Writer', 'Coder'], count: 6, time: at(0, 14, 5) }]
-  const out = show(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
+  const out = showRelay(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
   const events = findAll(out, node => node.props?.className === 'bt-event').map(text)
   assert.deepEqual(events, ['Paused after 6 Bot relays. Waiting: Writer and Coder'])
   assert.equal(find(out, node => node.type === 'button'), undefined)
@@ -186,7 +192,7 @@ test('an old paused round shows the pause as a plain line', () => {
 // and says what lets them go on.
 test('a round the idle guard paused names the Bots and how they go on', () => {
   const replies = [{ kind: 'paused', idle: true, botId: 'chief', name: 'Chief', names: ['Writer'], count: 6, limit: 6, time: at(0, 14, 5) }]
-  const out = show(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
+  const out = showRelay(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
   const events = findAll(out, node => node.props?.className === 'bt-event').map(text)
   assert.deepEqual(events, ['Chief and Writer went back and forth 6 times without progress and paused. Write here to go on'])
 })
@@ -195,7 +201,7 @@ test('a round the idle guard paused names the Bots and how they go on', () => {
 // notice, so the user sees why nothing was answered.
 test('a group whose admin passed alone shows the notice', () => {
   const replies = [{ kind: 'admin-passed', botId: 'chief', name: 'Chief', time: at(0, 14, 5) }]
-  const out = show(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
+  const out = showRelay(call('group_relay', 'direct', { content: { replies } }), { sessionId: 'room' })
   const events = findAll(out, node => node.props?.className === 'bt-event').map(text)
   assert.deepEqual(events, ['Chief did not answer or call anyone; call a member with @Name'])
 })
@@ -218,18 +224,24 @@ test('a group post drawn from its trigger shows the time it came in', () => {
   effects = []
 })
 
-// #1: the host draws the tool rows and dispatches each call to the view
-// registered under its wire name. The team's tools register there, so the test
-// drives that view the way the host does.
+// 上游式：团队自己注册 tool-call 座位，用自己的 ToolCell 画团队的工具行。
+// 这个测试直接驱动那个渲染：团队的调用画出来，别的调用不画。
 const props = (root, { sessionId = chief.id, roster = team(), actions = {}, turn = 1, held = {} } = {}) => ({
   sessionId,
-  toolName: root?.name ?? root?.call?.name ?? '',
-  phase: root?.kind === 'tool-result' ? 'result' : 'start',
-  block: root?.kind === 'tool-result'
-    ? { ...root, turn: root.turn ?? turn }
-    : { phase: 'start', name: root?.name ?? root?.call?.name ?? '', callId: root?.callId, argsRaw: root?.argsRaw ?? root?.call?.argsRaw ?? '', subCalls: root?.subCalls ?? [], turn: root?.turn ?? turn },  useRoster: select => select(roster), useUi: select => select({ reactions: {}, visits: {} }), actions,
-  useHeldCards: select => select(held),
+  turn,
+  roster,
+  actions: { noteLive: () => {}, ...actions },
+  useUi: select => select({ reactions: {}, visits: {} }),
+  useWork: select => select({ bots: {} }),
+  heldCards: held[sessionId],
+  hooks: {},
 })
+// 一次调用：宿主交给座位的东西（准备中或已定的结果）。
+const blockOf = (root, turn) => root?.kind === 'tool-result'
+  ? { ...root, turn: root.turn ?? turn }
+  : { phase: 'start', name: root?.name ?? root?.call?.name ?? '', callId: root?.callId, argsRaw: root?.argsRaw ?? root?.call?.argsRaw ?? '', subCalls: root?.subCalls ?? [], turn: root?.turn ?? turn }
+// 团队的工具行：渲染一次调用。
+const teamRow = (root, options = {}) => expand(renderTeamCall(blockOf(root, options.turn ?? 1), props(root, options)))
 
 // The host walks the call tree and dispatches every call to the view under its
 // wire name. The team has a view for its own tools and none for the rest, so
@@ -254,7 +266,7 @@ const show = (root, options) => {
     const id = call.callId ?? call
     if (seen.has(id)) return
     seen.add(id)
-    if (isTeam(call)) out.push(expand(TeamToolView(props(call, options))))
+    if (isTeam(call)) out.push(teamRow(call, options))
     for (const child of call.subCalls ?? []) visit(child)
   }
   visit(root)
@@ -262,6 +274,11 @@ const show = (root, options) => {
   return out.flat()
 }
 const shown = (root, options) => text(show(root, options))
+
+// 群聊的成员气泡就地画在团队的工具行里（上游式），所以它跟别的工具一样走
+// showRelay 这个辅助。
+const showRelay = show
+const shownRelay = shown
 
 // One finished call of every kind ToolCell draws, and what it shows.
 const BRANCHES = [
@@ -286,11 +303,13 @@ const rosterFor = callId => team({ questions: { chief: question(callId) }, secre
 test('every call ToolCell draws shows the same nested in a PTC program as on its own', () => {
   assert.equal(BRANCHES.length, 15)
   for (const [name, options, expected] of BRANCHES) {
-    const native = shown(call(name, 'direct', options), { roster: rosterFor('direct') })
+    // group_relay 的成员气泡现在由轮次尾部画，别的工具仍在自己的行里。
+    const render = name === 'group_relay' ? shownRelay : shown
+    const native = render(call(name, 'direct', options), { roster: rosterFor('direct') })
     assert.match(native, expected, `${name} on its own`)
-    const nested = shown(program([call(name, 'program:ptc:1', options)]), { roster: rosterFor('program:ptc:1') })
+    const nested = render(program([call(name, 'program:ptc:1', options)]), { roster: rosterFor('program:ptc:1') })
     assert.equal(nested, native, `${name} under run_code`)
-    const deep = shown(program([call('run_code', 'program:ptc:1', { subCalls: [call(name, 'program:ptc:1:ptc:1', options)] })]), { roster: rosterFor('program:ptc:1:ptc:1') })
+    const deep = render(program([call('run_code', 'program:ptc:1', { subCalls: [call(name, 'program:ptc:1:ptc:1', options)] })]), { roster: rosterFor('program:ptc:1:ptc:1') })
     assert.equal(deep, native, `${name} two programs deep`)
   }
 })
@@ -301,7 +320,7 @@ test('a program draws every known sub-call in dispatch order and each call once'
   const secret = call('request_secret', 'program:ptc:3', { args: { name: 'DEMO_TOKEN' } })
   const root = program([message, call('run_code', 'program:ptc:4', { subCalls: [relay, secret, message] }), relay, call('bash', 'program:ptc:5')])
   assert.deepEqual(JSON.parse(JSON.stringify(callTree(root).map(entry => entry.callId))), ['program', 'program:ptc:1', 'program:ptc:4', 'program:ptc:2', 'program:ptc:3', 'program:ptc:5'])
-  const out = shown(root, { roster: team({ secretRequests: { chief: [request('program:ptc:3')] } }) })
+  const out = shownRelay(root, { roster: team({ secretRequests: { chief: [request('program:ptc:3')] } }) })
   assert.match(out, /Messaged.*Writer.*Group reply\..*Chief needs a key/)
   assert.equal(count(out, 'Messaged'), 1)
   assert.equal(count(out, 'Group reply.'), 1)
@@ -311,7 +330,7 @@ test('a program draws every known sub-call in dispatch order and each call once'
 test('nested group relays keep their own replies in order, each once', () => {
   const first = call('group_relay', 'program:ptc:1:ptc:1', { content: { replies: [{ botId: 'writer', text: 'First reply.' }] } })
   const second = call('group_relay', 'program:ptc:1:ptc:2', { content: { replies: [{ botId: 'writer', text: 'Second reply.' }] } })
-  const out = shown(program([call('run_code', 'program:ptc:1', { subCalls: [first, second] }), first]), { sessionId: 'room' })
+  const out = shownRelay(program([call('run_code', 'program:ptc:1', { subCalls: [first, second] }), first]), { sessionId: 'room' })
   assert.match(out, /First reply\..*Second reply\./)
   assert.equal(count(out, 'First reply.'), 1)
 })
@@ -320,7 +339,7 @@ test('cards and replies still show when the program\'s own call head left the lo
   const roster = team({ questions: { chief: question('program:ptc:3') }, secretRequests: { chief: [request('program:ptc:1')] } })
   const relay = call('group_relay', 'program:ptc:2', { content: { replies: [{ botId: 'writer', text: 'Group reply.' }] } })
   const root = { ...program([call('request_secret', 'program:ptc:1', { args: { name: 'DEMO_TOKEN' } }), relay, call('ask_user', 'program:ptc:3')]), name: '', call: null }
-  assert.match(shown(root, { roster }), /Chief needs a key.*Group reply\..*Which draft\?/)
+  assert.match(shownRelay(root, { roster }), /Chief needs a key.*Group reply\..*Which draft\?/)
 })
 
 test('each sub-call shows its own state, not its program\'s', () => {
@@ -335,15 +354,26 @@ test('each sub-call shows its own state, not its program\'s', () => {
   assert.match(shown(program([refused, posted])), /Couldn't post in the group.*Posted in.*Ops/)
 })
 
+// 团队的工具视图：宿主树按工具名派发到它，团队的工具由团队画。
+const seatOf = (root, options = {}) => expand(ToolCell({
+  node: { data: { root: blockOf(root, options.turn ?? 1) }, location: { turn: { turn: options.turn ?? 1 } } },
+  sessionId: options.sessionId ?? chief.id,
+  useRoster: select => select(options.roster ?? team()),
+  useUi: select => select({ reactions: {}, visits: {} }),
+  useWork: select => select({ bots: {} }),
+  useHeldCards: select => select(options.held ?? {}),
+  actions: { noteLive: () => {}, ...options.actions },
+}))
+
 // #1: the host draws every tool call, so a program is a container and its own
 // row is the host's generic one; the tools it dispatched are the host's rows.
 // The team draws only its own tools.
 test('the host draws the ordinary tools, and the team draws only its own', () => {
-  // An ordinary tool is not the team's, so the team has no view for it.
-  assert.ok(emptied(TeamToolView(props(call('bash', 'direct')))))
+  // An ordinary tool is not the team's, so the team draws nothing for it.
+  assert.ok(emptied(seatOf(call('bash', 'direct'))))
   // A program is a container: its sub-calls are the rows, not the program.
-  assert.ok(emptied(TeamToolView(props(program([])))))
-  assert.ok(emptied(TeamToolView(props(program([call('bash', 'program:ptc:1')])))))
+  assert.ok(emptied(seatOf(program([]))))
+  assert.ok(emptied(seatOf(program([call('bash', 'program:ptc:1')]))))
   effects = []
 })
 
@@ -375,7 +405,7 @@ test('every call that draws nothing leaves only the empty mark, so its seat can 
     call('ask_user_question', 'aq-call', { args: { questions: [{ question: 'Ship it?' }] }, running: true }),
     call('remember', 'm-call', { running: true }),
   ]) {
-    assert.ok(onlyMarks(TeamToolView(props(root, { roster, held }))), `${root.name} leaves only marks`)
+    assert.ok(onlyMarks(teamRow(root, { roster, held })), `${root.name} leaves only marks`)
     effects = []
   }
 })
@@ -402,15 +432,15 @@ const slotOf = (out) => {
 test('a node holding a visible event next to a mark is not emptied', () => {
   const actions = { noteLive() {}, noteCards() {} }
   // Marks alone: emptied, so the row or seat wrapping the slot may hide.
-  const alone = slotOf(TeamToolView(props(call('ask_user', 'direct'), { actions })))
+  const alone = slotOf(teamRow(call('ask_user', 'direct'), { actions }))
   mount()
   assert.equal(alone.dataset.btEmptied, '')
 
   // The host's tree holds "Messaged Writer" and an answered question's mark:
   // the event stays, so the node is not emptied.
   const mixed = slotOf([
-    expand(TeamToolView(props(call('message_bot', 'program:ptc:1', { args: { to: 'Writer' } }), { actions }))),
-    expand(TeamToolView(props(call('ask_user', 'program:ptc:2'), { actions }))),
+    teamRow(call('message_bot', 'program:ptc:1', { args: { to: 'Writer' } }), { actions }),
+    teamRow(call('ask_user', 'program:ptc:2'), { actions }),
   ])
   mount()
   assert.ok(mixed.childNodes.some(kid => kid.hasAttribute('data-bt-empty')), 'the answered question marks itself')
@@ -586,7 +616,7 @@ const notes = (root, options = {}) => {
     const id = call.callId ?? call
     if (seen.has(id)) return
     seen.add(id)
-    if (isTeam(call)) TeamToolView(props(call, { ...options, actions }))
+    if (isTeam(call)) renderTeamCall(blockOf(call, options.turn ?? 1), props(call, { ...options, actions }))
     for (const child of call.subCalls ?? []) visit(child)
   }
   visit(root)
@@ -632,7 +662,7 @@ const draw = (root, store, options = {}) => {
     if (seen.has(id)) return
     seen.add(id)
     if (isTeam(call)) {
-      TeamToolView(props(call, { ...options, actions: { noteCards: store.noteCards } }))
+      renderTeamCall(blockOf(call, options.turn ?? 1), props(call, { ...options, actions: { noteCards: store.noteCards } }))
       unmounts.push(mount())
     }
     for (const child of call.subCalls ?? []) visit(child)
@@ -822,28 +852,31 @@ test('a secret in a hidden turn shows in the dock instead of nowhere', () => {
 // JSON — draw the replies that survived, or a marker row, never a blank turn.
 test('a pruned group relay still draws the replies that survived', () => {
   const pruned = '{"replies":[{"botId":"writer","text":"Still here."},{"botId":"chief","text":"[... tool result middle pruned ...'
-  const out = show(call('group_relay', 'direct', { content: pruned }), { sessionId: 'room' })
+  const out = showRelay(call('group_relay', 'direct', { content: pruned }), { sessionId: 'room' })
   assert.match(text(out), /Writer.*Still here\./)
-  const gone = show(call('group_relay', 'direct', { content: '{"replies":[{"botId":"writer","text":"cut' }), { sessionId: 'room' })
+  const gone = showRelay(call('group_relay', 'direct', { content: '{"replies":[{"botId":"writer","text":"cut' }), { sessionId: 'room' })
   assert.match(text(gone), /The group replies could not be shown/)
 })
 
 // The prune marker's "]" must not end the scan, and a cut inside a string must
 // not hide the replies after it either.
-test('a group relay recovers replies after the prune marker', () => {
+test('a group relay recovers replies after the prune marker with and without a roundId', () => {
   const between = '{"replies":[{"botId":"writer","text":"First."}[... tool result middle pruned ...],{"botId":"chief","text":"Last."}]}'
-  const out = show(call('group_relay', 'direct', { content: between }), { sessionId: 'room' })
-  assert.match(text(out), /Writer.*First\..*Chief.*Last\./)
   const inside = '{"replies":[{"botId":"writer","text":"First."},{"botId":"chief","text":"cut[... tool result middle pruned ...]{"botId":"writer","text":"Last."}]}'
-  const out2 = show(call('group_relay', 'direct', { content: inside }), { sessionId: 'room' })
-  assert.match(text(out2), /Writer.*First\..*Last\./)
+  for (const args of [{}, { roundId: 'round-2' }]) {
+    const out = show(call('group_relay', 'direct', { args, content: between }), { sessionId: 'room' })
+    assert.match(text(out), /Writer.*First\..*Chief.*Last\./)
+    const out2 = show(call('group_relay', 'direct', { args, content: inside }), { sessionId: 'room' })
+    assert.match(text(out2), /Writer.*First\..*Last\./)
+    assert.doesNotMatch(text(out2), /round-2/)
+  }
 })
 
 // Only the compactor's own marker splits the text: a reply that quotes a
 // bracketed ellipsis stays whole.
 test('a reply quoting a bracketed ellipsis is not mistaken for a prune marker', () => {
   const quoted = '{"replies":[{"botId":"writer","text":"Step [... details ...] done."}[... tool result middle pruned ...]{"botId":"chief","text":"Last."}]}'
-  const out = show(call('group_relay', 'direct', { content: quoted }), { sessionId: 'room' })
+  const out = showRelay(call('group_relay', 'direct', { content: quoted }), { sessionId: 'room' })
   assert.match(text(out), /Step \[... details ...] done\..*Chief.*Last\./)
 })
 
@@ -851,17 +884,17 @@ test('a reply quoting a bracketed ellipsis is not mistaken for a prune marker', 
 test('a PTC group relay shows its replies from the sub-call, live and after reload', async () => {
   const replies = [{ botId: 'writer', text: 'Hello from Writer.' }, { botId: 'chief', text: 'Hello from Chief.' }]
   const finished = program([call('group_relay', 'call-1-1:ptc:1', { content: { replies } })])
-  const reloaded = shown(finished, { sessionId: 'room' })
+  const reloaded = shownRelay(finished, { sessionId: 'room' })
   assert.match(reloaded, /Writer.*Hello from Writer\..*Chief.*Admin.*Hello from Chief\./)
   const headless = { ...finished, name: '', call: null }
-  assert.equal(shown(headless, { sessionId: 'room' }), reloaded)
+  assert.equal(shownRelay(headless, { sessionId: 'room' }), reloaded)
 
   const progress = [{ callId: 'other', replies: [{ botId: 'chief', text: 'Not this round.' }] }, { callId: 'call-1-1:ptc:1', replies: replies.slice(0, 1), speaking: ['chief'] }]
   const asked = []
   const actions = { roomProgress: async (id) => { asked.push(id); return progress } }
   const running = program([call('group_relay', 'call-1-1:ptc:1', { running: true })], { running: true })
   // The host dispatches the relay sub-call itself, not the program around it.
-  const relay = find(TeamToolView(props(running.subCalls[0], { sessionId: 'room', actions })), node => node.type?.name === 'GroupReplies')
+  const relay = find(renderTeamCall(blockOf(running.subCalls[0], 1), props(running.subCalls[0], { sessionId: 'room', actions })), node => node.type?.name === 'GroupReplies')
   effects = []
   sets.length = 0
   relay.type(relay.props)
@@ -977,6 +1010,54 @@ test('a question or view card closed without an answer on it stays at its call, 
   assert.equal(text(view), 'Pick a laneDismissed')
   assert.equal(find(view, node => node.type === 'button'), undefined)
   assert.ok(find(show(call('show_view', 'v-answered', { args: pick }), { roster }), node => node.props?.className === 'bt-q-gone') !== undefined)
+})
+
+test('a hidden-turn card floats in the dock while pending, then leaves the dock and settles at its turn when closed', () => {
+  const store = cardStore()
+  const asked = { question: 'Which draft?', options: [{ label: 'Short' }] }
+  const pick = { title: 'Pick a lane', view: { type: 'options', id: 'lane', options: [{ label: 'Ship now' }] } }
+  const meter = { title: 'Hidden meter', view: { type: 'metric', label: 'Done', value: '3' } }
+  const root = program([
+    call('message_bot', 'm-hidden', { args: { to: 'Writer' } }),
+    call('show_view', 'm-view', { args: meter }),
+    call('ask_user', 'q-hidden', { args: asked }),
+    call('show_view', 'v-hidden', { args: pick }),
+  ])
+  const pendingRoster = team({
+    exchangeTurns: { [chief.id]: [1] },
+    questions: { [chief.id]: { id: 'q-1', callId: 'q-hidden', ...asked } },
+    views: { [chief.id]: { id: 'v-1', callId: 'v-hidden', ...pick } },
+  })
+  // While pending, the hidden turn draws nothing and marks no cards, so the docks show both.
+  const pendingCell = draw(root, store, { roster: pendingRoster })
+  assert.equal(text(pendingCell.out), '')
+  assert.deepEqual(store.state, {})
+  const pendingViewDock = expand(WidgetDock(dockProps(store, pendingRoster)))
+  const pendingQuestionDock = expand(QuestionDock(dockProps(store, pendingRoster)))
+  assert.match(text(pendingViewDock), /Pick a lane/)
+  assert.match(text(pendingQuestionDock), /Which draft\?/)
+  pendingCell.unmount()
+
+  // Once closed by message or dismiss, both docks empty and the hidden turn draws only the settled cards.
+  const closedRoster = team({
+    exchangeTurns: { [chief.id]: [1] },
+    questions: {},
+    views: {},
+    closedCards: { [chief.id]: { 'q-hidden': 'dismissed', 'v-hidden': 'replied' } },
+  })
+  assert.equal(expand(WidgetDock(dockProps(store, closedRoster))), null)
+  assert.equal(expand(QuestionDock(dockProps(store, closedRoster))), null)
+  const settledCell = show(root, { roster: closedRoster })
+  assert.equal(text(settledCell), 'Which draft?DismissedPick a laneAnswered by message')
+  assert.equal(find(settledCell, each => each.type === 'button'), undefined)
+
+  // A card carried from an earlier part stays in the dock even if the current part drew the same call id.
+  store.noteCards(chief.id, ['same-call'], 1)
+  const carriedRoster = team({
+    views: { [chief.id]: { id: 'v-2', callId: 'same-call', callSessionId: 'chief-old', ...pick } },
+  })
+  assert.match(text(expand(WidgetDock(dockProps(store, carriedRoster)))), /Pick a lane/)
+  assert.ok(find(show(call('show_view', 'same-call', { args: pick }), { roster: carriedRoster }), each => each.props?.className === 'bt-q-gone') !== undefined)
 })
 
 test('an answered question card keeps only the chosen rows, each under its card letter, and the own answer after them', () => {
@@ -1143,4 +1224,58 @@ test('a folded code block leaves no copy of only its shown part', async () => {
   assert.ok(markdownTexts.some(given => given.includes('```js')))
   assert.equal(copyOf(short).length, 0)
   effects = []
+})
+
+
+test('an attachment preview copies its full code and never writes a partial read', async () => {
+  const inner = Array.from({ length: 4000 }, (_, i) => `line ${i + 1}`).join('\n')
+  const full = '```js\n' + inner + '\n```'
+  let whole = true
+  const errors = []
+  const bubble = () => expand(Bubbles({
+    texts: [full.slice(0, 1000)], roster: team(), selfId: chief.id, sessionId: chief.id,
+    actions: { reportError: error => errors.push(error.message) },
+    whole: { length: full.length, load: async () => ({ text: full, whole }) },
+    useUi: select => select({ reactions: {} }),
+  }))
+  const copyOf = out => find(out, node => node.type === 'button' && node.props?.className?.includes('bt-fold-copy'))
+  markdownTexts.length = 0
+  copiedTexts.length = 0
+  await copyOf(bubble()).props.onClick()
+  assert.deepEqual(copiedTexts, [inner])
+  assert.ok(markdownTexts.every(text => !text.includes('```')))
+  copiedTexts.length = 0
+  whole = false
+  await copyOf(bubble()).props.onClick()
+  assert.deepEqual(copiedTexts, [])
+  assert.deepEqual(errors, ['Could not read the whole code block'])
+  effects = []
+})
+
+
+test('an attachment starts the clipboard write inside its click before loading the text', async t => {
+  const inner = Array.from({ length: 4000 }, (_, i) => `line ${i + 1}`).join('\n')
+  const full = '```js\n' + inner + '\n```'
+  let release
+  const loaded = new Promise(resolve => { release = resolve })
+  let writing = false
+  clipboard.write = async items => {
+    writing = true
+    const blob = await items[0].getType('text/plain')
+    copiedTexts.push(await blob.text())
+  }
+  t.after(() => { delete clipboard.write; effects = [] })
+  const out = expand(Bubbles({
+    texts: [full.slice(0, 1000)], roster: team(), selfId: chief.id,
+    whole: { length: full.length, load: () => loaded },
+    useUi: select => select({ reactions: {} }),
+  }))
+  copiedTexts.length = 0
+  const button = find(out, node => node.type === 'button' && node.props?.className?.includes('bt-fold-copy'))
+  const copying = button.props.onClick()
+  assert.equal(writing, true, 'write is called synchronously in the gesture')
+  assert.deepEqual(copiedTexts, [], 'nothing is written before the full read')
+  release({ text: full, whole: true })
+  await copying
+  assert.deepEqual(copiedTexts, [inner])
 })

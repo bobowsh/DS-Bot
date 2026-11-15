@@ -2,7 +2,7 @@ import { createElement as h, Fragment, useEffect, useLayoutEffect, useMemo, useR
 import { createPortal } from 'react-dom'
 import { MarkdownText, writeClipboard } from './dsh-primitives.js'
 import { inkText } from './inks.js'
-import { linkMentions, mentionTarget, dayLabel, contentText, stripHeader, isHiddenTurn, isRelayContext, relaysBefore, relayPart, commRunOf, toolArgs, reminderPrompts, elapsedLabel, clockLabel, messageClock } from './text.js'
+import { linkMentions, mentionTarget, dayLabel, contentText, stripHeader, isHiddenTurn, isRelayContext, relaysBefore, relayPart, commRunOf, toolName, toolArgs, reminderPrompts, elapsedLabel, clockLabel, messageClock } from './text.js'
 import { SmileIcon, ReplyIcon, DotsIcon, CheckIcon, DownloadIcon, CopyIcon, GoalIcon, MemoryIcon } from './icons.js'
 import { goalEventText } from './goal.js'
 import { colorOf, toolState, BotMark, RoomAvatar } from './mark.js'
@@ -18,7 +18,7 @@ import { t } from './i18n.js'
 import { call } from './api.js'
 import { failureLabel } from './diagnostics.js'
 import { turnReasoning, thinkingStep, opensReply, stepActivity } from './turn-reasoning.js'
-import { parseReplies, stackReplies } from '../shared/group-replies.js'
+import { parseReplies, relayRange, stackReplies } from '../shared/group-replies.js'
 import { FOLD_AT, FOLD_HUGE, stripLongNote, useFold } from './fold.js'
 import { noHover, useViewport, viewBottom } from './motion.js'
 import { heldCardKey } from './sources.js'
@@ -26,7 +26,7 @@ import { BtwCardView } from './btw.js'
 import { partIndexOf, withBtwRows } from './btw-model.js'
 import { ViaTag } from './user-message.js'
 import { layoutOf } from './themes.js'
-import { reasoningShown } from './work-details.js'
+import { thinkingShown } from './work-details.js'
 
 export { clockLabel }
 
@@ -63,24 +63,31 @@ export function Bubbles({ texts, roster, selfId, actions, streaming, sessionId, 
     Number.isFinite(time) ? h('div', { className: 'bt-utime', title: clockLabel(time) }, messageClock(time)) : null)
 }
 
-// A folded message's last code block shows only its start; LinkBot draws its own
+// A folded message's last code block shows only its start; LinkHarness draws its own
 // copy control for it, bound to the whole block. DSH's and the app's copy
 // buttons live in the block's banner and their markup differs, so none of
 // theirs is intercepted or cloned.
 function FoldCodeCopy({ code, actions }) {
   const [copied, setCopied] = useState(false)
-  const copy = () => {
-    void writeClipboard(code).then((ok) => {
-      if (!ok) { actions?.reportError?.(new Error('Could not copy the code block'), 'copy'); return }
+  const copy = async () => {
+    try {
+      if (typeof code === 'function' && typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+        // Safari needs the clipboard write inside the click, before the attachment loads.
+        const text = Promise.resolve().then(code).then(value => new Blob([value], { type: 'text/plain' }))
+        await navigator.clipboard.write([new ClipboardItem({ 'text/plain': text })])
+      } else {
+        const text = typeof code === 'function' ? await code() : code
+        if (!await writeClipboard(text)) throw new Error('Could not copy the code block')
+      }
       setCopied(true); setTimeout(() => setCopied(false), 1000)
-    }, () => actions?.reportError?.(new Error('Could not copy the code block'), 'copy'))
+    } catch (error) { actions?.reportError?.(error, 'copy') }
   }
   return h('button', { type: 'button', className: 'bt-tool bt-fold-copy', 'aria-label': copied ? t('Copied') : t('Copy'), title: copied ? t('Copied') : t('Copy'), onClick: copy }, copied ? h(CheckIcon) : h(CopyIcon))
 }
 
 // A folded message's last code block shows only its start. The start is not
 // given to the host's Markdown — its block would carry a copy bound to the
-// part shown — so LinkBot draws the part itself, with a copy bound to the
+// part shown — so LinkHarness draws the part itself, with a copy bound to the
 // whole block. `body` renders the markdown before the block.
 const foldArea = (body, code, codeHead, actions) => (code === undefined ? body
   : h('div', { className: 'bt-fold-code' },
@@ -265,8 +272,9 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   const members = steps.length ? steps : [data]
   // The host's own work-details mode decides whether a settled thought shows:
   // compact folds it away, the rest show its first line. The team follows it, so
-  // the chat and the host's settings never disagree.
-  const shown = reasoningShown(useWorkDetails?.(value => value))
+  // the chat and the host's settings never disagree. The user's own switch wins
+  // over the mode when they have made one.
+  const shown = thinkingShown(roster.prefs, useWorkDetails?.(value => value))
   // The host draws the header of a folded turn and keeps the state of the fold: its own
   // toggle turns it, and the answer comes back here. The team draws the rows themselves,
   // so they follow the same state: while the host says the turn is folded, they are not
@@ -542,13 +550,14 @@ function EarlierParts({ sessionId, roster, actions }) {
       setView(current => ({ ...current, loading: false, failed: true }))
     })
   }
+  const closedEarlier = JSON.stringify((roster.byId[sessionId]?.parts ?? []).map(part => roster.closedCards?.[part] ?? null))
   useEffect(() => {
     generation.current += 1
     busy.current = false
     setView({ pages: [], cursor: undefined, loading: true, failed: false, startedAt: null })
     load(undefined)
     return () => { generation.current += 1 }
-  }, [sessionId])
+  }, [sessionId, closedEarlier])
   useLayoutEffect(() => {
     const pending = restore.current
     restore.current = null
@@ -764,6 +773,20 @@ export function Nothing() { return null }
 
 export { CellEmpty }
 
+// 群视图标记：这个组件在群聊和单聊的轮次尾部都会挂载，按 roomsById 精确设置/清除标记，
+// 让 CSS 只在群视图里调整工具区的呈现、不碰单聊。
+// 成员回复与「正在输入」提示由 GroupReplies 原地绘制（上游式：藏折叠标题、内容平铺），
+// 这里不再重复画。
+export function RelayTail({ sessionId, useRoster }) {
+  const roster = useRoster?.(value => value)
+  useEffect(() => {
+    const conv = document.querySelector?.('[data-conversation-session]')
+    if (roster?.roomsById?.[sessionId]) conv?.setAttribute('data-bt-group-chat', '')
+    else conv?.removeAttribute('data-bt-group-chat')
+  }, [roster, sessionId])
+  return null
+}
+
 // A pause longer than this splits the transcript with a time separator.
 const SEPARATOR_GAP_MS = 30 * 60 * 1000
 function nextTurnStart(turns, turn) {
@@ -957,6 +980,13 @@ function RelayEvent({ reply, bot, sessionId, actions }) {
   return null
 }
 
+// 群聊一轮的成员回复：成员气泡与「正在输入」提示都原地画在工具座位里
+// （上游式：藏掉折叠标题、正文平铺展开），所以回复不再搬到轮次尾部。
+// 结算后的那一轮，上游改为从群的账本（ledger）里按行号区间读回整段，
+// 这段逻辑与形态2 的原地绘制不冲突，两段并存。
+// Rows a later call closed do not change: each is read from the group's book once per page.
+const settledRows = new Map()
+
 function GroupReplies({ sessionId, callId, done, content, roster, actions, useUi, useWork }) {
   const [live, setLive] = useState({ replies: [], speaking: [] })
   useEffect(() => {
@@ -975,20 +1005,55 @@ function GroupReplies({ sessionId, callId, done, content, roster, actions, useUi
     void tick()
     return () => { stop = true; clearTimeout(timer) }
   }, [done, sessionId, callId])
+  // A settled round names where its rows are in the group's book; one from before
+  // the ledger carries them in its result.
+  const resultText = done ? contentText(content) : ''
+  const range = done ? relayRange(resultText) : undefined
+  const rowsKey = range === undefined ? undefined : `${sessionId}:${range.from}:${range.to ?? ''}:${range.anchor ?? ''}`
+  const [view, setView] = useState(() => (rowsKey === undefined ? null : settledRows.get(rowsKey) ?? null))
+  // An open cell that is quiet is read again when the team changes, not on a clock.
+  const quietKey = view?.open === true && view.active !== true ? roster.revision : undefined
+  useEffect(() => {
+    if (rowsKey === undefined) return undefined
+    const known = settledRows.get(rowsKey)
+    if (known !== undefined) { setView(known); return undefined }
+    // The newest call's rows grow while the group works: they are read every second then,
+    // and once when the group is quiet, until the next call closes them.
+    let stop = false
+    let timer
+    let seen = ''
+    const tick = async () => {
+      const next = await actions.groupRows(sessionId, range.from, range.to, range.anchor)
+      if (stop) return
+      if (next !== null && Array.isArray(next?.rows)) {
+        if (!next.open) settledRows.set(rowsKey, next)
+        const key = JSON.stringify(next)
+        if (key !== seen) { seen = key; setView(next) }
+        if (!next.open || next.active !== true) return
+      }
+      timer = setTimeout(tick, document.hidden ? 5000 : 1000)
+    }
+    void tick()
+    return () => { stop = true; clearTimeout(timer) }
+  }, [rowsKey, quietKey])
   let replies = live.replies
   let broken = false
-  if (done) {
-    const parsed = parseReplies(contentText(content))
+  if (range !== undefined) {
+    replies = view?.rows ?? live.replies
+  } else if (done) {
+    const parsed = parseReplies(resultText)
     replies = parsed.replies.length ? parsed.replies : live.replies
     broken = parsed.broken
   }
   // Every member answering in the round is typing; what each is doing comes as text,
   // so the cell redraws only when that changes.
-  const pending = done ? [] : live.speaking
+  const pending = range !== undefined ? (view?.open ? view.speaking ?? [] : []) : done ? [] : live.speaking
   const doing = JSON.parse(useWork?.(work => JSON.stringify(pending.map((id) => {
     const tool = work.bots?.[id]?.tool
     return tool ? [tool, workPhrase(work.bots[id])] : []
   }))) ?? '[]')
+  // 上游式：成员气泡与「正在输入」提示都原地画在这里（群视图里折叠标题被藏掉、
+  // 正文平铺展开，所以它们照旧可见），不再搬到轮次尾部。
   if (replies.length === 0 && pending.length === 0) {
     // A pruned tool result left nothing to draw; keep a marker row instead of an
     // empty turn, which reads as a blank gap on a narrow first paint.
@@ -1001,16 +1066,19 @@ function GroupReplies({ sessionId, callId, done, content, roster, actions, useUi
       if (reply.kind === 'user') {
         return h('div', { key: `user-${index}`, className: 'bt-urow' },
           h('div', { className: 'bt-ububble' }, h(MarkdownText, { text: reply.text, labels: mdLabels(), variant: 'compact' })),
-          (reply.via !== undefined || Number.isFinite(time)) ? h('div', { className: 'bt-utime', title: clockLabel(time) }, ...(reply.via !== undefined ? [h(ViaTag, { key: 'via', via: reply.via })] : []), Number.isFinite(time) ? messageClock(time) : null) : null)
-      }
-      if (reply.kind !== undefined) {
-        return h(RelayEvent, { key: `${reply.botId ?? reply.kind}-${index}`, reply, bot, sessionId, actions })
+          (reply.via !== undefined || Number.isFinite(time)) ? h('div', { key: 'utime', className: 'bt-utime', title: clockLabel(time) }, ...(reply.via !== undefined ? [h(ViaTag, { key: 'via', via: reply.via })] : []), Number.isFinite(time) ? messageClock(time) : null) : null)
       }
       if (reply.kind === 'goal') {
         return h('div', { key: `goal-${index}`, className: 'bt-event', title: reply.text || undefined },
           h('span', { className: 'bt-event-ico', 'aria-hidden': true }, h(GoalIcon)), goalEventText(reply))
       }
-      return h(GroupMessage, { key: `${reply.botId}-${index}`, bot, texts, room, roster, actions, msgKey: callId ? `${sessionId}:${callId}:${index}` : undefined, useUi, time, duration })
+      if (reply.kind !== undefined) {
+        return h(RelayEvent, { key: `${reply.botId ?? reply.kind}-${index}`, reply, bot, sessionId, actions })
+      }
+      return h(GroupMessage, {
+        key: `${reply.botId}-${index}`, bot, texts, room, roster, actions,
+        msgKey: callId ? `${sessionId}:${callId}:${index}` : undefined, useUi, time, duration,
+      })
     }),
     pending.map((id, at) => {
       const bot = roster.byId[id]
@@ -1022,9 +1090,9 @@ function GroupReplies({ sessionId, callId, done, content, roster, actions, useUi
     }))
 }
 
-// The team's own tools. The host draws every tool call as a folded row and
-// dispatches each one to the view registered under its wire name, so the team
-// keeps its own rows here and every other tool falls through to the host's.
+// The team's own tools. The host's tree draws every call and dispatches it by
+// wire name; the team registers a view for each of its own, so those calls
+// carry the team's rows and every other tool falls through to the host's.
 export const TEAM_TOOLS = [
   'message_bot', 'stop_bot', 'create_bot', 'update_bot', 'group_relay',
   'create_group', 'update_group', 'delete_group', 'post_to_group', 'ask_user',
@@ -1032,6 +1100,11 @@ export const TEAM_TOOLS = [
   'show_view', 'browser_handoff', 'computer_handoff', 'read_group_chat',
   'remember', 'forget',
 ]
+
+// The calls the team's own tool seat draws. Every other tool draws nothing there,
+// so the transcript shows the team's own rows and no tool detail. The computer
+// calls draw too: they are the team's own rows about a Bot's screen.
+export const DRAWN = new Set(TEAM_TOOLS)
 
 // A PTC program (`run_code`) dispatches the real tools as its sub-calls, so a
 // call draws by its own name wherever it sits in the tree.
@@ -1070,23 +1143,23 @@ function useShownCards(actions, sessionId, callIds) {
 // dispatched call, or a settled result.
 const blockOf = props => props.block
 
-// One team tool's row, as the host's tool view delivers it. The host owns the
-// row's shape; the team owns what the row says.
-export function TeamToolView(props) {
-  const { toolName: tool, phase } = props
-  const call = blockOf(props)
-  const done = phase === 'result'
-  const { text: arg, value: argValue } = toolArgs(call)
-  const sessionId = props.sessionId
-  const roster = props.useRoster?.(value => value)
+// One team tool's row. The host owns the row's shape; the team owns what the
+// row says. `env` carries the session, the roster and the actions the row reads.
+export function renderTeamCall(call, env) {
+  const { sessionId, roster, actions, useUi, useWork, heldCards, hooks } = env
+  // A Bot-to-Bot turn is the team's own business: it shows nowhere — except a
+  // question or view card the user dismissed or answered by message, which
+  // settles in the transcript where the call was made.
   if (roster === undefined) return h(CellEmpty)
-  // A Bot-to-Bot turn is the team's own business: it shows nowhere.
-  if (isHiddenTurn(roster, sessionId, call.turn)) return h(CellEmpty)
-  const actions = props.actions ?? {}
-  const heldCards = props.useHeldCards?.(state => state[sessionId])
-  const useUi = props.useUi
-  const useWork = props.useWork
-  const hooks = { useBrowserHolds: props.useBrowserHolds, useBrowserTabs: props.useBrowserTabs, useBrowserPages: props.useBrowserPages }
+  if (isHiddenTurn(roster, sessionId, call.turn)) {
+    const name = toolName(call)
+    const closed = roster.closedCards?.[sessionId]?.[call.callId]
+    const settles = (name === 'ask_user' || name === 'show_view') && call.callId && closed !== undefined
+    if (!settles) return h(CellEmpty)
+  }
+  const tool = toolName(call)
+  const done = call.kind === 'tool-result'
+  const { text: arg, value: argValue } = toolArgs(call)
   const self = roster.byId[sessionId]
   const findBot = nameOrId => roster.byId[nameOrId] ?? roster.bots.find(bot => bot.name.toLowerCase() === String(nameOrId ?? '').toLowerCase())
   // The dock above the composer carries a card the transcript does not draw, so
@@ -1138,7 +1211,7 @@ export function TeamToolView(props) {
     }
     case 'ask_user': {
       const question = roster.questions?.[sessionId]
-      if (!question || question.callId !== call.callId) {
+      if (!question || (question.callSessionId ?? sessionId) !== sessionId || question.callId !== call.callId) {
         // Dismissed or answered by a message: the card stays here, read-only.
         // Answered on the card: its reply message carries it, so no gap here.
         const closed = roster.closedCards?.[sessionId]?.[call.callId]
@@ -1187,4 +1260,123 @@ export function TeamToolView(props) {
       }
       return h(CellEmpty)
   }
+}
+
+// The team's own tool seat: the team draws the tool rows itself, so a plain tool
+// call shows nothing here and no tool detail reaches the transcript. The host
+// still owns the seat: it hands over the call tree.
+export function ToolCell({ node, sessionId, useRoster, useUi, useWork, useHeldCards, useBrowserHolds, useBrowserTabs, useBrowserPages, useComputer, actions }) {
+  const roster = useRoster(value => value)
+  const heldCards = useHeldCards?.(state => state[sessionId])
+  const root = node.data.root
+  const turn = node.location?.turn?.turn ?? root.turn
+  const hidden = isHiddenTurn(roster, sessionId, turn)
+  const findBot = nameOrId => roster.byId[nameOrId] ?? roster.bots.find(bot => bot.name.toLowerCase() === String(nameOrId ?? '').toLowerCase())
+  const closed = roster.closedCards?.[sessionId]
+  // Hidden Bot-to-Bot turns keep their own calls out of the chat, except a question
+  // or view card the user dismissed or answered by message, which settles here.
+  const calls = hidden
+    ? callTree(root).filter(call => (toolName(call) === 'ask_user' || toolName(call) === 'show_view') && call.callId && closed?.[call.callId] !== undefined)
+    : callTree(root)
+  const drawn = calls.filter(call => DRAWN.has(toolName(call)) || isComputerCall(toolName(call)))
+  // The newest call still running names the work, so a program reads as the tool it is in.
+  const running = root.kind === 'tool-result' ? undefined : calls.findLast(call => call.kind !== 'tool-result')
+  const note = running ? toolActivity(toolName(running), toolArgs(running).text, findBot, roster.byId[sessionId]) : null
+  // A running tool shows only as the activity row's phrase.
+  useLiveNote(actions, sessionId, `tool:${root.callId ?? node.key}`, note)
+  useShownCards(actions, sessionId, drawn.filter(call => (CARDS.has(toolName(call)) || isComputerCall(toolName(call))) && call.callId).map(call => call.callId))
+  if (drawn.length === 0) return h(CellEmpty)
+  const env = { sessionId, roster, actions, useUi, useWork, findBot, heldCards, hooks: { useBrowserHolds, useBrowserTabs, useBrowserPages, useComputer } }
+  return h(Fragment, null, drawn.map((call, index) => h(Fragment, { key: call.callId ?? index }, renderTeamCall(call, env))))
+}
+
+// One team tool's row, as the host's tool view delivers it: the host hands over
+// the call's identity, its phase and its block. The host owns the row's shape;
+// the team owns what the row says.
+export function TeamToolView(props) {
+  const call = blockOf(props)
+  const sessionId = props.sessionId
+  const roster = props.useRoster?.(value => value)
+  if (roster === undefined) return h(CellEmpty)
+  // A Bot-to-Bot turn is the team's own business: it shows nowhere.
+  if (isHiddenTurn(roster, sessionId, call.turn)) return h(CellEmpty)
+  const env = {
+    sessionId,
+    roster,
+    actions: props.actions ?? {},
+    useUi: props.useUi,
+    useWork: props.useWork,
+    heldCards: props.useHeldCards?.(state => state[sessionId]),
+    hooks: { useBrowserHolds: props.useBrowserHolds, useBrowserTabs: props.useBrowserTabs, useBrowserPages: props.useBrowserPages, useComputer: props.useComputer },
+  }
+  return renderTeamCall(call, env)
+}
+
+// A turn's own process seat.
+//
+// The host draws this seat: the turn's status row ("已完成，用时 3 秒") and the
+// fold over the turn's process. The team owns the seat, so it draws that row
+// itself — with the host's own wording and shape — and keeps the fold open so a
+// Bot chat is flat in every work-details mode.
+//
+// A group chat shows only the conversation: the members' bubbles and the "is
+// typing" notice. It has no tool rows and no turn status row either, so the row
+// is drawn in a private chat only.
+export function TurnProcessCell({ node, sessionId, turnProcess, useRoster, useUi, useTurnClock, actions }) {
+  const open = turnProcess === undefined || !turnProcess.foldable || turnProcess.open
+  useEffect(() => {
+    if (!open) turnProcess.setOpen(true)
+  }, [open, turnProcess])
+  const turn = node?.location?.turn?.turn ?? node?.data?.turn
+  const start = node?.location?.turn?.start?.time
+  const roster = useRoster(value => value)
+  const hidden = useRoster(roster => isHiddenTurn(roster, sessionId, turn))
+  // Exchange turns hide their replies but still show their trigger chip, so their start
+  // counts for separators too.
+  useEffect(() => {
+    actions.noteTurnTime(sessionId, turn, 'first', start)
+  }, [sessionId, turn, start])
+  // The reply to a turn the user saw begin arrived while the user was away.
+  const visit = useUi(state => state.visits?.[sessionId])
+  const fresh = useTurnClock((state) => {
+    const own = state[sessionId]?.[turn]
+    return !hidden && typeof visit?.seen === 'number' && own?.first !== undefined && own.first <= visit.seen
+      && own?.end !== undefined && own.end > visit.seen && own.end <= visit.entered
+  })
+  if (fresh) return h(NewDivider)
+  // A group chat shows only the conversation: no turn status row there.
+  if (roster?.roomsById?.[sessionId] !== undefined) return h(CellEmpty)
+  // The turn's status row: how long the turn took, in the host's wording.
+  const row = turnStatusRow(node)
+  return row === undefined ? h(CellEmpty) : h('div', { className: 'bt-turn-status' }, row)
+}
+
+// The turn's status line, in the host's wording: "已完成，用时 3 秒" for a turn
+// that ran, "已完成" for one whose length is unknown, "处理失败" for a failed
+// turn, "已停止" for a stopped one. The host writes the same words, so the two
+// read the same.
+function turnStatusRow(node) {
+  const location = node?.location
+  const turn = location?.kind === 'turn' || location?.kind === 'step' ? location.turn : undefined
+  if (turn?.status !== 'closed') return undefined
+  const reason = turn.end?.data?.reason?.kind
+  const stopped = reason === 'aborted' || reason === 'interrupted'
+  const elapsed = turn.start === undefined || turn.end === undefined ? undefined : Math.max(1000, turn.end.time - turn.start.time)
+  if (stopped) return t('Turn stopped')
+  if (reason === 'error') return t('Turn failed')
+  if (elapsed === undefined) return t('Turn done')
+  return t('Turn took {duration}', { duration: turnDurationLabel(elapsed) })
+}
+
+// How long a turn took, in the host's own words: "3 秒", "1 分 5 秒", "2 小时 3 分".
+function turnDurationLabel(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor(total / 60) % 60
+  const seconds = total % 60
+  const parts = []
+  if (hours > 0) parts.push(`${t('{n} hour', { n: hours })}`)
+  if (total >= 60) parts.push(`${t('{n} minute', { n: minutes })}`)
+  parts.push(`${t('{n} second', { n: seconds })}`)
+  return parts.join(' ')
 }

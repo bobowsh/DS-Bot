@@ -76,9 +76,12 @@ export function newerVersion(a, b) {
  * @param {string} options.folder - the plugin's folder in the data directory
  * @param {string} [options.name] - the package name, when it is not the import plugin
  * @param {string} [options.version] - the folder's version, when the caller knows it
+ * @param {boolean} [options.disabledByDefault] - a plugin that ships turned off: it is put in
+ *   place and recorded as a dependency, but it is not put into the bundle list, so the Host does
+ *   not load it. The user can turn it on in the plugin manager, and then it stays on.
  * @returns {Promise<{ installed: boolean, updated: boolean, listed: boolean }>}
  */
-export async function installImportPlugin({ profileDir, folder, name = PLUGIN_NAME, version }) {
+export async function installImportPlugin({ profileDir, folder, name = PLUGIN_NAME, version, disabledByDefault = false }) {
   const target = pluginDir(profileDir, name)
   const targetVersion = await packageVersion(target)
   // The version is read from the folder's own manifest, so a start that finds nothing to do
@@ -115,9 +118,11 @@ export async function installImportPlugin({ profileDir, folder, name = PLUGIN_NA
   }
   // The profile owns the plugin: it is one of the profile's dependencies, not of the app's.
   manifest.dependencies = { ...dependencies, [name]: sourceVersion }
-  if (!known && !listed) {
+  // A plugin that ships turned off is recorded as a dependency but stays out of the bundle list:
+  // the Host does not load it until the user turns it on. One the user turned on keeps its place.
+  if (!known && !listed && !disabledByDefault) {
     manifest.dsh = { ...manifest.dsh, profile: { ...manifest.dsh?.profile, bundles: [...bundles, name] } }
   }
   await writeFile(join(profileDir, 'package.json'), `${JSON.stringify(manifest, undefined, 2)}\n`, 'utf8')
-  return { installed: true, updated, listed: !known && !listed }
+  return { installed: true, updated, listed: !known && !listed && !disabledByDefault }
 }

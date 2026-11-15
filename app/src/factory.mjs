@@ -1,21 +1,31 @@
 // The factory seed: the resources the installer ships with are put under the data location
 // on first launch, so a fresh install opens on a ready-made Bot team. ds-bot reads the team
-// from <dataDir>/factory/factory-team.json (src/host/factory-seed.js); the skills live in the
-// git repository at <dataDir>/skills-repo/, which the installer puts in the data directory
-// beside the program and the first run only copies when the installer could not move it there.
-// The first run never reaches the network. Later starts
-// update it with `git pull` against the remote the repository carries (or DS_BOT_SKILLS_REPO).
-// isomorphic-git is loaded lazily: an offline machine or a build without the package still
-// works with the copy, and never fails the start.
-import { cp, mkdir } from 'node:fs/promises'
+// from <dataDir>/factory/factory-team.json (src/host/factory-seed.js). The factory skills and
+// plugins travel inside the data tree itself (data/.agents/skills/, data/profiles/), so the
+// installer or the first start puts them in place without any network use; the seed below is
+// the only resource that is version-checked and copied on first launch.
+//
+// The factory rules are the other shipped file: AGENTS.md lands in the shared agents root
+// (<dataDir>/.agents/AGENTS.md), which the Host reads as DSH_AGENTS_HOME. It is a factory
+// component and follows the package it came with, so it is written on every start. The rules a
+// user writes for themselves belong in <dataDir>/AGENTS.md, the harness home file: it outranks
+// the shared root's, and nothing here ever writes it (only a blank file is put there once, so
+// the place to write is visible in the first place).
+import { cp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import * as nodeFs from 'node:fs'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 const seedFile = dataDir => join(dataDir, 'factory', 'factory-team.json')
-const repoDir = dataDir => join(dataDir, 'skills-repo')
-// The identity a pull authors with when it cannot fast-forward; the shipped repo has none.
-const GIT_IDENTITY = { name: 'LinkBot', email: 'ds-bot@localhost' }
+/** The shipped factory rules: what every fresh install tells its Bots. */
+const bundledRules = resourcesDir => join(resourcesDir, 'factory', 'AGENTS.md')
+/** Where the Host reads the shared root's rules from (DSH_AGENTS_HOME/AGENTS.md). */
+const rulesFile = dataDir => join(dataDir, '.agents', 'AGENTS.md')
+/** The harness home file: the user's own rules, which outrank the shared root's. */
+const userRulesFile = dataDir => join(dataDir, 'AGENTS.md')
+// Says what the file is for, without adding a rule of its own: an empty file is dropped by the
+// instruction loader (blank content is no content), so the hint has to be a comment.
+const USER_RULES_PLACEHOLDER = '<!-- Your own rules for every Bot go here. The factory rules are in .agents/AGENTS.md. -->\n'
 
 /** The version a factory seed declares, or undefined when there is none to read. */
 function seedVersion(path) {
@@ -36,24 +46,39 @@ function newerSeed(candidate, installed) {
   return String(candidate) > String(installed)
 }
 
-async function copyTree(from, to, signal) {
-  await mkdir(to, { recursive: true })
-  await cp(from, to, { recursive: true, signal })
+/** Write the factory rules into the shared agents root. Returns whether there were any to write. */
+async function installFactoryRules({ dataDir, resourcesDir, signal }) {
+  const bundled = bundledRules(resourcesDir)
+  if (!existsSync(bundled)) return false
+  // The rules are a factory component like the plugins: an upgrade replaces them, so a copy the
+  // package already put there is rewritten rather than compared.
+  await mkdir(join(dataDir, '.agents'), { recursive: true, signal })
+  await cp(bundled, rulesFile(dataDir), signal)
+  return true
 }
 
-async function loadGit() {
-  try {
-    // The network layer exports its http client as default: clone/fetch/pull take it as `http`.
-    const [git, httpModule] = await Promise.all([import('isomorphic-git'), import('isomorphic-git/http/node')])
-    return { ...git, http: httpModule.default ?? httpModule }
-  } catch (error) {
-    console.warn(`LinkBot: skills updates are unavailable without the isomorphic-git package (${error instanceof Error ? error.message : String(error)})`)
-    return undefined
+/** Put the blank harness home file in place, once, and never over rules the user wrote. */
+async function installUserRulesPlaceholder({ dataDir, signal }) {
+  const file = userRulesFile(dataDir)
+  if (existsSync(file)) {
+    // A file the user kept and then emptied is still theirs: leave an existing file alone, and
+    // only fill one that carries nothing at all, so a blank place to write appears.
+    try {
+      if ((await readFile(file, 'utf8')).trim() !== '') return false
+    } catch {
+      return false
+    }
+    await writeFile(file, USER_RULES_PLACEHOLDER, { encoding: 'utf8', signal })
+    return false
   }
+  // A first run reaches here before anything else has made the data location.
+  await mkdir(dataDir, { recursive: true, signal })
+  await writeFile(file, USER_RULES_PLACEHOLDER, { encoding: 'utf8', signal })
+  return true
 }
 
-export async function installFactoryResources({ dataDir, resourcesDir, skillsRepoDir, signal }) {
-  const result = { seedCopied: false, repo: 'kept' }
+export async function installFactoryResources({ dataDir, resourcesDir, signal }) {
+  const result = { seedCopied: false, rulesWritten: false, userRulesSeeded: false }
   const bundledSeed = join(resourcesDir, 'factory', 'factory-team.json')
   // A seed that ships a newer version replaces the one already installed: an upgrade must be able
   // to renew the factory team. The copy is skipped while the versions match, so a seed the user
@@ -64,58 +89,7 @@ export async function installFactoryResources({ dataDir, resourcesDir, skillsRep
     await cp(bundledSeed, seedFile(dataDir), signal)
     result.seedCopied = true
   }
-  const target = repoDir(dataDir)
-  // A repository is already in place: it is the user's, and the pull keeps it current.
-  if (existsSync(join(target, '.git'))) return result
-  // The installer puts the repository in the data directory beside the program. It could not
-  // when the parent folder cannot be written (as under Program Files), and the copy the
-  // installer left is then read from the program folder.
-  const bundledRepo = skillsRepoDir ?? join(resourcesDir, 'skills-repo')
-  if (!existsSync(bundledRepo)) {
-    result.reason = 'no bundled skills repo'
-    return result
-  }
-  if (!existsSync(target)) {
-    // The bundled repository ships whole, its .git included, so the installed copy can pull.
-    await copyTree(bundledRepo, target, signal)
-    result.repo = 'copied'
-    return result
-  }
-  // An install from a build whose bundle was no repository: hand it the shipped .git so the
-  // pull works from here on. The working tree the user has stays as it is.
-  if (existsSync(join(bundledRepo, '.git'))) {
-    await cp(join(bundledRepo, '.git'), join(target, '.git'), { recursive: true, signal })
-    result.repo = 'git-added'
-  }
+  result.rulesWritten = await installFactoryRules({ dataDir, resourcesDir, signal })
+  result.userRulesSeeded = await installUserRulesPlaceholder({ dataDir, signal })
   return result
-}
-
-/** The remote the pull uses: the environment, then the repository's own configuration, else none. */
-export async function skillsRepoRemote(dir, git, env = process.env) {
-  const fromEnv = env.DS_BOT_SKILLS_REPO?.trim()
-  if (fromEnv) return fromEnv
-  try {
-    const url = await git.getConfig({ fs: nodeFs, dir, path: 'remote.origin.url' })
-    return typeof url === 'string' ? url.trim() : ''
-  } catch {
-    return ''
-  }
-}
-
-export async function pullSkillsRepo({ dataDir, env = process.env }) {
-  const target = repoDir(dataDir)
-  try {
-    if (!existsSync(join(target, '.git'))) return
-    const git = await loadGit()
-    if (git === undefined) return
-    const url = await skillsRepoRemote(target, git, env)
-    // No remote: nothing to update, and nothing to warn about.
-    if (url === '') return
-    await git.fetch({ fs: nodeFs, http: git.http, dir: target, url, singleBranch: true, depth: 1 })
-    // pull wants an identity even when it only fast-forwards, and the installed repository
-    // carries none; the merge itself never authors anything under fastForwardOnly.
-    await git.pull({ fs: nodeFs, http: git.http, dir: target, url, singleBranch: true, fastForwardOnly: true, author: GIT_IDENTITY })
-  } catch (error) {
-    console.warn(`LinkBot: the skills repo was not updated: ${error instanceof Error ? error.message : String(error)}`)
-  }
 }

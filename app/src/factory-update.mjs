@@ -432,7 +432,7 @@ export async function updateFactoryPlugins({ dataDir, profileDir, catalogUrl = C
     catalog = await readCatalog(catalogUrl, fetchImpl)
   } catch (error) {
     result.reason = `the catalog could not be read: ${error instanceof Error ? error.message : String(error)}`
-    log.error(`LinkBot: ${result.reason}`)
+    log.error(`LinkHarness: ${result.reason}`)
     return result
   }
   result.checked = true
@@ -462,21 +462,21 @@ export async function updateFactoryPlugins({ dataDir, profileDir, catalogUrl = C
         // never touches the manifest, so a plugin the reader turned off stays off.
         if (isNew) await recordInstalledPlugin({ profileDir, name: update.name, version: update.version })
         result[isNew ? 'installed' : 'updated'].push(update.name)
-        log.info(`LinkBot: plugin ${update.name} ${isNew ? 'installed' : 'updated to'} ${update.version}`)
+        log.info(`LinkHarness: plugin ${update.name} ${isNew ? 'installed' : 'updated to'} ${update.version}`)
       } else if (outcome.incompatible) {
         // A plugin the running DSH cannot satisfy is skipped, not counted as a failure: #12
         // wants it looked at again the next day, when the app itself may have moved ahead.
         result.skipped.push(update.name)
-        log.info(`LinkBot: plugin ${update.name} was skipped: ${outcome.reason}`)
+        log.info(`LinkHarness: plugin ${update.name} was skipped: ${outcome.reason}`)
       } else {
         failures[update.name] = count + 1
         result.failed.push(update.name)
-        log.error(`LinkBot: plugin ${update.name} was not updated: ${outcome.reason ?? 'unknown reason'}`)
+        log.error(`LinkHarness: plugin ${update.name} was not updated: ${outcome.reason ?? 'unknown reason'}`)
       }
     } catch (error) {
       failures[update.name] = count + 1
       result.failed.push(update.name)
-      log.error(`LinkBot: plugin ${update.name} was not updated: ${error instanceof Error ? error.message : String(error)}`)
+      log.error(`LinkHarness: plugin ${update.name} was not updated: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
   await writeState(dataDir, { day: today, failures })

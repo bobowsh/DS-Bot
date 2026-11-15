@@ -1,9 +1,9 @@
 {
   "name": "deepseek-bot",
-  "productName": "LinkBot",
-  "version": "0.3.0",
+  "productName": "LinkHarness",
+  "version": "0.3.6",
   "private": true,
-  "description": "LinkBot desktop app: the ds-bot team on its own pinned DeepSeek Harness.",
+  "description": "LinkHarness desktop app: the ds-bot team on its own pinned DeepSeek Harness.",
   "author": "Fei2411",
   "homepage": "https://github.com/Fei2411/DS-Bot",
   "desktopName": "dsbot.desktop",
@@ -14,13 +14,14 @@
     "build": "vite build",
     "start": "electron .",
     "pack": "electron-builder --dir --publish never",
-    "dist": "electron-builder --publish never",
+    "dist": "node scripts/dist.mjs",
     "check-packed": "node scripts/check-packed.mjs",
+    "check-asar": "node scripts/check-asar-sources.mjs",
     "runtime": "node scripts/prepare-runtime.mjs",
     "check-lifecycle": "node scripts/check-lifecycle.mjs",
     "shot": "node scripts/shot.mjs",
     "icon": "node scripts/icon.mjs",
-    "test": "node --test \"test/*.test.mjs\""
+    "test": "node --test --test-force-exit \"test/*.test.mjs\""
   },
   "dependencies": {
     "@deepseek-ai/cordis-plugin-group": "1.1.0",
@@ -71,7 +72,6 @@
     "ds-bot": "file:../ds-bot",
     "dsh-xdpool": "2.6.1",
     "electron-updater": "6.8.10",
-    "isomorphic-git": "1.44.8",
     "js-yaml": "4.3.2",
     "pnpm": "11.7.0",
     "ws": "8.18.3",

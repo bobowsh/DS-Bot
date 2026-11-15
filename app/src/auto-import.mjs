@@ -4,6 +4,7 @@
 // removed afterwards, so a later DSH run uses its own default home again.
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
+import { DISPLAY_NAME } from './legacy.mjs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { userDshHome } from './import.mjs'
@@ -122,14 +123,14 @@ export async function removeDshHomeVariableWithNotice(io = {}) {
   const result = removeDshHomeVariable({ read: io.read, remove: io.remove, broadcast: io.broadcast, name: io.name })
   if (result.removed.length > 0) {
     // The line the installer check reads: it says the variables are gone.
-    console.log(`LinkBot: removed the ${DSH_HOME_VARIABLE} variable (${result.removed.join(', ')})`)
+    console.log(`LinkHarness: removed the ${DSH_HOME_VARIABLE} variable (${result.removed.join(', ')})`)
   }
   if (result.skipped.length === 0 && result.failed.length === 0) return result
   const show = io.show
   if (typeof show === 'function') {
     await show({
       type: 'warning',
-      title: 'LinkBot',
+      title: DISPLAY_NAME,
       message: 'The system-wide DSH_HOME variable could not be removed.',
       detail: 'Removing it needs administrator rights. The variable still points DeepSeek Harness at '
         + 'your own data folder; you can remove it yourself with a right-click on "Environment Variables" '

@@ -1,9 +1,10 @@
 // Gives the page that the app's Host serves the app's own bridge, and the app's start page its
-// own, smaller one; each window's arguments name the one page that gets it. On Windows it also
-// marks the Host's page for the frameless window the way DSH Desktop's preload does
-// (apps/desktop/src/preload-windows.ts, preload-platform.ts and preload-theme.ts; see NOTICE),
-// but without data-platform: that puts DSH's shortcuts on native menu input, which this
-// window does not have.
+// own, smaller one; each window's arguments name the one page that gets it. On Windows and
+// macOS it also marks the Host's page for the frameless window the way DSH Desktop's preload
+// does on Windows (apps/desktop/src/preload-windows.ts, preload-platform.ts and
+// preload-theme.ts; see NOTICE), but without data-platform: that puts DSH's shortcuts on
+// native menu input, which this window does not have. So macOS takes DSH's caption-band
+// layout too, with the traffic lights where Windows has its caption buttons' band.
 const { contextBridge, ipcRenderer } = require('electron')
 
 const argument = name => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3)
@@ -37,7 +38,7 @@ if (startPage !== undefined) {
         try { run(from) } finally { requestAnimationFrame(() => { requestAnimationFrame(() => { ipcRenderer.send('ds-bot:handoff-ready') }) }) }
       })
     },
-    // LinkBot's settings show and move the app's data location through this.
+    // LinkHarness's settings show and move the app's data location through this.
     dataLocation: () => ipcRenderer.invoke('ds-bot:data-location'),
     moveData: (workspace) => ipcRenderer.invoke('ds-bot:move-data', typeof workspace === 'string' ? workspace : undefined),
     teamWorkspaceChanged: (path) => { ipcRenderer.send('ds-bot:team-workspace', String(path)) },
@@ -139,7 +140,7 @@ if (startPage !== undefined) {
       if (fullscreen) root.dataset.fullscreen = 'true'
       else delete root.dataset.fullscreen
     })
-    loaded(() => { frameless(caption.slice('--ds-bot-caption='.length), process.argv.includes('--ds-bot-mica')) })
+    loaded(() => { frameless(caption.slice('--ds-bot-caption='.length), argument('ds-bot-material')) })
   }
 }
 
@@ -569,7 +570,7 @@ function startBridge() {
   const listeners = new Set()
   let last
   const tell = (listener, state) => {
-    try { listener(state) } catch (error) { console.error('LinkBot: a start state listener failed', error) }
+    try { listener(state) } catch (error) { console.error('LinkHarness: a start state listener failed', error) }
   }
   ipcRenderer.on('ds-bot:start-state', (_event, state) => {
     last = state
@@ -591,13 +592,13 @@ function browserBridge() {
   const viewListeners = new Set()
   ipcRenderer.on('ds-bot:browser-view-changed', (_event, change) => {
     for (const listener of [...viewListeners]) {
-      try { listener(change) } catch (error) { console.error('LinkBot: a browser view listener failed', error) }
+      try { listener(change) } catch (error) { console.error('LinkHarness: a browser view listener failed', error) }
     }
   })
   ipcRenderer.on('ds-bot:browser-open-requested', (_event, request) => {
     if (typeof request?.lease !== 'string' || typeof request.url !== 'string') return
     for (const listener of [...(listeners.get(request.lease) ?? [])]) {
-      try { listener(request.url) } catch (error) { console.error('LinkBot: a browser link handler failed', error) }
+      try { listener(request.url) } catch (error) { console.error('LinkHarness: a browser link handler failed', error) }
     }
   })
   return {
@@ -639,7 +640,7 @@ function updatesBridge() {
   const listeners = new Set()
   ipcRenderer.on('ds-bot:app-update-changed', (_event, state) => {
     for (const listener of [...listeners]) {
-      try { listener(state) } catch (error) { console.error('LinkBot: an update state handler failed', error) }
+      try { listener(state) } catch (error) { console.error('LinkHarness: an update state handler failed', error) }
     }
   })
   return {
@@ -654,14 +655,15 @@ function updatesBridge() {
   }
 }
 
-function frameless(height, mica) {
+function frameless(height, material) {
   const root = document.documentElement
   root.dataset.windowsTitlebar = ''
   root.style.setProperty('--dsh-windows-titlebar-height', `${height}px`)
   // DSH keeps the dialog mask off the caption band, which then stays bright above a dimmed
   // page; here the band is part of the page, so the mask covers it too.
   root.style.setProperty('--dsh-frame-chrome-top', '0px')
-  captionColors(mica)
+  // The traffic lights take their colors from the system.
+  if (process.platform === 'win32') captionColors(material === 'mica')
 }
 
 // The caption buttons stand on the rightmost open column with Mica (the right sidebar or the

@@ -190,7 +190,7 @@ export function install(rt) {
     const importContext = filesystemContext ?? pluginContext ?? ctx
     const result = await importUserSessions(importContext, { home, service, importer, onProgress: message => rt.warn('%s', message) })
     // The line the installer check reads: it says what was imported and from where.
-    console.log(`LinkBot: imported ${result.imported} sessions from ${home} (${result.formats.join(', ') || 'no sessions'})`)
+    console.log(`LinkHarness: imported ${result.imported} sessions from ${home} (${result.formats.join(', ') || 'no sessions'})`)
     // The app listens for this message; a Host without an app (the plugin runs on its own)
     // has no channel, and the import is still done.
     if (typeof process.send === 'function') {

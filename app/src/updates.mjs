@@ -58,6 +58,9 @@ function isHttpsPage(page) {
 // available | failed. While a check, a download or a ready install is on, a new check must
 // not start, so `check()` is a no-op in those phases.
 const UPDATE_BUSY = new Set(['checking', 'downloading', 'downloaded'])
+// watchUpdates 只在检查更新：autoDownload 关掉后不会再进 downloading，'available'（有新版本
+// 等用户自己去装）就是那个「别再查了」的状态，watchReleases 不受影响。
+const UPDATE_NOTICE_BUSY = new Set([...UPDATE_BUSY, 'available'])
 
 function stateHolder(log) {
   let state = { phase: 'checking' }
@@ -67,7 +70,7 @@ function stateHolder(log) {
     set: (next) => {
       state = next
       for (const listener of [...listeners]) {
-        try { listener(next) } catch (error) { log.error(`LinkBot: an update state listener failed: ${error instanceof Error ? error.message : String(error)}`) }
+        try { listener(next) } catch (error) { log.error(`LinkHarness: an update state listener failed: ${error instanceof Error ? error.message : String(error)}`) }
       }
     },
     subscribe: (listener) => {
@@ -80,7 +83,7 @@ function stateHolder(log) {
 // `asset` names the release asset of this install (default: the macOS zip); a release without
 // it does not count.
 export function watchReleases({ current, arch, fetch = globalThis.fetch, ask, open, feed = RELEASES_URL, log = console, asset }) {
-  const assetName = asset ?? (version => `LinkBot-${version}-mac-${arch}.zip`)
+  const assetName = asset ?? (version => `LinkHarness-${version}-mac-${arch}.zip`)
   let asked
   let latest = Promise.resolve(null)
   const holder = stateHolder(log)
@@ -89,16 +92,16 @@ export function watchReleases({ current, arch, fetch = globalThis.fetch, ask, op
     latest = (async () => {
       try {
         const response = await fetch(feed, {
-          headers: { accept: 'application/vnd.github+json', 'user-agent': `LinkBot/${current}` },
+          headers: { accept: 'application/vnd.github+json', 'user-agent': `LinkHarness/${current}` },
         })
         if (!response.ok) {
-          log.error(`LinkBot: update check failed: HTTP ${String(response.status)}`)
+          log.error(`LinkHarness: update check failed: HTTP ${String(response.status)}`)
           holder.set({ phase: 'failed' })
           return null
         }
         const releases = await response.json()
         if (!Array.isArray(releases)) {
-          log.error('LinkBot: update check failed: releases response is not an array')
+          log.error('LinkHarness: update check failed: releases response is not an array')
           holder.set({ phase: 'failed' })
           return null
         }
@@ -112,7 +115,7 @@ export function watchReleases({ current, arch, fetch = globalThis.fetch, ask, op
           if (!isNewer(version, current)) continue
           if (!Array.isArray(release.assets) || !release.assets.some(entry => entry?.name === assetName(version))) continue
           if (!isHttpsPage(release.html_url)) {
-            log.error('LinkBot: update check failed: release page URL is not HTTPS')
+            log.error('LinkHarness: update check failed: release page URL is not HTTPS')
             continue
           }
           if (found === undefined || isNewer(version, found.version)) found = { version, page: release.html_url }
@@ -121,17 +124,17 @@ export function watchReleases({ current, arch, fetch = globalThis.fetch, ask, op
           holder.set({ phase: 'current' })
           return null
         }
-        log.info(`LinkBot: update ${found.version} available`)
+        log.info(`LinkHarness: update ${found.version} available`)
         if (ask !== undefined && asked !== found.version) {
           asked = found.version
           void Promise.resolve().then(() => ask(found.version))
             .then(yes => (yes ? open(found.page) : undefined))
-            .catch((error) => { log.error(`LinkBot: update ${found.version} not opened: ${error instanceof Error ? error.message : String(error)}`) })
+            .catch((error) => { log.error(`LinkHarness: update ${found.version} not opened: ${error instanceof Error ? error.message : String(error)}`) })
         }
         holder.set({ phase: 'available', version: found.version, page: found.page })
         return found
       } catch (error) {
-        log.error(`LinkBot: update check failed: ${error instanceof Error ? error.message : String(error)}`)
+        log.error(`LinkHarness: update check failed: ${error instanceof Error ? error.message : String(error)}`)
         holder.set({ phase: 'failed' })
         return null
       }
@@ -168,8 +171,11 @@ export function watchReleases({ current, arch, fetch = globalThis.fetch, ask, op
  *   ready install is on.
  */
 export function watchUpdates({ updater, beforeInstall, ask, feed, log = console }) {
-  updater.autoDownload = true
-  updater.autoInstallOnAppQuit = true
+  // 用户 2026-11-10 拍板（方案 C）：只检查、不下载、不在退出时自动安装。
+  // 上游的自动下载会让 Fei2411/DS-Bot 的新版本在用户退出时把我们的定制包换掉
+  // （2026-11-09 夜里 0.3.2 就是这样躺进 pending/ 的）。新版只作为提示。
+  updater.autoDownload = false
+  updater.autoInstallOnAppQuit = false
   if (feed) updater.setFeedURL({ provider: 'generic', url: feed })
   const holder = stateHolder(log)
   const install = async () => {
@@ -179,7 +185,10 @@ export function watchUpdates({ updater, beforeInstall, ask, feed, log = console 
   let asked
   updater.on('checking-for-update', () => { holder.set({ phase: 'checking' }) })
   updater.on('update-not-available', () => { holder.set({ phase: 'current' }) })
-  updater.on('update-available', (info) => { holder.set({ phase: 'downloading', version: info?.version }) })
+  updater.on('update-available', (info) => {
+    // 不下载：只记下新版并给出发布页，About 行据此提示「有新版本」。
+    holder.set({ phase: 'available', version: info?.version, page: RELEASE_PAGE })
+  })
   // The download's progress, for the failure page's update banner: once per whole per cent.
   updater.on('download-progress', (progress) => {
     const current = holder.state()
@@ -188,16 +197,16 @@ export function watchUpdates({ updater, beforeInstall, ask, feed, log = console 
     holder.set({ ...current, percent, received: Math.round(Number(progress.transferred) / MB) || 0, total: Math.round(Number(progress.total) / MB) || 0 })
   })
   updater.on('update-downloaded', ({ version }) => {
-    log.info(`LinkBot: update ${version} downloaded`)
+    log.info(`LinkHarness: update ${version} downloaded`)
     holder.set({ phase: 'downloaded', version })
     if (ask === undefined || asked === version) return
     asked = version
     void ask(version).then(now => (now ? install() : undefined))
-      .catch((error) => { log.error(`LinkBot: update ${version} not installed: ${error instanceof Error ? error.message : String(error)}`) })
+      .catch((error) => { log.error(`LinkHarness: update ${version} not installed: ${error instanceof Error ? error.message : String(error)}`) })
   })
   // A downloaded update stays ready: a later failed check does not hide it.
   updater.on('error', (error) => {
-    log.error(`LinkBot: update failed: ${error instanceof Error ? error.message : String(error)}`)
+    log.error(`LinkHarness: update failed: ${error instanceof Error ? error.message : String(error)}`)
     if (holder.state().phase !== 'downloaded') holder.set({ phase: 'failed' })
   })
   let latest = Promise.resolve(null)
@@ -207,15 +216,19 @@ export function watchUpdates({ updater, beforeInstall, ask, feed, log = console 
   const settled = (next) => { if (holder.state().phase === 'checking') holder.set(next) }
   const run = () => {
     latest = updater.checkForUpdates().then((result) => {
-      if (result?.isUpdateAvailable && result.downloadPromise) {
-        settled({ phase: 'downloading', version: result.updateInfo.version })
-        return { version: result.updateInfo.version, downloaded: result.downloadPromise.then(() => true, () => false) }
+      // autoDownload 关着，宿主不返回 downloadPromise：有新版只提示，不下载。
+      if (result?.isUpdateAvailable) {
+        // 万一宿主仍给了 downloadPromise，也要吞掉它的失败——否则会变成未处理的拒绝
+        // （宿主自己还会同时发 error 事件，界面照样能看到失败）。
+        result.downloadPromise?.catch(() => {})
+        settled({ phase: 'available', version: result.updateInfo.version, page: RELEASE_PAGE })
+        return { version: result.updateInfo.version, downloaded: Promise.resolve(false) }
       }
       settled({ phase: 'current' })
       return null
     }, () => { settled({ phase: 'failed' }); return null })
   }
-  const check = () => { if (!UPDATE_BUSY.has(holder.state().phase)) run() }
+  const check = () => { if (!UPDATE_NOTICE_BUSY.has(holder.state().phase)) run() }
   run()
   const timer = setInterval(check, CHECK_EVERY_MS)
   return { stop: () => { clearInterval(timer) }, latest: () => latest, install, state: holder.state, subscribe: holder.subscribe, check }

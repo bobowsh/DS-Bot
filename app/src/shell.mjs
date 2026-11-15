@@ -2,29 +2,97 @@
 // back to it, and the tray's Quit is the one ordinary way out. The app itself decides when
 // a close really ends it: an update, a data move, a failed start and the end of the
 // operating system's session all close the window for good.
-import { BackgroundNotice } from './background-notice.mjs'
 import { createTray } from './tray.mjs'
+import { DISPLAY_NAME } from './legacy.mjs'
 
 export const SHELL_TEXT = {
   en: {
-    tooltip: 'LinkBot',
-    open: 'Open LinkBot',
-    quit: 'Quit LinkBot',
-    notice: 'LinkBot keeps running in the system tray. Its Bots go on working while the window is closed.',
-    noticeConfirm: 'OK',
-    fallback: 'The system tray is not available, so LinkBot cannot stay in the background. Do you want to end it?',
+    tooltip: 'LinkHarness',
+    open: 'Open LinkHarness',
+    quit: 'Quit LinkHarness',
+    closeAsk: {
+      message: 'What should happen when the window closes?',
+      toTray: 'Minimize to the system tray',
+      quit: 'Quit LinkHarness',
+      cancel: 'Cancel',
+    },
+    fallback: 'The system tray is not available, so LinkHarness cannot stay in the background. Do you want to end it?',
     cancel: 'Cancel',
     stopAll: 'Stop all',
   },
   zh: {
-    tooltip: 'LinkBot',
-    open: '打开 LinkBot',
-    quit: '退出 LinkBot',
-    notice: 'LinkBot 会留在系统托盘里继续运行，关掉窗口时 Bot 们照常工作。',
-    noticeConfirm: '好',
-    fallback: '系统托盘不可用，LinkBot 不能留在后台。要结束它吗？',
+    tooltip: 'LinkHarness',
+    open: '打开 LinkHarness',
+    quit: '退出 LinkHarness',
+    closeAsk: {
+      message: '关闭窗口后要做什么？',
+      toTray: '最小化到系统托盘',
+      quit: '退出 LinkHarness',
+      cancel: '取消',
+    },
+    fallback: '系统托盘不可用，LinkHarness 不能留在后台。要结束它吗？',
     cancel: '取消',
     stopAll: '全部停止',
+  },
+  'zh-TW': {
+    tooltip: 'DS Bot',
+    open: '打開 DS Bot',
+    quit: '結束 DS Bot',
+    notice: 'DS Bot 會留在系統匣裡繼續運行，關掉視窗時 Bot 們照常工作。',
+    noticeConfirm: '好',
+    fallback: '系統匣不可用，DS Bot 不能留在背景。要結束它嗎？',
+    cancel: '取消',
+    stopAll: '全部停止',
+  },
+  ja: {
+    tooltip: 'DS Bot',
+    open: 'DS Bot を開く',
+    quit: 'DS Bot を終了',
+    notice: 'DS Bot はシステムトレイで動作し続けます。ウィンドウを閉じても Bot は作業を続けます。',
+    noticeConfirm: 'OK',
+    fallback: 'システムトレイが利用できないため、DS Bot をバックグラウンドに残せません。終了しますか？',
+    cancel: 'キャンセル',
+    stopAll: 'すべて停止',
+  },
+  ko: {
+    tooltip: 'DS Bot',
+    open: 'DS Bot 열기',
+    quit: 'DS Bot 종료',
+    notice: 'DS Bot은 시스템 트레이에서 계속 실행됩니다. 창을 닫아도 Bot은 계속 작업합니다.',
+    noticeConfirm: '확인',
+    fallback: '시스템 트레이를 사용할 수 없어 DS Bot을 백그라운드에 유지할 수 없습니다. 종료할까요?',
+    cancel: '취소',
+    stopAll: '모두 중지',
+  },
+  es: {
+    tooltip: 'DS Bot',
+    open: 'Abrir DS Bot',
+    quit: 'Salir de DS Bot',
+    notice: 'DS Bot sigue ejecutándose en la bandeja del sistema. Sus Bots continúan trabajando mientras la ventana está cerrada.',
+    noticeConfirm: 'Aceptar',
+    fallback: 'La bandeja del sistema no está disponible, por lo que DS Bot no puede permanecer en segundo plano. ¿Quieres cerrarlo?',
+    cancel: 'Cancelar',
+    stopAll: 'Detener todo',
+  },
+  fr: {
+    tooltip: 'DS Bot',
+    open: 'Ouvrir DS Bot',
+    quit: 'Quitter DS Bot',
+    notice: 'DS Bot continue de fonctionner dans la barre d’état système. Ses Bots continuent de travailler lorsque la fenêtre est fermée.',
+    noticeConfirm: 'OK',
+    fallback: 'La barre d’état système n’est pas disponible, DS Bot ne peut donc pas rester en arrière-plan. Voulez-vous l’arrêter ?',
+    cancel: 'Annuler',
+    stopAll: 'Tout arrêter',
+  },
+  de: {
+    tooltip: 'DS Bot',
+    open: 'DS Bot öffnen',
+    quit: 'DS Bot beenden',
+    notice: 'DS Bot läuft im Systembereich weiter. Seine Bots arbeiten weiter, während das Fenster geschlossen ist.',
+    noticeConfirm: 'OK',
+    fallback: 'Der Systembereich ist nicht verfügbar, daher kann DS Bot nicht im Hintergrund bleiben. Möchtest du es beenden?',
+    cancel: 'Abbrechen',
+    stopAll: 'Alle stoppen',
   },
 }
 
@@ -34,7 +102,7 @@ export const SHELL_TEXT = {
  * @param {{
  *   electron: { app: any, Menu: any, Tray: any, powerMonitor: any },
  *   platform: string,
- *   messages: () => { tooltip: string, open: string, quit: string, notice: string, noticeConfirm: string, fallback: string, cancel: string },
+ *   messages: () => { tooltip: string, open: string, quit: string, closeAsk: { message: string, toTray: string, quit: string, cancel: string }, fallback: string, cancel: string },
  *   trayImage: () => any,
  *   window: () => any,
  *   build: () => any,
@@ -42,7 +110,7 @@ export const SHELL_TEXT = {
  *   quit: () => void,
  *   busy: () => boolean,
  *   ready: () => boolean,
- *   notice: { marker: () => string, show: (options: object) => Promise<{ response: number }> },
+ *   closeAsk: { show: (options: object) => Promise<{ response: number }> },
  *   fallback?: { show: (options: object) => Promise<{ response: number }> },
  *   log?: Pick<Console, 'warn'>,
  * }} options the pieces of the app the shell drives
@@ -52,7 +120,6 @@ export function createShell(options) {
   const { app, powerMonitor } = electron
   // The tray is kept here, so that it stays alive as long as the app runs.
   let tray
-  let notice
   // The app is on its way out: the window may close for good.
   let quitting = false
   // A quit was asked for; the app may still refuse it (a first-run dialog, a copy).
@@ -141,7 +208,7 @@ export function createShell(options) {
     } catch (error) {
       // Without a tray the window stays where the user can reach it; the app never vanishes.
       tray = undefined
-      log.warn(`LinkBot: the system tray is not available: ${error instanceof Error ? error.message : String(error)}`)
+      log.warn(`LinkHarness: the system tray is not available: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
@@ -153,19 +220,20 @@ export function createShell(options) {
     const t = text()
     try {
       const { response } = await options.fallback.show({
-        type: 'question', title: 'LinkBot', message: t.fallback,
+        type: 'question', title: DISPLAY_NAME, message: t.fallback,
         buttons: [t.quit, t.cancel], defaultId: 1, cancelId: 1, noLink: true,
       })
       if (response === 0) { quit(); return }
     } catch (error) {
-      log.warn(`LinkBot: the fallback quit could not be asked: ${error instanceof Error ? error.message : String(error)}`)
+      log.warn(`LinkHarness: the fallback quit could not be asked: ${error instanceof Error ? error.message : String(error)}`)
     }
     // The window stays in the task bar, where the user can reach it.
     target.minimize()
   }
 
   /**
-   * The window's close: it hides, unless the app is really leaving.
+   * The window's close: with a tray it asks every time what the close should do — minimize to
+   * the tray, end the app, or nothing. Without one it asks whether the app should end.
    * @param {{ preventDefault: () => void }} event the window's close event
    */
   const close = (event) => {
@@ -178,8 +246,29 @@ export function createShell(options) {
     // Without a tray there is no way back to a hidden window, and no Quit of its own: the
     // close asks whether the app should end.
     if (tray === undefined) { void askFallback(target); return }
-    if (notice === undefined) { hide(target); return }
-    notice.close(() => { hide(target) })
+    void askClose(target)
+  }
+
+  /**
+   * The close question, asked on every window close: end the app, minimize to the tray, or
+   * leave the window as it is. Quitting is the first answer and the default one, so a press
+   * that lands on it ends the app. The quit goes through the tray's own quit, so a first-run
+   * dialog or a running copy can still refuse it.
+   * @param {any} target the window the question is about
+   */
+  const askClose = async (target) => {
+    const t = text().closeAsk
+    try {
+      const { response } = await options.closeAsk.show({
+        type: 'question', title: DISPLAY_NAME, message: t.message,
+        buttons: [t.quit, t.toTray, t.cancel], defaultId: 0, cancelId: 2, noLink: true,
+      })
+      if (response === 0) { quit(); return }
+      if (response === 1) { hide(target); return }
+    } catch (error) {
+      log.warn(`LinkHarness: the close question could not be asked: ${error instanceof Error ? error.message : String(error)}`)
+    }
+    // A cancelled or failed question leaves the window where it is.
   }
 
   /** The window's own listeners. */
@@ -206,15 +295,10 @@ export function createShell(options) {
       // another application can still call the shutdown off.
       powerMonitor.on('shutdown', () => { sessionEnding = true })
     }
-    notice = new BackgroundNotice({
-      marker: options.notice.marker(), show: options.notice.show, focus: options.notice.focus, message: text().notice, confirm: text().noticeConfirm, log,
-    })
     buildTray()
   }
 
   const dispose = () => {
-    notice?.dispose()
-    notice = undefined
     tray?.dispose()
     tray = undefined
   }

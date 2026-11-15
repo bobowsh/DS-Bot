@@ -2,20 +2,28 @@
 // DSH serves, with their API keys and models, and the providers it can add. DSH keeps
 // all of it; a key only ever travels from these inputs to the host.
 import { createElement as h, useEffect, useState } from 'react'
-import { CheckIcon, TrashIcon } from './icons.js'
+import { CheckIcon, ChevronRightIcon, TrashIcon } from './icons.js'
 import { KeyIcon, MaskedInput } from './secret-card.js'
 import { Segmented, SPRING_SHAPE } from './motion.js'
 import { hostText, t } from './i18n.js'
 
-const PROTOCOL_NAMES = { 'openai-completions': 'OpenAI Chat Completions', 'openai-responses': 'OpenAI Responses', 'anthropic-messages': 'Anthropic Messages' }
-// Anthropic's SDK appends /v1/messages itself; the OpenAI ones take the /v1 root.
-const ENDPOINT_HINTS = { 'anthropic-messages': 'https://gateway.example' }
+const PROTOCOL_NAMES = {
+  'openai-completions': 'OpenAI Chat Completions',
+  'openai-responses': 'OpenAI Responses',
+  'anthropic-messages': 'Anthropic Messages',
+  'google-generative-ai': 'Google Gemini',
+}
+// Anthropic's SDK appends /v1/messages itself, Gemini takes /v1beta, and OpenAI takes /v1.
+const ENDPOINT_HINTS = {
+  'anthropic-messages': 'https://gateway.example',
+  'google-generative-ai': 'https://generativelanguage.googleapis.com/v1beta',
+}
 const SHOWN_MODELS = 8
 
 // A failure in the interface language; the dialog's error line shows it.
 const translated = promise => Promise.resolve(promise).catch((failure) => { throw new Error(hostText(failure?.message ?? String(failure))) })
 
-export function ProvidersPage({ actions, run, Section }) {
+export function ProvidersPage({ actions, run, Section, advanced = null }) {
   const [view, setView] = useState(null)
   const [open, setOpen] = useState(null)
   const [adding, setAdding] = useState(false)
@@ -32,13 +40,17 @@ export function ProvidersPage({ actions, run, Section }) {
       })),
       adding ? h(AddProvider, { key: 'add', view, apply, actions, onDone: () => setAdding(false) }) : null),
     adding ? null : h('div', { key: 'add', className: 'bt-actions' }, h('button', { type: 'button', className: 'bt-soft bt-soft-sm', onClick: () => setAdding(true) }, t('Add a provider'))),
+    // DSH's own Models page: each model's context, output, inputs, thinking levels and order.
+    advanced ? h('div', { key: 'advanced', className: 'bt-set-card' },
+      h('button', { type: 'button', className: 'bt-set-row bt-bs-row bt-advanced', onClick: advanced },
+        h('span', { className: 'bt-set-copy' }, h('span', null, t('Advanced settings'))), h(ChevronRightIcon))) : null,
   ]
 }
 
 function keyState(key) {
   if (key === null) return null
   if (!key.configured) return ['missing', t('Needs an API key')]
-  return key.writable ? ['set', t('Key set')] : ['outside', t('Key set outside LinkBot')]
+  return key.writable ? ['set', t('Key set')] : ['outside', t('Key set outside LinkHarness')]
 }
 
 function ProviderRow({ provider, apply, actions, open, onToggle }) {
@@ -55,7 +67,7 @@ function ProviderRow({ provider, apply, actions, open, onToggle }) {
       state ? h('span', { className: 'bt-set-control' }, h('span', { className: 'bt-provider-state', 'data-state': state[0] }, state[1])) : null),
     open ? h('div', { className: 'bt-secret-edit' },
       provider.key?.writable ? h(KeyEditor, { provider, apply, actions }) : null,
-      provider.key && !provider.key.writable ? h('div', { className: 'bt-set-hint' }, t('This key comes from outside LinkBot, such as an environment variable, and cannot be changed here.')) : null,
+      provider.key && !provider.key.writable ? h('div', { className: 'bt-set-hint' }, t('This key comes from outside LinkHarness, such as an environment variable, and cannot be changed here.')) : null,
       provider.models.length > 0 ? h('div', { className: 'bt-secret-edit-block' },
         h('div', { className: 'bt-secret-edit-label' }, t('Models')),
         h('div', { className: 'bt-provider-models' },

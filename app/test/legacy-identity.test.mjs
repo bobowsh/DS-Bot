@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process'
 import { test } from 'node:test'
 import { parse } from 'yaml'
 import { UUID } from 'builder-util-runtime'
-import { APP_ID, configureIdentity, LEGACY_ARTIFACT_PREFIX, LEGACY_PRODUCT_NAME } from '../src/legacy.mjs'
+import { APP_ID, configureIdentity, LEGACY_ARTIFACT_PREFIX, LEGACY_PRODUCT_NAME, LEGACY_USER_DATA_NAMES } from '../src/legacy.mjs'
 
 function fixture({ saved = [], packaged = true } = {}) {
   const app = new EventEmitter()
@@ -41,7 +41,8 @@ for (const platform of ['win32', 'darwin', 'linux']) {
     } else {
       assert.deepEqual(f.names, [LEGACY_PRODUCT_NAME])
       f.app.emit('ready')
-      assert.deepEqual(f.names, [LEGACY_PRODUCT_NAME, 'DS Bot'])
+      // The visible name restored on ready is the product's own name, not the folder it reused.
+      assert.deepEqual(f.names, [LEGACY_PRODUCT_NAME, 'LinkHarness'])
     }
   })
 }
@@ -73,6 +74,26 @@ test('an isolated data run never probes an installed application', () => {
 test('a source installation also keeps its existing shell data', () => {
   const f = fixture({ packaged: false })
   assert.equal(configureIdentity(f.app, { env: {}, mkdir: () => {}, exists: path => path === f.legacy }).userData, f.legacy)
+})
+
+// 只装过「内部 product name 还是 DS Bot」那一代的机器，userData 目录只有 `DS Bot`。
+// 名单里少了它，这些用户升级后就会落进空的 LinkHarness，设置和 locations 都看不到。
+test('an installation that only ever had the DS Bot folder is reused', () => {
+  const f = fixture()
+  const onlyDsBot = join(f.paths.appData, 'DS Bot')
+  // 新的 userData 是 LinkHarness，没有 locations.json；旧的 DS Bot 才有。
+  f.paths.userData = join(f.paths.appData, 'LinkHarness')
+  const result = configureIdentity(f.app, {
+    env: {}, platform: 'linux', mkdir: () => {},
+    exists: path => path === onlyDsBot || path === join(onlyDsBot, 'locations.json'),
+  })
+  assert.equal(result.userData, onlyDsBot, 'falls back to the DS Bot folder')
+  assert.equal(result.legacy, true)
+})
+
+test('the legacy list runs newest to oldest and includes every shipped folder', () => {
+  // 顺序是有意义的：第一个存在的目录被复用，所以最近的一代必须排在前面。
+  assert.deepEqual(LEGACY_USER_DATA_NAMES, ['LinkBot', 'DS Bot', 'DeepSeek Bot'])
 })
 
 for (const suffix of ['mac-arm64.zip', 'mac-x64.zip', 'linux-amd64.deb']) {

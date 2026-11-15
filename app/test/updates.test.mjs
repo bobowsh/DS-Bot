@@ -45,7 +45,7 @@ const release = (version, options = {}) => {
     html_url: options.page ?? `https://github.com/Fei2411/DS-Bot/releases/tag/v${version}`,
     draft: options.draft ?? false,
     prerelease: options.prerelease ?? false,
-    assets: options.assets ?? [{ name: `LinkBot-${version}-mac-${arch}.zip` }],
+    assets: options.assets ?? [{ name: `LinkHarness-${version}-mac-${arch}.zip` }],
   }
 }
 
@@ -85,7 +85,7 @@ describe('watchReleases', () => {
     assert.equal(await updates.latest(), null)
     assert.deepEqual(calls[0], {
       url: RELEASES_URL,
-      options: { headers: { accept: 'application/vnd.github+json', 'user-agent': 'LinkBot/0.1.7' } },
+      options: { headers: { accept: 'application/vnd.github+json', 'user-agent': 'LinkHarness/0.1.7' } },
     })
 
     const feed = 'http://127.0.0.1:8080/'
@@ -168,10 +168,10 @@ describe('watchReleases', () => {
 
   test('logs failed requests, invalid JSON, and non-HTTPS release pages without throwing', async (t) => {
     const cases = [
-      [async () => releaseResponse({}, 403), 'LinkBot: update check failed: HTTP 403'],
-      [async () => { throw new Error('offline') }, 'LinkBot: update check failed: offline'],
-      [async () => ({ ok: true, status: 200, json: async () => { throw new Error('bad JSON') } }), 'LinkBot: update check failed: bad JSON'],
-      [async () => releaseResponse([release('0.1.9', { page: 'http://github.com/Fei2411/DS-Bot' })]), 'LinkBot: update check failed: release page URL is not HTTPS'],
+      [async () => releaseResponse({}, 403), 'LinkHarness: update check failed: HTTP 403'],
+      [async () => { throw new Error('offline') }, 'LinkHarness: update check failed: offline'],
+      [async () => ({ ok: true, status: 200, json: async () => { throw new Error('bad JSON') } }), 'LinkHarness: update check failed: bad JSON'],
+      [async () => releaseResponse([release('0.1.9', { page: 'http://github.com/Fei2411/DS-Bot' })]), 'LinkHarness: update check failed: release page URL is not HTTPS'],
     ]
     for (const [fetch, message] of cases) {
       const log = quietLog()
@@ -189,7 +189,7 @@ describe('watchReleases', () => {
     })
     t.after(updates.stop)
     assert.equal(await updates.latest(), null)
-    assert.deepEqual(log.lines, ['LinkBot: update check failed: releases response is not an array'])
+    assert.deepEqual(log.lines, ['LinkHarness: update check failed: releases response is not an array'])
   })
 
   test('waits for the matching-architecture zip before asking', async (t) => {
@@ -221,7 +221,7 @@ describe('watchReleases', () => {
   test('a given asset replaces the mac zip: the deb of a Linux install', async (t) => {
     const page = 'https://github.com/Fei2411/DS-Bot/releases/tag/v0.1.9'
     // The deb's file name uses the Debian architecture (x64 → amd64).
-    const deb = version => `LinkBot-${version}-linux-amd64.deb`
+    const deb = version => `LinkHarness-${version}-linux-amd64.deb`
     // A release with only the mac zip does not count for a deb install.
     const misses = watchReleases({
       current: '0.1.7', arch: 'x64', asset: deb,
@@ -232,7 +232,7 @@ describe('watchReleases', () => {
 
     const hits = watchReleases({
       current: '0.1.7', arch: 'x64', asset: deb,
-      fetch: async () => releaseResponse([release('0.1.9', { page, assets: [{ name: 'LinkBot-0.1.9-linux-amd64.deb' }] })]),
+      fetch: async () => releaseResponse([release('0.1.9', { page, assets: [{ name: 'LinkHarness-0.1.9-linux-amd64.deb' }] })]),
       log: quietLog(),
     })
     t.after(hits.stop)
@@ -296,7 +296,7 @@ describe('watchReleases', () => {
     t.after(updates.stop)
     await updates.latest()
     await sleep(20)
-    assert.deepEqual(log.lines, ['LinkBot: update 0.1.9 available', 'LinkBot: update 0.1.9 not opened: dialog failed'])
+    assert.deepEqual(log.lines, ['LinkHarness: update 0.1.9 available', 'LinkHarness: update 0.1.9 not opened: dialog failed'])
     assert.deepEqual(unhandled, [])
   })
 
@@ -391,13 +391,30 @@ describe('watchReleases', () => {
 })
 
 describe('watchUpdates', () => {
-  test('downloads in the background, installs at the quit, and checks at once', (t) => {
+  test('checks for updates as a notice only, and never downloads or installs on quit', (t) => {
     const updater = new FakeUpdater()
     t.after(watchUpdates({ updater, beforeInstall: async () => {}, log: quietLog() }).stop)
-    assert.equal(updater.autoDownload, true)
-    assert.equal(updater.autoInstallOnAppQuit, true)
+    // 用户 2026-11-10 拍板（方案 C）：不再自动下载、不在退出时自动安装。
+    assert.equal(updater.autoDownload, false)
+    assert.equal(updater.autoInstallOnAppQuit, false)
     assert.equal(updater.checks, 1)
     assert.deepEqual(updater.feeds, [])
+  })
+
+  test('reports a newer version as available without downloading it', async (t) => {
+    const updater = new FakeUpdater()
+    updater.found = () => ({ isUpdateAvailable: true, updateInfo: { version: '0.1.9' } })
+    const updates = watchUpdates({ updater, beforeInstall: async () => {}, log: quietLog() })
+    t.after(updates.stop)
+    await sleep(30)
+    const state = updates.state()
+    assert.equal(state.phase, 'available')
+    assert.equal(state.version, '0.1.9')
+    // 没有下载：latest() 给出的 downloaded 永远是 false。
+    const latest = await updates.latest()
+    assert.equal(latest.version, '0.1.9')
+    assert.equal(await latest.downloaded, false)
+    assert.deepEqual(updater.installs, [])
   })
 
   test('reads a given feed in place of the GitHub releases', (t) => {
@@ -433,7 +450,7 @@ describe('watchUpdates', () => {
       await sleep(20)
       assert.deepEqual(updater.installs, [])
       assert.equal(stopped, false)
-      assert.deepEqual(log.lines, ['LinkBot: update 0.1.9 downloaded'])
+      assert.deepEqual(log.lines, ['LinkHarness: update 0.1.9 downloaded'])
     }
   })
 
@@ -444,14 +461,14 @@ describe('watchUpdates', () => {
     const updates = watchUpdates({ updater, beforeInstall: async () => {}, log })
     t.after(updates.stop)
     assert.equal(await updates.latest(), null)
-    assert.deepEqual(log.lines, ['LinkBot: update failed: offline'])
+    assert.deepEqual(log.lines, ['LinkHarness: update failed: offline'])
   })
 
-  test('tells what the newest check found and whether its download finished', async (t) => {
+  test('tells what the newest check found: a newer version the user installs by hand', async (t) => {
+    // 不再自动下载：`downloaded` 永远是 false，只报告「有新版」。
     const cases = [
       [null, null],
-      [finds('0.1.9', () => Promise.resolve(['installer.exe'])), true],
-      [finds('0.1.9', () => Promise.reject(new Error('sha512 checksum mismatch'))), false],
+      [() => ({ isUpdateAvailable: true, updateInfo: { version: '0.1.9' } }), false],
     ]
     for (const [found, downloaded] of cases) {
       const updater = new FakeUpdater()
@@ -509,7 +526,10 @@ describe('watchUpdates', () => {
     updater.emit('checking-for-update')
     assert.deepEqual(updates.state(), { phase: 'checking' })
     updater.emit('update-available', { version: '0.1.9' })
-    assert.deepEqual(updates.state(), { phase: 'downloading', version: '0.1.9' })
+    // 不自动下载：有新版只停在 available，并给出发布页。
+    const announced = updates.state()
+    assert.equal(announced.phase, 'available')
+    assert.equal(announced.version, '0.1.9')
     updater.emit('update-downloaded', { version: '0.1.9' })
     assert.deepEqual(updates.state(), { phase: 'downloaded', version: '0.1.9' })
   })
@@ -526,13 +546,9 @@ describe('watchUpdates', () => {
     updater.emit('update-available', { version: '0.1.9' })
     const MB = 1024 * 1024
     updater.emit('download-progress', { percent: 37.4, transferred: 78.2 * MB, total: 212 * MB })
-    updater.emit('download-progress', { percent: 37.9, transferred: 79 * MB, total: 212 * MB })
     updater.emit('download-progress', { percent: 38.1, transferred: 80.6 * MB, total: 212 * MB })
-    updater.emit('download-progress', { percent: Number.NaN })
-    assert.deepEqual(seen.slice(1), [
-      { phase: 'downloading', version: '0.1.9', percent: 37, received: 78, total: 212 },
-      { phase: 'downloading', version: '0.1.9', percent: 38, received: 81, total: 212 },
-    ])
+    // 不再自动下载：任何 download-progress 都不该变成状态。
+    assert.ok(seen.every(state => state.phase !== 'downloading'))
     updater.emit('update-downloaded', { version: '0.1.9' })
     assert.deepEqual(updates.state(), { phase: 'downloaded', version: '0.1.9' })
   })
@@ -580,9 +596,9 @@ describe('watchUpdates', () => {
     const off = updates.subscribe(state => seen.push(state.phase))
     updater.emit('checking-for-update')
     updater.emit('update-available', { version: '0.1.9' })
-    assert.deepEqual(seen, ['checking', 'downloading'])
+    assert.deepEqual(seen, ['checking', 'available'])
     off()
     updater.emit('update-downloaded', { version: '0.1.9' })
-    assert.deepEqual(seen, ['checking', 'downloading'])
+    assert.deepEqual(seen, ['checking', 'available'])
   })
 })

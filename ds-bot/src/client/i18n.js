@@ -1,6 +1,12 @@
-// Interface copy follows the DSH language. Keys are the English text; `zh` maps them.
-// Copy is looked up at render time and every slot outlet re-renders on a language
-// switch, so nothing caches a translated string.
+// Interface copy follows the DSH language. Keys are the English text; `zh`, `zh-TW`,
+// `ja`, `ko`, `es`, `fr` and `de` map them. Copy is looked up at render time and every
+// slot outlet re-renders on a language switch, so nothing caches a translated string.
+import { convertDict, convertHostErrors, toTraditional } from './locales/zh-tw.js'
+import { DSH_JA, HOST_ERRORS_JA, JA } from './locales/ja.js'
+import { DSH_KO, HOST_ERRORS_KO, KO } from './locales/ko.js'
+import { DSH_ES, HOST_ERRORS_ES, ES } from './locales/es.js'
+import { DSH_FR, HOST_ERRORS_FR, FR } from './locales/fr.js'
+import { DSH_DE, HOST_ERRORS_DE, DE } from './locales/de.js'
 
 export const NAMESPACE = 'ds-bot'
 
@@ -16,6 +22,17 @@ const ZH = {
   'New chat': '新对话',
   'Back to chat': '返回对话',
   'New…': '新建',
+  'New section': '新建分组',
+  'Rename section': '重命名分组',
+  'Section color': '分组颜色',
+  'Move section up': '上移分组',
+  'Move section down': '下移分组',
+  'Ungroup section': '解散分组',
+  'Remove from section': '移出分组',
+  'Move to new section…': '移至新分组…',
+  'Add to {name}': '添加到 {name}',
+  'Add existing': '添加已有对话',
+  None: '无',
   'Collapse sidebar': '收起侧边栏',
   'Expand sidebar': '展开侧边栏',
   'Resize sidebar': '调整侧边栏宽度',
@@ -46,9 +63,9 @@ const ZH = {
   '{count} members': '{count} 位成员',
   'Loading…': '加载中…',
   'Edit Bot': '编辑 Bot',
+  'Give up waiting for {name}': '不再等 {name}',
   'Make Main Bot': '设为主 Bot',
   'Remove Main Bot role': '取消主 Bot',
-  'Bot settings': 'Bot 设置',
   'Create group chat': '新建群聊',
   'Delete group': '删除群聊',
   'New Bot': '新 Bot',
@@ -191,13 +208,20 @@ const ZH = {
   'Conversation': '会话内容',
   'Work details': '工作步骤',
   'Show the work of a turn': '显示这一轮做过的事',
+  'Compact': '简洁',
+  'Standard': '标准',
+  'Detailed': '详细',
+  'Verbose': '完全展开',
   '{turns} turns, {steps} steps': '{turns} 轮 {steps} 步',
   'Show the work of this turn': '展开这一轮做过的事',
   'Hide the work of this turn': '收起这一轮做过的事',
   'Switch to classic Agent mode': '切换经典 Agent 模式',
+  'AIDE workbench': 'AIDE 工作台',
   'Back to the Bot team': '回到 Bot 团队界面',
   'Only “Full details” keeps the process rows of a finished turn.': '只有「完全展开」会保留已完成轮次的过程行。',
+  'Bot mode': 'Bot 模式',
   'Switch': '切换',
+  'Back to DS Bot': '返回 DS Bot',
   '{model} is not available anymore. Pick another model for me.': '{model} 已经不可用了。给我换一个模型吧。',
   '{provider} API key': '{provider} API key',
   'Enter the API key': '请填入 API key',
@@ -211,10 +235,30 @@ const ZH = {
   'Add a provider': '添加服务商',
   'Needs an API key': '需要 API key',
   'Key set': '已设置 key',
-  'Key set outside LinkBot': 'key 在 LinkBot 之外设置',
+  'Key set outside LinkHarness': 'key 在 LinkHarness 之外设置',
   'No models': '没有模型',
   '{count} models': '{count} 个模型',
-  'This key comes from outside LinkBot, such as an environment variable, and cannot be changed here.': '这个 key 来自 LinkBot 之外（例如环境变量），这里改不了。',
+  'This key comes from outside LinkHarness, such as an environment variable, and cannot be changed here.': '这个 key 来自 LinkHarness 之外（例如环境变量），这里改不了。',
+  // What a Bot runs on
+  'Runs on': '运行方式',
+  'DS Bot model': 'DS Bot 模型',
+  'Local agent': '本地 Agent',
+  'CLI default': 'CLI 默认',
+  'Signed in': '已登录',
+  'Not signed in': '未登录',
+  'Sign-in unknown': '登录状态未知',
+  'Looking for agent CLIs…': '正在查找 Agent CLI…',
+  'Reading models…': '正在读取模型…',
+  "Answers with a model served by DS Bot, with DS Bot's tools.": '用 DS Bot 里的模型回答，用 DS Bot 的工具。',
+  'Answers through this CLI on your computer, with its own tools and sign-in.': '通过这台电脑上的 CLI 回答，用它自己的工具和登录。',
+  'Change what {name} runs on?': '更换 {name} 的运行方式？',
+  'Its own chat starts a new part with a handoff before the next turn.': '下一轮开始前，它的私聊会开新的一段并做好交接。',
+  'Its own chat and {count} group chats each start a new part with a handoff before the next turn.': '下一轮开始前，它的私聊和 {count} 个群聊都会开新的一段并做好交接。',
+  'Earlier messages stay readable. Its memory and instructions stay the same.': '之前的内容还能查看，记忆和指令不变。',
+  'Its shared MCP servers and skills do not reach a local agent.': '挂给它的共享 MCP 和技能到不了本地 Agent。',
+  '{agent} is not signed in. Sign in first, or its turns fail.': '{agent} 还没登录。先登录，否则它的回复会失败。',
+  'The privacy rules of a private Bot do not cover the tools of a local agent.': '私有 Bot 的隐私规则管不到本地 Agent 自己的工具。',
+  'Change and start a new part': '更换并开新的一段',
   // Local agents page
   'Local agents': '本地 Agent',
   'This DSH cannot register local agent routes.': '这个 DSH 不能注册本地 Agent 路由。',
@@ -227,6 +271,8 @@ const ZH = {
   'Add agent': '添加 Agent',
   'Copies the sign-in command': '复制登录命令',
   'Sign in': '登录',
+  'Sign-in command copied. Run it in a terminal: {command}': '登录命令已复制。请在终端运行：{command}',
+  'Could not copy the sign-in command. Run this in a terminal: {command}': '没能复制登录命令。请在终端手动运行：{command}',
   Found: '已找到',
   'Not found': '未找到',
   Arguments: '参数',
@@ -235,6 +281,7 @@ const ZH = {
   'Open this earlier session': '打开这个较早的会话',
   'Session {number}': '会话 {number}',
   'Current session': '当前会话',
+  'This page could not be shown.': '这个页面无法显示。',
   'Current': '当前',
   'This key comes from outside DS Bot, such as an environment variable, and cannot be changed here.': '这个 key 来自 DS Bot 之外（例如环境变量），这里改不了。',
   'and {count} more': '还有 {count} 个',
@@ -296,7 +343,7 @@ const ZH = {
   'HTTP status': 'HTTP 状态码',
   'Request ID': '请求 ID',
   'Provider message': '原文',
-  'LinkBot': 'LinkBot',
+  'LinkHarness': 'LinkHarness',
   'Message {name}': '给 {name} 发消息',
   'Press Enter to steer queued messages': '按 Enter 插话发送排队的消息',
   'Couldn’t steer the queued messages. Try again.': '插话发送失败，请重试。',
@@ -374,7 +421,7 @@ const ZH = {
   'Rename {name}': '重命名 {name}',
   'Add instructions in Bot settings': '在 Bot 设置里添加说明',
   'No scheduled tasks yet. To add one, tell the Bot in its chat what to do and when.': '还没有定时任务。要添加，在对话里告诉 Bot 做什么、什么时候做。',
-  'The browser is in DSH Desktop and the LinkBot app.': '浏览器在 DSH 桌面版和 LinkBot 应用里。',
+  'The browser is in DSH Desktop and the LinkHarness app.': '浏览器在 DSH 桌面版和 LinkHarness 应用里。',
   'New tab': '新标签页',
   'Close tab': '关闭标签页',
   'Open {title}': '打开 {title}',
@@ -498,6 +545,10 @@ const ZH = {
   'Text width': '正文宽度',
   'Show thinking': '显示思考过程',
   'Enter sends message': '回车发送消息',
+  'Bring up related memory': '自动带上相关记忆',
+  'Group memory size': '群记忆容量',
+  'Bot memory size': 'Bot 记忆容量',
+  'Team memory size': '团队记忆容量',
   'Bots · {count}': 'Bot · {count}',
   'First in the sidebar. Pick another Bot to hand it the role; {name} then stops being a Main Bot.': '排在侧栏最上面。选另一个 Bot 就会把主 Bot 交给它，{name} 随之不再是主 Bot。',
   'Choose a Bot…': '选择一个 Bot…',
@@ -509,13 +560,71 @@ const ZH = {
   'No group chats yet.': '还没有群聊。',
   'A group chat lets several Bots work on one thing with you.': '在群聊里，几个 Bot 和你一起做一件事。',
   'Back to group chats': '返回群聊列表',
-  'LinkBot settings': 'LinkBot 设置',
+  'LinkHarness settings': 'LinkHarness 设置',
   'Settings pages': '设置页面',
-  'Models, providers, and the rest of DeepSeek Harness': '模型、服务商和 DeepSeek Harness 的其他设置',
-  'Harness settings': 'Harness 设置',
-  'Open Harness settings': '打开 Harness 设置',
+  'Advanced settings': '高级设置',
+  'Back to models': '返回模型',
+  'Open Plugins': '打开插件页',
+  'Open settings': '打开设置',
+  'Open settings file': '打开配置文件',
+  'Could not open the settings file': '无法打开配置文件',
+  'Show code work view': '显示代码工作视图',
+  'Could not save. Try again.': '保存失败，请重试',
+  // The sidebar's connection status and DSH Desktop's update status.
+  'Connection lost. Refresh to retry': '连接异常，刷新重试',
+  Reconnecting: '重新连接中',
+  'Connection lost. Reconnect now': '连接异常，点击立即重连',
+  'Connection dropped and retrying. Reconnect now': '连接中断，正在重试，点击立即重连',
+  'Retry update': '重试更新',
+  'New version': '新版本',
+  '{percent}%': '{percent}%',
+  'Verifying the update…': '正在校验更新文件…',
+  'Getting ready to restart…': '正在准备重启…',
+  'Install and restart': '安装并重启',
+  '{label}: {version}': '{label}：{version}',
+  'Downloading the update: {percent}%, version {version}': '正在下载更新：{percent}%，目标版本：{version}',
+  'Could not check for updates. Try again later.': '检查更新失败，请稍后重试。',
+  'Could not check for updates. Check your connection and try again.': '检查更新失败，请检查网络连接后重试。',
+  'Could not download the update. Try again.': '下载更新失败，请重试。',
+  'Could not download the update. Check your connection and try again.': '下载更新失败，请检查网络连接后重试。',
+  'Could not install the update. Try again later.': '安装更新失败，请稍后重试。',
+  'Could not install the update. Check your connection and try again.': '安装更新失败，请检查网络连接后重试。',
+  'Tasks could not stop safely, so the update was not installed. Try again later.': '未能安全停止任务，更新尚未安装，请稍后重试。',
+  'New tasks started. Confirm again to stop them and update.': '有新任务开始运行，请重新确认是否停止任务并更新。',
+  'Task status is not available. Try again when the workspace is ready.': '无法确认任务状态，请在工作区就绪后重试更新。',
+  'Could not leave full screen. Leave full screen and try again.': '无法退出全屏，请退出全屏后重试更新',
+  // The Host runs another release than the page.
+  'The service version changed': '服务版本变化',
+  'This page paused live updates. Reload to load the new version.': '服务版本已变化，本页面已暂停热更新，刷新后加载新版本。',
+  'Reload to load the new version': '刷新以加载新版本',
+  'Not now': '暂不刷新',
+  Service: '服务',
+  Page: '页面',
+  Unknown: '未解析',
   'Back to Bots': '返回 Bot 列表',
   'Close settings': '关闭设置',
+
+  // Phone
+  Phone: '手机',
+  'Off. Phones cannot reach this computer.': '已关闭。手机连不上这台电脑。',
+  'On. Paired phones can use DS Bot here.': '已开启。配对过的手机可以用这台电脑上的 DS Bot。',
+  'Cannot reach the Server. Trying again…': '连不上服务器，正在重试…',
+  'Phone access': '手机访问',
+  'Beta': '测试版',
+  'Phone app': '手机 App',
+  'Android beta': 'Android 测试版',
+  Server: '服务器',
+  'The Relay Server that passes encrypted messages between your phone and this computer. It cannot read them.': '在手机和这台电脑之间转发加密消息的中转服务器。它读不到消息内容。',
+  'Pair a phone': '配对手机',
+  'Scan this code with the DS Bot app on your phone.': '用手机上的 DS Bot App 扫这个码。',
+  'The code works once. It stops working in {count} min.': '这个码只能用一次，{count} 分钟后失效。',
+  'Show a QR code': '显示二维码',
+  'Your phone scans it once. After that it connects by itself.': '手机扫一次就行，以后会自动连接。',
+  'Turn on phone access first': '请先打开手机访问',
+  Phones: '手机',
+  'No phones yet': '还没有配对的手机',
+  'Paired on {date}': '{date} 配对',
+
   'Mark as Unread': '标为未读',
   'Rename Bot': '重命名 Bot',
   'Group settings': '群设置',
@@ -527,19 +636,23 @@ const ZH = {
   'Remove DSH Agent': '移除 DSH Agent',
   'New session': '新会话',
   'Session actions': '会话操作',
+  Plugins: '插件',
   'Plain dsh session': '原生 dsh 会话',
   'just now': '刚刚',
   '{n} min': '{n} 分钟',
   '{n} h': '{n} 小时',
   '{n} d': '{n} 天',
-  'LinkBot {version} is available': 'LinkBot {version} 可以更新',
-  'Updating LinkBot…': '正在更新 LinkBot…',
-  'LinkBot {version} is installed. Restart DSH to use it.': 'LinkBot {version} 已安装，重启 DSH 后生效',
-  'LinkBot {version} is installed.': 'LinkBot {version} 已安装。',
-  'LinkBot update': 'LinkBot 更新',
-  'LinkBot {version}': 'LinkBot {version}',
+  'LinkHarness {version} is available': 'LinkHarness {version} 可以更新',
+  'Updating LinkHarness…': '正在更新 LinkHarness…',
+  // The brand rename reached the settings rows before the update row: this one still says the
+  // old name when it was written, so both spellings carry the same Chinese text.
+  'Updating LinkBot…': '正在更新 LinkHarness…',
+  'LinkHarness {version} is installed. Restart DSH to use it.': 'LinkHarness {version} 已安装，重启 DSH 后生效',
+  'LinkHarness {version} is installed.': 'LinkHarness {version} 已安装。',
+  'LinkHarness update': 'LinkHarness 更新',
+  'LinkHarness {version}': 'LinkHarness {version}',
   'Update installed': '更新已安装',
-  'Restart DSH to start using LinkBot {version}.': '重启 DSH 后开始使用 LinkBot {version}。',
+  'Restart DSH to start using LinkHarness {version}.': '重启 DSH 后开始使用 LinkHarness {version}。',
   'You have {version}.': '当前版本 {version}。',
   'The update did not finish: {reason}': '更新没有完成：{reason}',
   'Updating…': '正在更新…',
@@ -548,7 +661,7 @@ const ZH = {
   'DSH update': 'DSH 更新',
   'DSH {version}': 'DSH {version}',
   'Restart DSH to start using DSH {version}.': '重启 DSH 后开始使用 DSH {version}。',
-  'Update LinkBot {version} first.': '先更新 LinkBot {version}。',
+  'Update LinkHarness {version} first.': '先更新 LinkHarness {version}。',
   'Open updates': '打开更新',
   'Search Bots, chats and messages': '搜索 Bot、对话和消息',
   'Clear search': '清除搜索',
@@ -783,6 +896,12 @@ const ZH = {
   'by you': '由你添加',
   'by {name}': '由 {name} 添加',
   'Remove from memory': '从记忆中删除',
+  'until {day}': '有效至 {day}',
+  'Tidied: {merged} merged, {moved} moved, {retired} archived': '已整理：合并 {merged} 条，移动 {moved} 条，归档 {retired} 条',
+  'Only when needed': '需要时才读',
+  'Move to…': '移到…',
+  'Every conversation': '每次都带',
+  'ended {day}': '已于 {day} 结束',
   'Click again to remove': '再点一次删除',
   'Ask or update': '询问或更新',
   'Added: {text}': '已添加：{text}',
@@ -904,11 +1023,11 @@ const ZH = {
   'Compared with the day before': '与前一天相比',
   'Compared with the {count} days before': '与再往前 {count} 天相比',
   '{share}% of all usage from {span}': '占 {span} 全部用量的 {share}%',
-  'About LinkBot': '关于 LinkBot',
+  'About LinkHarness': '关于 LinkHarness',
   'Version {version}': '版本 {version}',
-  'Star LinkBot on GitHub': '在 GitHub 上给 LinkBot 点 Star',
+  'Star LinkHarness on GitHub': '在 GitHub 上给 LinkHarness 点 Star',
   '{count} stars': '{count} 个 Star',
-  'If LinkBot helps you, a star on GitHub helps more people find it.': '如果 LinkBot 对你有用，欢迎在 GitHub 上点个 Star，让更多人看到它。',
+  'If LinkHarness helps you, a star on GitHub helps more people find it.': '如果 LinkHarness 对你有用，欢迎在 GitHub 上点个 Star，让更多人看到它。',
   'Check for updates': '检查更新',
   'Checking…': '正在检查…',
   'Up to date': '已是最新版本',
@@ -922,7 +1041,7 @@ const ZH = {
   '{version} is available': '{version} 已发布',
   'Installed from a local folder; update it there.': '从本地文件夹安装，请在那里更新。',
   'Updates are not offered for this install.': '这种安装方式不提供更新。',
-  'Updates come with the LinkBot app.': '随 LinkBot 应用一起更新。',
+  'Updates come with the LinkHarness app.': '随 LinkHarness 应用一起更新。',
   'Source code': '源代码',
   'Release notes': '发布说明',
   'Report a problem': '报告问题',
@@ -931,7 +1050,7 @@ const ZH = {
   'For example: I asked Writer in the group chat and it showed an error.': '例如：我在群聊里问 Writer，它显示出错了。',
   'Versions, system, models, and the latest errors. Saved keys, tokens, and your home folder are hidden.': '版本、系统、模型和最近的错误。已保存的密钥、令牌和你的用户目录都已隐藏。',
   'GitHub issue': 'GitHub issue',
-  'Opens a new issue in the LinkBot repository with all of this filled in. Nothing is sent until you submit it there.': '在 LinkBot 仓库新建一个 issue，并填好以上内容。你在 GitHub 上提交之前，什么都不会发出。',
+  'Opens a new issue in the LinkHarness repository with all of this filled in. Nothing is sent until you submit it there.': '在 LinkHarness 仓库新建一个 issue，并填好以上内容。你在 GitHub 上提交之前，什么都不会发出。',
   'Report on GitHub': '在 GitHub 上报告',
   'Copied the diagnostics.': '已复制诊断信息。',
   'Could not copy. Select the text below and copy it.': '无法复制。请选中下面的文字手动复制。',
@@ -943,7 +1062,7 @@ const ZH = {
   'Recent errors': '最近的错误',
   'Recent errors · {count}': '最近的错误 · {count}',
   'No errors recorded.': '没有错误记录。',
-  'Failed model calls and LinkBot problems show here, newest first.': '模型调用失败和 LinkBot 的问题会显示在这里，最新的在前。',
+  'Failed model calls and LinkHarness problems show here, newest first.': '模型调用失败和 LinkHarness 的问题会显示在这里，最新的在前。',
   'Model call': '模型调用',
   'This window': '这个窗口',
   'Error log': '错误日志',
@@ -1005,7 +1124,7 @@ const ZH = {
   'How many': '数量',
   'Create task': '创建任务',
   'Turn on Automation tasks in DSH': '在 DSH 里打开「自动化任务」',
-  'Switch on Automation tasks on the Plugins page in Harness settings.': '在 Harness 设置的插件页启用「自动化任务」。',
+  'Switch on Automation tasks on the Plugins page in Settings.': '在设置的插件页启用「自动化任务」。',
   'New task': '新建任务',
   'No scheduled tasks yet.': '还没有定时任务。',
   'No scheduled tasks yet. Add one': '还没有定时任务，去添加',
@@ -1086,14 +1205,14 @@ const ZH = {
   'This side chat is no longer here.': '这个侧边对话已经不在了。',
   'This side question is no longer here.': '这个侧边提问已经不在了。',
   'This Bot has not called a model yet. Send a normal message first.': '这个 Bot 还没有调用过模型，请先正常发一条消息。',
-  'LinkBot restarted before this answer finished.': 'LinkBot 在回答完成前重启了。',
+  'LinkHarness restarted before this answer finished.': 'LinkHarness 在回答完成前重启了。',
   'The model called a tool again after being told not to, so this aside was not answered.': '模型在被要求不要调用工具之后又调用了工具，所以这次没有回答。',
   'The model wrote nothing.': '模型没有写任何内容。',
   'Nothing to ask': '没有要问的内容',
   'Nothing to open': '没有要打开的内容',
   'Nothing to cancel': '没有要取消的内容',
   'Nothing to close': '没有要关闭的内容',
-  'LinkBot is still loading this chat.': 'LinkBot 还在加载这个对话。',
+  'LinkHarness is still loading this chat.': 'LinkHarness 还在加载这个对话。',
   'No model is available. Add one in Harness settings.': '没有可用的模型，请先在 Harness 设置里添加模型。',
   Working: '工作中',
   Search: '搜索',
@@ -1381,6 +1500,7 @@ const ZH = {
   'Finish signing in in your browser.': '在浏览器里完成登录。',
   'Open again': '重新打开',
   'Did not come back here?': '登录后没有回到这里？',
+  'Copied to clipboard': '已复制到剪贴板',
   'Paste the code on {host} and authorize.': '在 {host} 粘贴这个码并授权。',
   'Add another': '再添加一个',
   'QQ, 163, 126, Gmail, iCloud, and other IMAP mail': 'QQ、163、126、Gmail、iCloud 等 IMAP 邮箱',
@@ -1496,7 +1616,7 @@ const ZH = {
 const HOST_ERRORS = [
   [/^Could not reach the mail server at (.+)\. Check the server address\.$/, '连不上邮件服务器 $1，请检查服务器地址。'],
   [/^Model (.+) is not available\. Available: (.*)$/, '模型 $1 不可用。可用的：$2'],
-  [/^The API key for (.+) is set outside LinkBot and cannot be changed here$/, '$1 的 API key 是在 LinkBot 之外设置的，这里改不了'],
+  [/^The API key for (.+) is set outside LinkHarness and cannot be changed here$/, '$1 的 API key 是在 LinkHarness 之外设置的，这里改不了'],
   [/^(.+) takes no API key here$/, '$1 不能在这里填 API key'],
   [/^(.+) is already set up$/, '$1 已经设置过了'],
   [/^DSH offers no provider (.+)$/, 'DSH 没有服务商 $1'],
@@ -1509,6 +1629,8 @@ const HOST_ERRORS = [
   [/^"(.+)" calls everyone in a group, so it cannot be a Bot name$/, '「$1」在群里表示所有人，不能用作 Bot 名字'],
   [/^"(.+)" stands for the user in a chat, so it cannot be a Bot name$/, '「$1」在对话里表示用户本人，不能用作 Bot 名字'],
   [/^Another group chat is already called "(.+)"$/, '已经有叫「$1」的群聊了'],
+  [/^Another section is already called "(.+)"$/, '已经有叫「$1」的分组了'],
+  [/^Enter a section name$/, '请输入分组名称'],
   [/^A group chat holds at most (\d+) Bots$/, '一个群聊最多 $1 个 Bot'],
   [/^Reply mode must be one of (.+)$/, '回复模式只能是 $1'],
   [/^Only the user, a Main Bot, or the admin of "(.+)" can change it$/, '只有你、主 Bot 或「$1」的管理员可以修改'],
@@ -1549,6 +1671,46 @@ const HOST_ERRORS = [
   [/^Memory cannot change now: [\s\S]*$/, '现在不能修改记忆：另一个 dsh 正在使用这个 Bot 团队'],
 ]
 const HOST_ZH = {
+  'The Server address must start with ws:// or wss://': '服务器地址必须以 ws:// 或 wss:// 开头',
+  'Enter the Server address first': '请先填服务器地址',
+  'Turn on phone access first': '请先打开手机访问',
+  'This phone is not paired': '这台手机没有配对',
+  'Another dsh has this Bot team open, so phones connect to that one': '另一个 dsh 打开了这个 Bot 团队，手机会连到那一个',
+  'This dsh runs on a Node without WebSocket': '这个 dsh 用的 Node 不支持 WebSocket',
+  'Phones are paired and removed on the computer': '配对和删除手机只能在电脑上做',
+  'Request failed': '请求失败',
+  'Permissions are not available in this DeepSeek Harness': '这个 DeepSeek Harness 不支持权限设置',
+  'Avatar images must be PNG, JPEG, WebP, or GIF': '头像图片必须是 PNG、JPEG、WebP 或 GIF',
+  'Avatar image is too large': '头像图片太大了',
+  'A Bot needs a name': 'Bot 需要一个名字',
+  'A Bot name cannot contain @, ` or a line break': 'Bot 名字里不能有 @、` 或换行',
+  'Unknown Bot': '找不到这个 Bot',
+  'Unknown conversation': '找不到这个对话',
+  'A group chat needs at least two Bots': '群聊至少要两个 Bot',
+  'The admin must be a member of the group': '管理员必须是群成员',
+  'Unknown group chat': '找不到这个群聊',
+  'No Bot is left in this group chat': '这个群聊里已经没有 Bot 了',
+  'That group chat has been deleted': '这个群聊已经删除了',
+  'Hand the admin role to another member instead of leaving the group without one': '请把管理员交给其他成员，不要让群聊没有管理员',
+  'Hand the admin role to another member before leaving the group': '离开群聊前，请先把管理员交给其他成员',
+  'The team needs at least one Main Bot': '团队至少要有一个主 Bot',
+  'Only a Main Bot can be replaced': '只能替换主 Bot',
+  'A Main Bot cannot be deleted; remove its Main Bot role first': '主 Bot 不能删除，请先取消它的主 Bot 身份',
+  'Unknown theme': '未知主题',
+  'Accent must be a #rrggbb color': '强调色必须是 #rrggbb 格式',
+  'Type the key first': '请先输入密钥',
+  'Choose every Bot or a list of Bots': '请选择所有 Bot 或指定的 Bot',
+  'This request is gone': '这个请求已经不存在了',
+  'This request was already answered': '这个请求已经处理过了',
+  'A name uses capitals, digits, and underscores, and starts with a letter': '名字只能用大写字母、数字和下划线，并以字母开头',
+  'No such key': '没有这个密钥',
+  'Type a question or a change first': '请先输入问题或要改的内容',
+  'No model is available. Add one in Settings > Models.': '没有可用的模型，请先在 设置 → 模型 里添加。',
+  'Memory is turned off on this host': '这台主机关闭了记忆功能',
+  'The model wrote nothing': '模型没有输出内容',
+  'Write the entry to save.': '请写下要保存的内容。',
+  'This DeepSeek Harness has no folder chooser': '这个 DeepSeek Harness 没有文件夹选择窗口',
+  'This DeepSeek Harness cannot list folders': '这个 DeepSeek Harness 不能列出文件夹',
   "Side chat is only available in a Bot's private chat.": '侧边对话只在 Bot 的私聊里可用。',
   'Write a question.': '写上问题。',
   'Write a question after /side.': '在 /side 后面写上问题。',
@@ -1581,6 +1743,10 @@ const HOST_ZH = {
   'Loading the provider…': '正在加载提供方…',
   'Could not load the provider': '提供方加载失败',
   'The provider package is not installed': '提供方包未安装',
+  'Install it in this DSH': '在这个 DSH 里安装',
+  'Run {command}, then restart DSH.': '运行 {command}，然后重启 DSH。',
+  'Copy command': '复制命令',
+  'Bots get no computer tools until the provider is ready.': '提供方就绪之前，Bot 拿不到电脑工具。',
   'Another computer-use provider is running': '另一个电脑操控提供方正在运行',
   'Computer use is not available on this platform': '此平台不支持电脑操控',
   'Accessibility': '辅助功能',
@@ -1608,8 +1774,76 @@ const HOST_ZH = {
   'Stop {name}': '停止 {name}',
   '{name} · foreground': '{name} · 前台',
   '{name} waits for the computer': '{name} 等你停手',
+  // The turn's status row: the host writes these, and the team writes the same
+  // words now that it owns the seat the host used to draw it in.
+  'Turn stopped': '已停止',
+  'Turn failed': '处理失败',
+  'Turn done': '已完成',
+  'Turn took {duration}': '已完成，用时 {duration}',
+  '{n} second': '{n} 秒',
+  '{n} minute': '{n} 分',
+  '{n} hour': '{n} 小时',
 }
 Object.assign(ZH, HOST_ZH)
+
+const ZH_TW = convertDict(ZH)
+const HOST_ERRORS_ZH_TW = convertHostErrors(HOST_ERRORS)
+
+export const LANGUAGES = [
+  { id: 'zh-TW', label: '繁體中文', fallback: 'zh' },
+  { id: 'ja', label: '日本語', fallback: 'en' },
+  { id: 'ko', label: '한국어', fallback: 'en' },
+  { id: 'es', label: 'Español', fallback: 'en' },
+  { id: 'fr', label: 'Français', fallback: 'en' },
+  { id: 'de', label: 'Deutsch', fallback: 'en' },
+]
+
+export const DICTIONARY = {
+  zh: ZH,
+  'zh-TW': ZH_TW,
+  ja: JA,
+  ko: KO,
+  es: ES,
+  fr: FR,
+  de: DE,
+}
+
+const HOST_ERROR_TABLE = {
+  zh: HOST_ERRORS,
+  'zh-TW': HOST_ERRORS_ZH_TW,
+  ja: HOST_ERRORS_JA,
+  ko: HOST_ERRORS_KO,
+  es: HOST_ERRORS_ES,
+  fr: HOST_ERRORS_FR,
+  de: HOST_ERRORS_DE,
+}
+
+const DSH_LOCALE_PACKS = {
+  ja: DSH_JA,
+  ko: DSH_KO,
+  es: ES && DSH_ES,
+  fr: DSH_FR,
+  de: DSH_DE,
+}
+
+const DATE_LOCALES = {
+  zh: 'zh-CN',
+  'zh-TW': 'zh-TW',
+  ja: 'ja-JP',
+  ko: 'ko-KR',
+  es: 'es-ES',
+  fr: 'fr-FR',
+  de: 'de-DE',
+  en: 'en-US',
+}
+
+function resolveLangKey(tag) {
+  const lower = String(tag ?? '').toLowerCase()
+  if (lower === 'zh-tw' || lower === 'zh-hk' || lower === 'zh-mo' || lower.startsWith('zh-hant')) return 'zh-TW'
+  if (lower.startsWith('zh')) return 'zh'
+  const primary = lower.split('-')[0]
+  return Object.hasOwn(DICTIONARY, primary) ? primary : 'en'
+}
 
 const fill = (text, params) => (params
   ? text.replace(/\{(\w+)\}/g, (match, name) => (name in params ? String(params[name]) : match))
@@ -1623,10 +1857,68 @@ export function installLocale(locale) {
   if (!locale || typeof locale.register !== 'function' || typeof locale.bind !== 'function') return () => {}
   service = locale
   bound = locale.bind(NAMESPACE)
-  const off = locale.register(NAMESPACE, 'zh', ZH)
+  const offs = []
+  const pushOff = (fn) => { if (typeof fn === 'function') offs.push(fn) }
+
+  if (typeof locale.addLanguage === 'function') {
+    const existing = new Set((locale.getLocale?.()?.locales ?? []).map(item => String(item.id).toLowerCase()))
+    for (const def of LANGUAGES) {
+      if (!existing.has(def.id.toLowerCase())) {
+        try { pushOff(locale.addLanguage(def)) } catch { /* already added */ }
+      }
+    }
+  }
+
+  for (const [langId, dict] of Object.entries(DICTIONARY)) {
+    pushOff(locale.register(NAMESPACE, langId, dict))
+  }
+
+  // Register DSH settings/common namespace translations only after each owning DSH plugin registers its namespace.
+  let syncing = false
+  let disposed = false
+  const syncDshNamespaces = () => {
+    if (disposed || syncing || !(locale.dicts instanceof Map)) return
+    syncing = true
+    try {
+      for (const [langId, namespaces] of Object.entries(DSH_LOCALE_PACKS)) {
+        for (const [ns, dict] of Object.entries(namespaces ?? {})) {
+          const map = locale.dicts.get(ns)
+          if (!map || map.has(langId.toLowerCase())) continue
+          try { pushOff(locale.register(ns, langId, dict)) } catch { /* already registered */ }
+        }
+      }
+      for (const [ns, map] of locale.dicts.entries()) {
+        if (ns === NAMESPACE || map.has('zh-tw')) continue
+        const zhDict = map.get('zh')
+        if (zhDict) {
+          try { pushOff(locale.register(ns, 'zh-TW', convertDict(zhDict))) } catch { /* ignore */ }
+        }
+      }
+    } finally {
+      syncing = false
+    }
+  }
+  syncDshNamespaces()
+  if (typeof locale.subscribe === 'function') {
+    pushOff(locale.subscribe(syncDshNamespaces))
+  }
+
+  const origResolveText = typeof locale.resolveText === 'function' ? locale.resolveText.bind(locale) : null
+  if (origResolveText) {
+    locale.resolveText = (text) => {
+      const resolved = origResolveText(text)
+      if (resolveLangKey(language()) === 'zh-TW' && typeof text === 'object' && text !== null && !('zh-tw' in text)) {
+        return toTraditional(resolved)
+      }
+      return resolved
+    }
+    offs.push(() => { locale.resolveText = origResolveText })
+  }
+
   return () => {
+    disposed = true
     if (service === locale) { service = null; bound = null }
-    if (typeof off === 'function') off()
+    for (let i = offs.length - 1; i >= 0; i--) offs[i]()
   }
 }
 
@@ -1636,9 +1928,10 @@ export function t(key, params) {
 
 // A message from the host, in the interface language.
 export function hostText(message) {
-  if (!language().startsWith('zh')) return message
+  const lang = resolveLangKey(language())
+  if (lang === 'en') return message
   if (Object.hasOwn(ZH, message)) return t(message)
-  for (const [pattern, template] of HOST_ERRORS) {
+  for (const [pattern, template] of HOST_ERROR_TABLE[lang] ?? []) {
     if (pattern.test(message)) return message.replace(pattern, template)
   }
   return message
@@ -1650,7 +1943,4 @@ export function language() {
   return typeof active === 'string' ? active : 'en'
 }
 
-export const dateLocale = () => (language().startsWith('zh') ? 'zh-CN' : 'en-US')
-
-// Translations for the tests: the Chinese dictionary itself.
-export const DICTIONARY = { zh: ZH }
+export const dateLocale = () => DATE_LOCALES[resolveLangKey(language())] ?? 'en-US'

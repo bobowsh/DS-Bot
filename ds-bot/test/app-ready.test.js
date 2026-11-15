@@ -153,6 +153,25 @@ test('in Agent mode the return button reports what the team sidebar would', asyn
   assert.deepEqual(calls, [[]])
 })
 
+test('the return button says where it goes, and a click goes back to the Bot surface', () => {
+  const { app } = readyCalls()
+  const { BotReturn } = page(app)
+  const text = node => (typeof node === 'string' ? node : [node?.props?.children].flat().filter(Boolean).map(text).join(''))
+  const modes = []
+  const wide = mount(BotReturn)({ ...returnProps('agent', TEAM), actions: { setSurface: mode => modes.push(mode) } })
+  // 我们的口径：返回按钮只画图标（不显示文字），产品名在标签与提示里。
+  assert.equal(wide.props['aria-label'], 'LinkHarness')
+  assert.equal(wide.props.title, 'LinkHarness')
+  assert.equal(text(wide), '')
+  wide.props.onClick()
+  assert.deepEqual(modes, ['bot'])
+  // The narrow footer keeps the whale alone; the name stays in the label and tooltip.
+  const narrow = mount(BotReturn)({ ...returnProps('agent', TEAM), wide: false })
+  assert.equal(narrow.props['aria-label'], 'LinkHarness')
+  assert.equal(narrow.props.title, 'LinkHarness')
+  assert.equal(text(narrow), '')
+})
+
 test('without the app bridge or its ready() the sidebar draws as before', async () => {
   for (const app of [undefined, {}]) {
     const { TeamSidebar, clientErrors } = page(app)

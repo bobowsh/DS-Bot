@@ -19,7 +19,7 @@ export async function unreadableSessions(persistence, ids) {
       }
     } catch (error) {
       if (error?.name === 'SessionFormatUnsupportedError') unreadable.push(id)
-      else console.warn(`LinkBot: could not read ${id} while checking the team: ${error instanceof Error ? error.message : String(error)}`)
+      else console.warn(`LinkHarness: could not read ${id} while checking the team: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
   return unreadable

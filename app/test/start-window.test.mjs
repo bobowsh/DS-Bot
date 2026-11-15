@@ -193,7 +193,7 @@ test('what the hint row can prepare for: a new team, a reinstall or an import', 
 })
 
 test('the copied details name the version and the reason before the log', () => {
-  assert.equal(detailsText({ version: '0.2.2', platform: 'win32', arch: 'x64', reason: 'engine', lines: ['l1', 'l2'] }), 'DS Bot 0.2.2 (win32 x64)\nreason: engine\n\nl1\nl2')
+  assert.equal(detailsText({ version: '0.2.2', platform: 'win32', arch: 'x64', reason: 'engine', lines: ['l1', 'l2'] }), 'LinkHarness 0.2.2 (win32 x64)\nreason: engine\n\nl1\nl2')
 })
 
 test('the start window remembers the theme and the motion tier in its own file', (t) => {
@@ -297,7 +297,7 @@ function startWindow(t) {
   const main = new fake.electron.BrowserWindow({ show: false })
   const calls = { retry: 0, reload: 0, close: 0, pick: [], answer: [], update: [], saveAs: [], saveTo: undefined }
   const start = new StartWindow({
-    electron: fake.electron, page: join(tmpdir(), 'start', 'start.html'), preload: 'preload.cjs', icon: 'icon.ico', mica: false, devTools: false,
+    electron: fake.electron, page: join(tmpdir(), 'start', 'start.html'), preload: 'preload.cjs', icon: 'icon.ico', devTools: false,
     lang: () => 'en', motion: 'normal', version: '0.0.0', program: [], log: { dir: 'logs', tail: () => ['a log line'] },
     mainWindow: () => main,
     onRetry: () => { calls.retry += 1 }, onReload: () => { calls.reload += 1 }, onClose: () => { calls.close += 1 },
@@ -390,7 +390,7 @@ test('〔保存日志…〕 writes the log where the app\'s picker says, and not
   s.act('saveLog')
   const saved = () => (readdirSync(dir).length > 0 ? readFileSync(join(dir, 'log.txt'), 'utf8') : '')
   for (let i = 0; i < 500 && !saved().includes('a log line'); i += 1) await new Promise(resolve => setImmediate(resolve))
-  assert.match(saved(), /^DS Bot 0\.0\.0 \([\s\S]*a log line/u)
+  assert.match(saved(), /^LinkHarness 0\.0\.0 \([\s\S]*a log line/u)
 })
 
 test('a dialog of the start window turns it opaque while it waits see-through', (t) => {
