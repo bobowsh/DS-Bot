@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="AIDE">
+  <!-- The mark of Visual Studio Code, redrawn as vectors: the tall ribbon that leans to the
+       right, the small band beside it, and the bracket strokes between them. The blue is the
+       editor's own (#0098FF). The mark belongs to Microsoft Corporation; see NOTICE. -->
+  <g fill="#0098FF">
+    <path d="M74.6 268.6 213.4 160.7v24.7L104.6 268.6l108.8 83.2v24.7L74.6 268.6z"/>
+    <path d="M184.1 268.6 322.9 160.7v190.6L184.1 268.6z" opacity=".9"/>
+    <path d="M389.6 236.9 251.5 130.7v30.1l95.9 71.9v36.6l-95.9 71.9v30.1l138.1-106.2z" opacity=".8"/>
+  </g>
+</svg>

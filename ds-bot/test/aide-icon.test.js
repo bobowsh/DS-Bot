@@ -23,7 +23,11 @@ test('the AIDE mark is the editor\'s blue, drawn as vectors', () => {
 
 test('the plugin ships the same mark as its own icon', () => {
   // dsh-aide 的 icon.svg 与我们画的形状是同一份：插件列表和页脚按钮说的是同一个东西。
-  const icon = join(PLUGIN, '..', '..', 'dsh-plugins-dev', 'dsh-aide', 'icon.svg')
+  //
+  // 这份 svg 是 dsh-aide 插件自己的 icon.svg 的副本，签进仓库（test/data/aide-icon.svg），
+  // 是为了让测试不依赖仓库外的本地插件开发目录（以前读 ../../dsh-plugins-dev/dsh-aide/，
+  // 在 CI 那种干净环境里根本不存在，测试必然 ENOENT）。上游哪天改了图标，这里要跟着更新。
+  const icon = join(PLUGIN, 'test', 'data', 'aide-icon.svg')
   const svg = readFileSync(icon, 'utf8')
   assert.ok(svg.includes('#0098FF'), '打包源里的图标也是 VS Code 的蓝')
   assert.ok(svg.includes('<path'), '打包源里的图标是矢量')

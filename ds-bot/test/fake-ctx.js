@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module'
+
 // DSH's `attachments` service (dsh-attachment-local), in memory. A file ref has a
 // name and is read as a stream, in small chunks that split characters as a stream
 // may. An image ref, as a prompt's image block stores it, has no name: only
@@ -45,6 +47,18 @@ export function fakeApproval(outcome = 'allowed-once') {
 
 // A stand-in for the plugin context that records what apply() registers, in order,
 // without starting any service.
+/** The services the plugin declares in its own `inject`: what the real ctx would let it read. */
+let injectCache
+function injectedNames() {
+  if (injectCache === undefined) {
+    const { readFileSync } = createRequire(import.meta.url)('node:fs')
+    const source = readFileSync(new URL('../index.js', import.meta.url), 'utf8')
+    const match = /export const inject = \[([^\]]*)\]/u.exec(source)
+    injectCache = match === null ? [] : [...match[1].matchAll(/'([^']+)'/gu)].map(hit => hit[1])
+  }
+  return injectCache
+}
+
 export function fakeContext({ services = {} } = {}) {
   const calls = []
   const disposers = []
@@ -60,7 +74,19 @@ export function fakeContext({ services = {} } = {}) {
     listeners,
     sections,
     logger: { warn() {}, info() {} },
-    get: name => services[name],
+    // As in real cordis, a service is reachable only when the plugin declared it in `inject`.
+    // The plugin's own inject list is read from ds-bot/index.js, so a tool that calls
+    // ctx.get('fs') without declaring it fails here the way it fails in the host.
+    // The host refuses a service the plugin never declared in `inject`. Only `fs` is enforced
+    // here: the tools that read and write files reach it with ctx.get('fs'), and a missing
+    // declaration is exactly the bug this guards (write/edit shipped without it and every
+    // file write failed). The other services keep the looser shape the modules rely on.
+    get: name => {
+      if (name === 'fs' && !injectedNames().includes('fs')) {
+        throw new Error('cannot get property "fs" without inject')
+      }
+      return services[name]
+    },
     // As in real cordis: the plugin does not inject this service, so reading it throws.
     get subagents() { throw new Error('cannot get property "subagents" without inject') },
     // The real ctx guards plain access with `inject`; service() reads this.

@@ -17,9 +17,9 @@
 // (`satisfiesDshRange` in src/factory-update.mjs), so a package the build accepts is a package
 // the update path would accept too. Its comparison ignores prerelease tags and compares the
 // three numbers, which is what npm's own resolution does for the ranges these plugins declare.
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { satisfiesDshRange } from '../src/factory-update.mjs'
+import semver from 'semver'
 
 /** The DSH packages whose versions the app pins: the first one names the host version. */
 const DSH_PACKAGE = '@deepseek-ai/dsh'
@@ -43,11 +43,30 @@ export function hostDshVersion(appDir) {
       return undefined
     }
   }
-  // Every `@deepseek-ai/dsh*` dependency the app declares, so a plugin's peer range can be
-  // checked against the package it actually names.
+  // Every `@deepseek-ai/dsh*` package the app actually has, not only the ones it names in
+  // package.json. A plugin peers on packages the app carries transitively (dsh-agent,
+  // dsh-session, dsh-subagent, ...), and looking only at the declared list made those ranges
+  // unverifiable: dsh-better-sidebar@0.32.1 peers on ^0.2.2-rc.2 while this app runs rc.1, and
+  // the check called it compatible because those names were never in the map.
+  const installed = join(appDir, 'node_modules', '@deepseek-ai')
+  let entries = []
+  try {
+    entries = readdirSync(installed)
+  } catch {
+    entries = []
+  }
+  for (const entry of entries) {
+    if (!entry.startsWith('dsh')) continue
+    const name = `@deepseek-ai/${entry}`
+    const manifest = read(name)
+    if (manifest?.version !== undefined) packages.set(name, manifest.version)
+  }
+  // The declared list still counts: a package the app names but has not installed yet should
+  // not silently look absent.
   const declared = JSON.parse(readFileSync(join(appDir, 'package.json'), 'utf8'))
   for (const name of Object.keys(declared.dependencies ?? {})) {
     if (!name.startsWith('@deepseek-ai/dsh')) continue
+    if (packages.has(name)) continue
     const manifest = read(name)
     if (manifest?.version !== undefined) packages.set(name, manifest.version)
   }
@@ -72,9 +91,26 @@ export function hostDshVersion(appDir) {
  * @param {{ version: string, packages: Map<string, string> }} host - from {@link hostDshVersion}
  * @returns {{ compatible: boolean, reason?: string }}
  */
+// Why not `satisfiesDshRange` from factory-update.mjs: that helper compares only the three
+// numbers and drops the prerelease tag, so it calls 0.2.2-rc.1 a match for >=0.2.2-rc.2. The
+// host itself disagrees — it skips such a plugin and warns about crashes — so the packer must
+// use the same reading as the host: semver, prerelease included.
+// includePrerelease is what makes the comparison match the host: a range like
+// ">=0.2.1-rc.2 <0.3.0" must accept 0.2.2-rc.1 (it does, with prerelease allowed), while
+// "^0.2.2-rc.2" must reject it (rc.1 is older than rc.2). Plain semver.satisfies drops
+// prerelease versions out of every range, which would refuse every plugin this app can run.
+const satisfies = (version, range) => {
+  try {
+    return semver.satisfies(version, range, { includePrerelease: true })
+  } catch {
+    // An unparseable range says nothing we can check: refuse rather than pass it through.
+    return false
+  }
+}
+
 export function compatibilityOf(manifest, host) {
   const engines = manifest?.engines ?? {}
-  if (typeof engines.dsh === 'string' && engines.dsh !== '' && !satisfiesDshRange(host.version, engines.dsh)) {
+  if (typeof engines.dsh === 'string' && engines.dsh !== '' && !satisfies(host.version, engines.dsh)) {
     return { compatible: false, reason: `declares engines.dsh ${engines.dsh}, but this app runs DSH ${host.version}` }
   }
   for (const [name, range] of Object.entries(manifest?.peerDependencies ?? {})) {
@@ -83,7 +119,7 @@ export function compatibilityOf(manifest, host) {
     // Not carried here: nothing to compare, and refusing on it would drop plugins that peer on
     // packages our own composition may mount another way.
     if (installed === undefined) continue
-    if (!satisfiesDshRange(installed, String(range))) {
+    if (!satisfies(installed, String(range))) {
       return { compatible: false, reason: `peer-depends on ${name} ${range}, but this app carries ${installed}` }
     }
   }
