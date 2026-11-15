@@ -3,11 +3,12 @@
 // answer is supplied here, so the decisions are what is under test.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { candidatesFor, compatibilityOf, isNewer } from '../scripts/factory-versions.mjs'
+import { fileURLToPath } from 'node:url'
+import { candidatesFor, compatibilityOf, hostDshVersion, isNewer } from '../scripts/factory-versions.mjs'
 import { factoryRegistries, PUBLIC_REGISTRIES, resolveFactoryVersion } from '../scripts/bundled-plugin.mjs'
 
 // The host the app pins, as src/factory-update.mjs compares it: three numbers, prerelease ignored.
-const HOST = { version: '0.2.2-rc.1', packages: new Map([['@deepseek-ai/dsh', '0.2.2-rc.1'], ['@deepseek-ai/dsh-tools', '0.2.2-rc.1']]) }
+const HOST = { version: '0.2.2-rc.1', packages: new Map([['@deepseek-ai/dsh', '0.2.2-rc.1'], ['@deepseek-ai/dsh-tools', '0.2.2-rc.1'], ['@deepseek-ai/dsh-llm', '0.2.2-rc.1']]) }
 
 /** A registry answer for one package, standing in for the network. */
 function fakeRegistry({ latest, manifests = {} }) {
@@ -49,6 +50,26 @@ test('a peer dependency on a DSH package is checked against the version the app 
   assert.deepEqual(compatibilityOf({ peerDependencies: { '@deepseek-ai/dsh-tools': '^0.2.1-rc.1' } }, HOST), { compatible: true })
   // A package this app does not carry is not a refusal: another plugin may bring it.
   assert.deepEqual(compatibilityOf({ peerDependencies: { '@deepseek-ai/dsh-not-here': '>=9.0.0' } }, HOST), { compatible: true })
+})
+
+test('a prerelease host is compared the way the host itself compares it', () => {
+  // The host runs 0.2.2-rc.1. A plugin that peers on ^0.2.2-rc.2 must be refused, because the
+  // host skips it and warns about crashes — this is exactly what happened with
+  // dsh-better-sidebar@0.32.1, which used to slip through and got packed anyway.
+  assert.equal(compatibilityOf({ peerDependencies: { '@deepseek-ai/dsh-llm': '^0.2.2-rc.2' } }, HOST).compatible, false)
+  // Its previous release asks for rc.1 and is fine.
+  assert.equal(compatibilityOf({ peerDependencies: { '@deepseek-ai/dsh-llm': '^0.2.2-rc.1' } }, HOST).compatible, true)
+  // A range with an rc floor still accepts a newer rc: >=0.2.1-rc.2 covers 0.2.2-rc.1.
+  assert.equal(compatibilityOf({ engines: { dsh: '>=0.2.1-rc.2 <0.3.0' } }, HOST).compatible, true)
+  assert.equal(compatibilityOf({ engines: { dsh: '>=0.2.0-rc.1' } }, HOST).compatible, true)
+})
+
+test('a peer on a package the app carries is checked, not skipped as unknown', () => {
+  // dsh-agent is not in app/package.json, it comes in transitively. Before the host map was
+  // built from node_modules, a peer on it was silently unverifiable.
+  const { packages } = hostDshVersion(fileURLToPath(new URL('..', import.meta.url)))
+  assert.ok(packages.size > 100, `every installed dsh package is known (${packages.size})`)
+  assert.ok(packages.has('@deepseek-ai/dsh-agent'), 'a transitively installed package is in the map')
 })
 
 test('the build pulls from the public mirrors unless the environment names a registry', (t) => {

@@ -1,29 +1,81 @@
 {
   "comment": "出厂插件与技能清单（用户 2026-11-08 拍板）。plugins 打进 data/profiles/ds-bot/node_modules/（scoped 包按 name 建 scoped 目录），skills 打进 data/skills/<slug>/，languageServers 打进 data/lsp/<name>/（原生程序，由宿主 PATH 找到）。运行时清单 data/factory/plugins.json 由打包脚本按本清单生成，格式不变。",
   "plugins": [
-    { "name": "dsh-chat-import", "version": "0.26.6" },
-    { "name": "dsh-xdpool", "version": "2.6.7" },
-    { "name": "dshmarket", "version": "1.73.19" },
-    { "name": "@linxin666/dsh-client-ui-git-graph", "version": "0.4.14" },
-    { "name": "dsh-rule-manager", "version": "0.1.0" },
-    { "name": "@astron-team/skillhub-dsh", "version": "0.6.3" },
-    { "name": "dsh-aide", "version": "0.12.0" },
-    { "name": "dsh-better-sidebar", "version": "0.32.1" },
-    { "name": "dsh-screenshot-native", "version": "1.0.0" },
-    { "name": "ds-harness-remote", "version": "0.6.5" },
-    { "name": "dsh-plugin-guide", "version": "0.5.9" }
+    {
+      "name": "dsh-chat-import",
+      "version": "0.26.7"
+    },
+    {
+      "name": "dsh-xdpool",
+      "version": "2.6.7"
+    },
+    {
+      "name": "dshmarket",
+      "version": "1.73.19"
+    },
+    {
+      "name": "@linxin666/dsh-client-ui-git-graph",
+      "version": "0.4.14"
+    },
+    {
+      "name": "dsh-rule-manager",
+      "version": "0.1.0"
+    },
+    {
+      "name": "@astron-team/skillhub-dsh",
+      "version": "0.6.3"
+    },
+    {
+      "name": "dsh-aide",
+      "version": "0.12.0"
+    },
+    {
+      "name": "dsh-better-sidebar",
+      "version": "0.32.0"
+    },
+    {
+      "name": "ds-harness-remote",
+      "version": "0.6.5"
+    },
+    {
+      "name": "dsh-plugin-guide",
+      "version": "0.5.9"
+    },
+    {
+      "name": "dsh-screenshot-xn",
+      "version": "1.1.1"
+    },
+    {
+      "name": "dsh-codex-style-computer-use",
+      "version": "2.3.0"
+    }
   ],
   "skills": [
-    { "slug": "grilling" },
-    { "slug": "ub-mode" },
-    { "slug": "cua-driver" },
-    { "slug": "skillhub-cli" }
+    {
+      "slug": "grilling"
+    },
+    {
+      "slug": "ub-mode"
+    },
+    {
+      "slug": "cua-driver"
+    },
+    {
+      "slug": "skillhub-cli"
+    }
   ],
   "languageServers": [
-    { "name": "clangd" },
-    { "name": "pyright" }
+    {
+      "name": "clangd"
+    },
+    {
+      "name": "pyright"
+    }
   ],
   "disabledByDefault": [
-    { "name": "ds-harness-remote", "reason": "它连的是远程服务，没有授权就连不上，界面右下角一直显示「正在重连」；用户 2026-11-08 定为出厂默认关闭，需要时在插件管理器里打开。" }
+    {
+      "name": "ds-harness-remote",
+      "reason": "它连的是远程服务，没有授权就连不上，界面右下角一直显示「正在重连」；用户 2026-11-08 定为出厂默认关闭，需要时在插件管理器里打开。"
+    }
   ]
 }
