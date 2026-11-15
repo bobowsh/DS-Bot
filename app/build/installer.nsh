@@ -221,17 +221,21 @@
   !endif
 !macroend
 
-; The factory plugins (a DSH home tree: profiles/ds-bot/node_modules/<plugin>), the skills
-; repository and the factory list travel in <INSTDIR>\data (extraFiles). The data home of an
-; install is the folder beside the program, so the installer moves them there after the install.
+; The factory plugins (a DSH home tree: profiles/ds-bot/node_modules/<plugin>), the shared
+; agents root (skills and the factory AGENTS.md) and the factory list travel in <INSTDIR>\data
+; (extraFiles). The data home of an install is the folder beside the program, so the installer
+; moves them there after the install.
 ;
 ; Only the two whitelisted folders are written, and inside profiles only the names on the
 ; factory list: the data home holds the user's own data (bot/, profiles/, sessions/ ...), and
 ; a plugin the user installed themselves must not be replaced or removed by an upgrade.
 ;
-; The factory skills are the package's own copies: an installed one is replaced, but one backup
-; of the replaced content is kept (<data>\skills\<slug>.bak, the most recent previous content
-; only). A skill the package does not carry is the user's own and is left alone.
+; The factory skills are the package's own copies and are replaced outright, with no previous
+; copy kept. A skill the package does not carry is the user's own and is left alone.
+;
+; The shared agents root is <data>\.agents: the app hands it to the Host as DSH_AGENTS_HOME.
+; The factory AGENTS.md there is the package's own and is replaced; the user's own rules live in
+; <data>\AGENTS.md (the harness home file), which this never writes.
 ;
 ; A move that fails (the parent folder cannot be written, as under Program Files) does not stop
 ; the install: the first start reads the tree from <INSTDIR>\data and copies it into the profile
@@ -300,25 +304,22 @@
       StrCpy $R7 1
     ${EndIf}
   ${EndIf}
-  ; The factory skills: replace the installed copies, keeping one .bak of each replaced skill,
-  ; and leave the skills the package does not carry alone. The sync state file is dropped when
-  ; the package carries skills, so the next start re-records versions instead of downloading
-  ; what the package just put in place.
-  ${If} ${FileExists} "$INSTDIR\data\skills\*.*"
+  ; The factory skills live in the shared agents root of the data home (<data>\.agents\skills),
+  ; which the app hands the Host as DSH_AGENTS_HOME. They are replaced outright: this is a
+  ; factory component, and a previous copy is not kept. A skill the package does not carry is
+  ; the user's own and is left alone. The sync state file is dropped when the package carries
+  ; skills, so the next start re-records versions instead of downloading what the package just
+  ; put in place.
+  ${If} ${FileExists} "$INSTDIR\data\.agents\skills\*.*"
     Delete "$R1\skills-sync.json"
-    FindFirst $R2 $3 "$INSTDIR\data\skills\*.*"
+    FindFirst $R2 $3 "$INSTDIR\data\.agents\skills\*.*"
     dsbSkillsLoop:
       StrCmp $3 "" dsbSkillsEnd
       StrCmp $3 "." dsbSkillsNext
       StrCmp $3 ".." dsbSkillsNext
-      ${If} ${FileExists} "$INSTDIR\data\skills\$3\*.*"
-        StrCpy $5 "$INSTDIR\data\skills\$3"
-        StrCpy $6 "$R1\skills\$3"
-        ${If} ${FileExists} "$6\*.*"
-          RMDir /r "$R1\skills\$3.bak"
-          CreateDirectory "$R1\skills\$3.bak"
-          CopyFiles /SILENT "$6\*.*" "$R1\skills\$3.bak"
-        ${EndIf}
+      ${If} ${FileExists} "$INSTDIR\data\.agents\skills\$3\*.*"
+        StrCpy $5 "$INSTDIR\data\.agents\skills\$3"
+        StrCpy $6 "$R1\.agents\skills\$3"
         ClearErrors
         RMDir /r "$6"
         CreateDirectory "$6"
@@ -333,6 +334,13 @@
       Goto dsbSkillsLoop
     dsbSkillsEnd:
     FindClose $R2
+  ${EndIf}
+  ; The factory rules go where the Host reads the shared root's AGENTS.md. They are the package's
+  ; own, so an upgraded install takes the shipping ones. The user's own rules are in
+  ; <data>\AGENTS.md, which this never writes.
+  ${If} ${FileExists} "$INSTDIR\data\.agents\AGENTS.md"
+    CreateDirectory "$R1\.agents"
+    CopyFiles /SILENT "$INSTDIR\data\.agents\AGENTS.md" "$R1\.agents\AGENTS.md"
   ${EndIf}
   ; Only when everything was moved is the installer's own data tree removed. A failed move
   ; leaves it in place: the first start reads the factory tree from <INSTDIR>\data instead.

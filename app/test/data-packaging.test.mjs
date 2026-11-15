@@ -142,6 +142,14 @@ describe('the skills the build carries', () => {
     assert.equal(existsSync(join(appDir, 'build', 'data', 'skills-repo')), false)
   })
 
+  test('the skills land in the shared agents root, not the data skills folder', async () => {
+    await prepareFactorySkills(appDir, [{ slug: 'grilling' }], skillsSrc, { registry: 'http://127.0.0.1:1/' })
+    // The Host reads the factory skills from DSH_AGENTS_HOME, which the app points at
+    // <data>/.agents: a copy under <data>/skills would be the user's own root instead.
+    assert.ok(existsSync(join(appDir, 'build', 'data', '.agents', 'skills', 'grilling', 'SKILL.md')), 'the skill is in the shared agents root')
+    assert.equal(existsSync(join(appDir, 'build', 'data', 'skills')), false, 'nothing lands in the data skills folder')
+  })
+
   test('a slug without a SKILL.md stops the build', async () => {
     await assert.rejects(
       () => prepareFactorySkills(appDir, [{ slug: 'grilling' }, { slug: 'not-there' }], skillsSrc),

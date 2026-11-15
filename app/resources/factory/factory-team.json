@@ -1,5 +1,5 @@
 {
-  "version": "2",
+  "version": "3",
   "bots": [
     {
       "factoryId": "factory-1-Chief of Sta",
@@ -40,7 +40,6 @@
       "role": "升级维护",
       "instructions": "你是 DSH（DeepSeek Harness）的升级与维护工程师，负责让这台机器上的 DSH 保持健康、可升级、可回滚。\n\n【核心职责】\n- DSH 本体与桌面 Host 的版本升级：查新版本、看 changelog 与破坏性变更、备份、升级、验证、必要时回滚\n- profile 与插件生态维护：desktop profile 的 bundles 列表、cordis.patch.yml 配置层、插件版本一致性\n- 依赖与运行时维护：Node/pnpm 版本、Electron 宿主、asar 内实现的位置与结构\n- 故障排查：插件加载失败、配置不生效、API 报错（尤其上游网关类错误）、会话异常\n\n【工作方式】\n- 升级前必查：新版 changelog、peerDependencies 变化、是否是破坏性版本；不确定就先备份\n- 备份要落到具体路径并说清回滚命令，别只说备份了\n- 验证分三层说清：语法/加载层、配置层、运行时端到端层。只验到前两层就明确交代，不要含糊成好了\n- 破坏性操作（删 sessions、改 profile 配置、替换插件）前必须先说后果\n- 不确定用户意图时先问\n\n【环境约定】\n- 工作目录，临时脚本放该目录下 tmp\\，不要直接落在根目录\n- 写脚本用 Node.js 或 Python，不要用 pwsh 写脚本逻辑（pwsh 只用于一次性命令和进程调度）；不要用 pwsh 写文件，用文件工具\n- 对话必须用中文\n\n【汇报】\n- 结论 + 证据（在哪验的、输出是什么）+ 回滚方式；没验到的部分直说\n- 遇到卡点先报告再继续",
       "capabilities": [
-        "dsh-profile-plugin-ops",
         "ub-mode",
         "grilling"
       ]
@@ -109,20 +108,15 @@
   ],
   "capabilities": {
     "items": {
-      "dsh-profile-plugin-ops": {
-        "kind": "skill",
-        "description": "用于在 DSH profile 中安装、升级插件，或将 MCP 工具改为按 Bot 挂载，并验证依赖、patch 与运行状态。",
-        "locator": "skills/dsh-profile-plugin-ops"
-      },
       "ub-mode": {
         "kind": "skill",
         "description": "精简工程准则：写代码或改代码时按「先跑通 → 再做对 → 按实践收尾」三段执行。",
-        "locator": "skills/ub-mode"
+        "locator": ".agents/skills/ub-mode"
       },
       "grilling": {
         "kind": "skill",
         "description": "需求澄清拷问：在动手前把需求问透，逐个逼出隐含假设与边界条件。",
-        "locator": "skills/grilling"
+        "locator": ".agents/skills/grilling"
       }
     }
   }

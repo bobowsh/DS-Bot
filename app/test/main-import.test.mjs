@@ -80,6 +80,15 @@ test('the first start offers the DSH team on the import card, copies it on cards
   const runtime = process.resourcesPath
   const check = hostState.envs.find(env => env.DS_BOT_CHECK)
   assert.equal(check.DS_BOT_RUNTIME_DIR, runtime)
+  // The shared agents root travels with every Host, the check included: the factory AGENTS.md
+  // and the factory skills are read from there, and a Host without it would read the user's
+  // own ~/.agents instead. The check runs in its own throwaway home under the data folder, so
+  // its shared root sits beside THAT home, not beside the data folder itself.
+  assert.equal(check.DSH_AGENTS_HOME, join(check.DSH_HOME, '.agents'))
+  assert.match(check.DSH_HOME, /\.import-check-\d+$/u, 'the check keeps its throwaway home')
+  const team = hostState.envs.filter(env => !env.DS_BOT_CHECK).at(-1)
+  assert.equal(team.DSH_HOME, home)
+  assert.equal(team.DSH_AGENTS_HOME, join(home, '.agents'))
   assert.equal(hostExecutable(check.DS_BOT_RUNTIME_DIR, 'linux'), join(runtime, 'primary-runtime', 'dependencies', 'node', 'bin', 'node'))
   await handOff()
   app.quit()
