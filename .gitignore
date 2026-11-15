@@ -46,3 +46,9 @@ node_modules/
 
 # Bytecode from the record-browser-gif encoder's local media tests.
 __pycache__/
+
+# Scratch folders for throwaway scripts and logs: the repo's own work in progress,
+# never a deliverable. tools/gitgraph-patch writes its backups and its postinstall
+# log under tmp/gitgraph-patch/.
+tmp/
+app/tmp/
