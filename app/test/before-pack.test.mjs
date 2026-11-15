@@ -15,6 +15,8 @@ test('a build for the architecture of this Node goes on', async () => {
   const plugins = []
   const servers = []
   const packed = []
+  const patched = []
+  const order = []
   // A real app directory carrying the real manifest: the hook reads it from the app dir.
   const root = mkdtempSync(join(tmpdir(), 'ds-bot-before-pack-'))
   const appDir = join(root, 'app')
@@ -24,12 +26,18 @@ test('a build for the architecture of this Node goes on', async () => {
   const packager = { appDir, appInfo: { version: '0.0.0' } }
   await beforePack(
     { arch: Arch[process.arch], electronPlatformName: process.platform, packager },
-    async (request) => { asked.push(request) },
+    async (request) => { asked.push(request); order.push('prepare') },
     async (dir, skillsEntries) => { skills.push({ dir, skillsEntries }) },
     async (dir, pluginEntries) => { plugins.push({ dir, pluginEntries }) },
     async (dir, serverEntries) => { servers.push({ dir, serverEntries }) },
     async (dir) => { packed.push(dir) },
+    (dir) => { patched.push(dir); order.push('patch') },
   )
+  // The writeBytes patch is applied for the app directory the pack is building.
+  assert.deepEqual(patched, [appDir])
+  // It runs before the Office runtime is fetched: a moved anchor stops the pack without
+  // first downloading the slow payload for a build that cannot ship.
+  assert.deepEqual(order, ['patch', 'prepare'])
   assert.equal(asked.length, 1)
   assert.equal(asked[0].target, runtimeTarget(process.platform, process.arch))
   assert.equal(asked[0].output, join(appDir, 'build', 'runtime'))

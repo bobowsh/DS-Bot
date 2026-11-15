@@ -93,7 +93,10 @@ binary。**不是乱码，是报错**——但用户依然干不了活：改不�
 2. **原子发布**：与 `writeText` 同一套机制（同目录临时文件 → 替换），Windows 上保留
    目标文件的 DACL。
 3. **沙箱围栏**：sandbox 后端的 `checkedTarget` 照拦，`read-only` 预设照样拒。
-4. **观察语义**：沿用 `replaceIfVersion` / `createIfAbsent`，版本不符 `FS_STALE_VERSION`。
+4. **观察语义**：沿用 `replaceIfVersion` / `createIfAbsent`。实测（宿主 `dsh-fs-local`
+   `writeTarget`，`lib/index.js:1037-1039`）：`replaceIfVersion` 版本不符报
+   `FS_STALE_VERSION`；`createIfAbsent` 目标已存在报 `FS_NOT_OBSERVED`（不是
+   `FS_STALE_VERSION`——早期这节把两者混成一个码，2026-11-15 按实测更正）。
 5. **返回**：与 `writeText` 同形的 `WriteOutcome`（字节写无文本 `before`/`after` 时置空）。
 
 ## 五、B 方案：插件层的影子 write / edit
@@ -131,6 +134,30 @@ message 说人话：这个文件是什么编码、为什么不能写、要先转
 - dsh-desktop-me 的先例：它把 patch 放 `patches/` 目录并从 `node_modules` 生成
   （`git show 96a410a40` 可见四个 `.patch` 文件）。我们做法相同，但针对 0.2.2-rc.1
   重新适配，不直接套它的 0.1.0-rc.8 patch。
+
+### 补丁接线（2026-11-15 补，PR #60 遗留的 BLOCKED 之一）
+
+PR #60 合了补丁脚本，但脚本**没有接进打包流程**——打包前不手动跑一次，正式包里的宿主
+就没 `writeBytes`，影子 write/edit 遇非 UTF-8 全走「明确拒绝」分支，装机版实际写不了
+非 UTF-8（不写坏，但功能名存实亡）。这次把它接进 `beforePack`：
+
+- **接线点**：`app/scripts/before-pack.mjs` 调 `patchForPack(appDir)`，放在最贵的
+  Office runtime 下载**之前**——anchor 一旦对不上，打包立刻失败，不浪费一次慢下载。
+- **覆盖两条路径**：`npm run pack`（`electron-builder --dir`）与 `npm run dist`
+  （`scripts/dist.mjs` 走 electron-builder CLI）都触发 `beforePack`，一个接线点两条都盖住。
+- **失败必须拦住打包**：`patchForPack` 在三处主动抛错——① app 的 `node_modules` 不存在；
+  ② 目标包缺失（`absent`）；③ anchor 移动（宿主版本变了，`run()` 抛 `anchor not found`）。
+  任何一种都不许静默跳过，否则打出来的就是「写不了非 UTF-8」的残废包。
+- **幂等**：脚本本身以 `writeBytes` 特征串判断，重复跑结果一致（已打补丁报 `patched`）。
+- **harness 缺失只跳过**：harness 是测试替身，没有不拦打包；app 的 node_modules 没有则拦。
+
+验证（本机实测）：`--revert` 回到干净 → `--check` 报 6 处 `unpatched`（exit 1）→ 调
+`patchForPack` 自动打上 6 处 → `--check` 全 `patched`（exit 0）。测试见
+`app/test/fs-writebytes-patch.test.mjs`（新增 4 例：幂等、缺 app 树拦截、缺包拦截、
+anchor 移动拦截）与 `app/test/before-pack.test.mjs`（patch 在 prepare 之前跑）。
+
+**仍未解除**：装机 asar 端到端未验（解除条件 = 打包后真机建 GBK 文件 → 影子 write 改 →
+读回字节仍是 GB18030、BOM 保留）。
 
 ## 七、验收标准
 

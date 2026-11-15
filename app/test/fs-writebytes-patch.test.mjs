@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-const { run, revert } = await import(new URL('../scripts/fs-writebytes-patch.mjs', import.meta.url).href)
+const { run, revert, patchForPack } = await import(new URL('../scripts/fs-writebytes-patch.mjs', import.meta.url).href)
 const HOST_MODULES = fileURLToPath(new URL('../node_modules/@deepseek-ai/', import.meta.url))
 const PKGS = ['dsh-fs', 'dsh-fs-local', 'dsh-fs-sandbox']
 const FILE = 'lib/index.js'
@@ -85,4 +85,35 @@ test('an unknown host version is refused rather than patched blindly', (t) => {
 test('a run reports every target package by name', (t) => {
   const modules = staged(t)
   assert.deepEqual(run(modules).map(row => row.pkg), PKGS.map(pkg => `@deepseek-ai/${pkg}`), 'every target is reported')
+})
+
+// The pack entry: before-pack calls it so `npm run pack`/`dist` carry the byte channel without
+// anyone remembering to run the script first. What matters is that it cannot let an unpatched
+// Host into the package — every way the patch fails must throw, not skip.
+test('patchForPack applies once and is idempotent across runs', (t) => {
+  const modules = staged(t)
+  const first = patchForPack('app-dir', [modules])
+  assert.deepEqual(first[0].report.map(row => row.state), ['applied', 'applied', 'applied'])
+  // A second pack over the same tree changes nothing: already patched, still in place.
+  const again = patchForPack('app-dir', [modules])
+  assert.deepEqual(again[0].report.map(row => row.state), ['patched', 'patched', 'patched'])
+})
+
+test('patchForPack stops the pack when the app node_modules is not there', () => {
+  assert.throws(() => patchForPack('app-dir', [join(tmpdir(), 'ds-bot-no-such-modules')]),
+    /the pack needs .* to patch writeBytes into, and it is not there/u)
+})
+
+test('patchForPack stops the pack when a package is missing from the tree', (t) => {
+  const modules = staged(t)
+  rmSync(join(modules, '@deepseek-ai', 'dsh-fs-local', FILE))
+  assert.throws(() => patchForPack('app-dir', [modules]),
+    /writeBytes could not reach @deepseek-ai\/dsh-fs-local/u)
+})
+
+test('patchForPack stops the pack when an anchor moved under a new Host version', (t) => {
+  const modules = staged(t)
+  const file = join(modules, '@deepseek-ai', 'dsh-fs', FILE)
+  writeFileSync(file, readFileSync(file, 'utf8').replaceAll('get sandboxMode() {}', 'get sandboxMode() { return undefined }'), 'utf8')
+  assert.throws(() => patchForPack('app-dir', [modules]), /anchor not found/u)
 })
