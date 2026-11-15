@@ -85,7 +85,17 @@ const jsonOut = args.includes('--json') ? args[args.indexOf('--json') + 1] : nul
 const showAll = args.includes('--all')
 
 const findings = []
-const files = walk(root).map(path => relative(root, path).split('\\').join('/')).sort()
+// A tree that is not there is a broken invocation, not a clean scan: say which path was
+// missing and stop with its own exit code. Without this the CI log carries only
+// "Process completed with exit code 1" and the reason never reaches anyone.
+let files
+try {
+  files = walk(root).map(path => relative(root, path).split('\\').join('/')).sort()
+} catch (error) {
+  console.error(`scan: cannot read the tree to scan at "${root}": ${error?.message ?? error}`)
+  console.error('scan: the caller must extract a copy of the repository there first (for example: git archive HEAD | tar -x -C <dir>).')
+  process.exit(2)
+}
 
 for (const file of files) {
   for (const rule of FORBIDDEN_FILES) {

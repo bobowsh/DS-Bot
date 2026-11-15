@@ -70,7 +70,7 @@
     "@deepseek-ai/libreoffice-kit": "0.1.5",
     "deep-view": "0.1.2",
     "ds-bot": "file:../ds-bot",
-    "dsh-xdpool": "2.6.1",
+    "dsh-xdpool": "2.6.7",
     "electron-updater": "6.8.10",
     "js-yaml": "4.3.2",
     "pnpm": "11.7.0",
@@ -78,7 +78,7 @@
     "yaml": "2.9.1"
   },
   "devDependencies": {
-    "dsh-chat-import": "0.26.3",
+    "dsh-chat-import": "0.26.6",
     "electron": "44.7.0",
     "electron-builder": "26.17.0",
     "esbuild": "0.28.2",
