@@ -109,9 +109,14 @@ export async function prepareBundledPlugins(appDir, entries, pluginsDev = defaul
     // when it is newer AND compatible; otherwise the version the manifest pins is shipped.
     const resolved = useRegistry
       ? await resolve(entry, { appDir, registries })
-      : { version: entry.version, via: 'dev-folder', note: 'no registry answered' }
+      : { version: entry.version, note: 'no registry answered' }
     const effective = { ...entry, version: resolved.version }
-    const staged = await sourceOf(appDir, effective, pluginsDev, useRegistry && resolved.via === 'registry', registries)
+    // Whether to ASK the registry is a separate question from whether the version moved: a
+    // plugin whose registry latest equals the pinned version is not an update, but its tarball
+    // must still come from the registry — the local development folder holds whatever someone
+    // last checked out there, which is how a build once shipped 0.26.4 for a manifest saying
+    // 0.26.6 and then refused to pack it. Only a build with no reachable registry may fall back.
+    const staged = await sourceOf(appDir, effective, pluginsDev, useRegistry, registries)
     const { from, manifest, via } = staged
     if (manifest.name !== entry.name) throw new Error(`The folder resolved for ${entry.name} is actually ${manifest.name}; the factory manifest and the folder disagree.`)
     if (manifest.version !== effective.version) throw new Error(`${entry.name} is version ${manifest.version} where the manifest promises ${effective.version}; refusing to pack a drifted version.`)
@@ -119,7 +124,7 @@ export async function prepareBundledPlugins(appDir, entries, pluginsDev = defaul
     const stage = await stagePlugin(appDir, from, manifest)
     const folder = await copyPlugin(stage, bundledPluginDir(appDir, entry.name))
     made.push({ name: manifest.name, version: manifest.version, via, folder, pinned: entry.version, note: resolved.note })
-    console.log(`LinkHarness: ${manifest.name}@${manifest.version} from ${via === 'registry' ? resolved.registry ?? registries.join(' / ') : pluginsDev}${entry.version === manifest.version ? '' : ` (the manifest pins ${entry.version})`}${resolved.note === undefined ? '' : ` — ${resolved.note}`}`)
+    console.log(`LinkHarness: ${manifest.name}@${manifest.version} from ${via === 'registry' ? 'the registry' : pluginsDev}${entry.version === manifest.version ? '' : ` (the manifest pinned ${entry.version})`}${resolved.note === undefined ? '' : ` — ${resolved.note}`}`)
     await rm(dirname(stage), { recursive: true, force: true })
   }
   // The list of the plugins the build carries. The installer and the first start read it to tell
@@ -276,24 +281,24 @@ export async function resolveFactoryVersion(entry, { appDir, registries }) {
     const latest = await latestVersion(entry.name, registry)
     if (latest.error !== undefined) {
       if (registries.indexOf(registry) === registries.length - 1) {
-        return { version: pinned, via: 'manifest', note: `the registry could not be read (${latest.error}); shipping the version the manifest pins` }
+        return { version: pinned, note: `the registry could not be read (${latest.error}); shipping the version the manifest pins` }
       }
       continue
     }
     if (!isNewer(latest.version, pinned)) {
-      return { version: pinned, via: 'manifest', registry, note: `the registry's latest is ${latest.version}, which is not newer; shipping the version the manifest pins` }
+      return { version: pinned, note: `the registry's latest is ${latest.version}, which is not newer; shipping the version the manifest pins` }
     }
     const info = await manifestAt(entry.name, latest.version, registry)
     if (info.error !== undefined) {
-      return { version: pinned, via: 'manifest', registry, note: `${latest.version} could not be read (${info.error}); shipping the version the manifest pins` }
+      return { version: pinned, note: `${latest.version} could not be read (${info.error}); shipping the version the manifest pins` }
     }
     const check = compatibilityOf(info.manifest, host)
     if (!check.compatible) {
-      return { version: pinned, via: 'manifest', registry, note: `skipped ${latest.version}: ${check.reason}` }
+      return { version: pinned, note: `skipped ${latest.version}: ${check.reason}` }
     }
-    return { version: latest.version, via: 'registry', registry, note: undefined }
+    return { version: latest.version, note: undefined }
   }
-  return { version: pinned, via: 'manifest', note: 'no registry answered; shipping the version the manifest pins' }
+  return { version: pinned, note: 'no registry answered; shipping the version the manifest pins' }
 }
 
 /**
