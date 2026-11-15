@@ -45,12 +45,13 @@ extraResources:
   - from: resources/factory
     to: factory
 # The factory plugins (a DSH home tree: profiles/ds-bot/node_modules), the factory skills and
-# the factory list travel in the data directory beside the program, as plain folders. The
-# installer moves profiles/, skills/ and factory/ to the data home beside the program
-# (build/installer.nsh); when that fails the first start reads the tree from here.
+# the factory list travel beside the program as one 7z archive, not as a loose folder: the
+# installer copies one file and unpacks it once, straight into the data home (<盘>\LinkBot\data).
+# Unpacked in the payload it would be written three times — to the installer's temp folder, to
+# $INSTDIR, then to the data home (build/installer.nsh).
 extraFiles:
-  - from: build/data
-    to: data
+  - from: build/data.7z
+    to: data.7z
 # node-pty, sharp and koffi ship prebuilt binaries for each platform. A rebuild would compile
 # node-pty from source and needs a C++ toolchain.
 npmRebuild: false

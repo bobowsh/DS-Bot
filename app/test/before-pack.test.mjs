@@ -14,6 +14,7 @@ test('a build for the architecture of this Node goes on', async () => {
   const skills = []
   const plugins = []
   const servers = []
+  const packed = []
   // A real app directory carrying the real manifest: the hook reads it from the app dir.
   const root = mkdtempSync(join(tmpdir(), 'ds-bot-before-pack-'))
   const appDir = join(root, 'app')
@@ -27,6 +28,7 @@ test('a build for the architecture of this Node goes on', async () => {
     async (dir, skillsEntries) => { skills.push({ dir, skillsEntries }) },
     async (dir, pluginEntries) => { plugins.push({ dir, pluginEntries }) },
     async (dir, serverEntries) => { servers.push({ dir, serverEntries }) },
+    async (dir) => { packed.push(dir) },
   )
   assert.equal(asked.length, 1)
   assert.equal(asked[0].target, runtimeTarget(process.platform, process.arch))
@@ -38,6 +40,11 @@ test('a build for the architecture of this Node goes on', async () => {
   assert.deepEqual(plugins[0].pluginEntries, manifest.plugins)
   assert.deepEqual(skills[0].skillsEntries, manifest.skills)
   assert.deepEqual(servers[0].serverEntries, manifest.languageServers)
+  // The data tree is packed into the installer's archive, and only after every part of it is
+  // written: the skills and the language servers land after the plugins, so an archive made
+  // earlier would miss them.
+  assert.equal(packed.length, 1)
+  assert.equal(packed[0], appDir)
   rmSync(root, { recursive: true, force: true })
 })
 

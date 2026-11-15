@@ -10,8 +10,8 @@
 // neither stops the build: a package the manifest promises must not silently go missing.
 // Every resolved version must match the manifest, so a drifted folder cannot ship.
 import { spawn } from 'node:child_process'
-import { cp, mkdir, readFile, rm } from 'node:fs/promises'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { cp, mkdir, readdir, readFile, rm } from 'node:fs/promises'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { compatibilityOf, hostDshVersion, isNewer, latestVersion } from './factory-versions.mjs'
@@ -148,6 +148,86 @@ export async function prepareBundledPlugins(appDir, entries, pluginsDev = defaul
   // version is untouched: no needless churn in the diff.
   writePackedVersions(appDir, made)
   return made.map(({ folder }) => folder)
+}
+
+/** Where the installer reads the packed data tree from, beside the tree it was built from. */
+export const dataArchivePath = appDir => join(appDir, 'build', 'data.7z')
+
+/**
+ * Pack the built data tree into one 7z archive and remove the tree itself.
+ *
+ * Why an archive: the tree is 11,583 files and the NSIS install writes every one of them twice
+ * (electron-builder unpacks its own archive to a temp folder, then copies that to $INSTDIR) before
+ * the installer moves the tree to the data home a third time. As one archive the install copies a
+ * single file and unpacks it once, in place. The unpack costs the same file creation as either
+ * copy; what it saves is two of the three passes.
+ *
+ * Why 7z and not tar.gz: NSIS has no tar support, while electron-builder's own toolchain ships
+ * Nsis7z::Extract, which reads 7z.
+ *
+ * The tree is removed afterwards: a leftover tree next to the archive is packed again by
+ * extraFiles, which once grew the installer from 378 MB to 456 MB.
+ * @param {string} appDir @param {string} [compression] - the 7z level; mx=5 matches the measured
+ *   trade-off (mx=9 shrinks 67 MB to 54 MB but takes 86 s instead of 27 s at build time).
+ * @returns {Promise<string>} the archive's path
+ */
+export async function packDataArchive(appDir, compression = process.env.DS_BOT_DATA_ARCHIVE_LEVEL ?? '5') {
+  const data = bundledDataDir(appDir)
+  const archive = dataArchivePath(appDir)
+  if (!existsSync(data)) throw new Error(`The data tree ${data} is missing, so there is nothing to pack for the installer.`)
+  const sevenZip = await sevenZipBinary()
+  await rm(archive, { force: true })
+  await new Promise((resolve, reject) => {
+    // -bso0 -bsp0 keep the log quiet; the archive is the evidence.
+    const child = spawn(sevenZip, ['a', '-t7z', `-mx=${compression}`, '-bso0', '-bsp0', archive, data],
+      { stdio: ['ignore', 'pipe', 'pipe'] })
+    let output = ''
+    child.stdout.on('data', chunk => { output += chunk })
+    child.stderr.on('data', chunk => { output += chunk })
+    child.on('error', reject)
+    child.on('exit', code => code === 0
+      ? resolve()
+      : reject(new Error(`7za could not pack the data tree (exit ${code}): ${output.trim().split('\n').slice(-3).join(' ')}`)))
+  })
+  const size = statSync(archive).size
+  await rm(data, { recursive: true, force: true })
+  console.log(`LinkHarness: the data tree is packed into build/data.7z (${(size / 1048576).toFixed(1)} MiB) and the tree removed`)
+  return archive
+}
+
+/**
+ * The 7za executable electron-builder ships in its cache.
+ *
+ * It is not on PATH and the build must not depend on the machine having 7-Zip installed:
+ * electron-builder downloads this copy itself for its own packing, so it is already here.
+ * DS_BOT_7ZA overrides it.
+ * @returns {Promise<string>}
+ */
+async function sevenZipBinary() {
+  const fromEnv = process.env.DS_BOT_7ZA?.trim()
+  if (fromEnv !== undefined && fromEnv !== '') return fromEnv
+  const cache = join(process.env.LOCALAPPDATA ?? process.env.HOME ?? '', 'electron-builder', 'Cache')
+  let entries = []
+  try {
+    entries = await readdir(cache)
+  } catch {
+    entries = []
+  }
+  const dirs = entries.filter(name => name.startsWith('7zip@')).sort().reverse()
+  for (const dir of dirs) {
+    const root = join(cache, dir)
+    let inner = []
+    try {
+      inner = await readdir(root)
+    } catch {
+      continue
+    }
+    for (const version of inner) {
+      const bin = join(root, version, 'bin', process.platform === 'win32' ? '7za.exe' : '7za')
+      if (existsSync(bin)) return bin
+    }
+  }
+  throw new Error('The build needs 7za from electron-builder\'s cache, and it is not there. Run an electron-builder pack once so it downloads, or set DS_BOT_7ZA to its path.')
 }
 
 /**
