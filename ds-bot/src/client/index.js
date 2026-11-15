@@ -619,6 +619,15 @@ export function apply(ctx) {
     // Agent mode hands the surface back to the shell; everything open on the Bot
     // surface closes first so nothing stale reopens on the way back.
     surfaceMode: () => surface.getSnapshot().mode,
+    // Open a plugin's main panel the way the host's own panel list does. The layout service
+    // checks the id against the live panel registry, so an absent plugin is refused there
+    // rather than here; `false` says only that this host has no layout service at all.
+    openPanel: (id) => {
+      const layout = ctx.get('layout')
+      if (typeof layout?.selectPanel !== 'function') return false
+      layout.selectPanel(id)
+      return true
+    },
     setSurface: (mode) => {
       if (mode !== 'bot' && mode !== 'agent') return
       // Already there: still worth the landing check — a cold start never calls

@@ -16874,11 +16874,8 @@ var QueueIcon = lineIcon(["M4 6h12", "M4 10h12", "M4 14h8", "M14 12.5l2 1.5-2 1.
 var SETTINGS_ICONS = { general: GearIcon, bots: PeopleIcon, groups: ChatsIcon, im: ImIcon, usage: GaugeIcon };
 
 // src/client/aide-bridge.js
-var AIDE_SHOW_EVENT = "dvw-workbench-show";
+var AIDE_PANEL_ID = "dsh-aide";
 var AIDE_OVERLAY_SELECTOR = ".dvw-overlay";
-function requestAideWorkbench() {
-  window.dispatchEvent(new Event(AIDE_SHOW_EVENT));
-}
 var aideWorkbenchOpen = (root = typeof document === "undefined" ? void 0 : document) => root !== void 0 && root.querySelector(AIDE_OVERLAY_SELECTOR) !== null;
 function watchAideWorkbench(onChange) {
   let last = aideWorkbenchOpen();
@@ -16899,19 +16896,19 @@ function watchAideWorkbench(onChange) {
 
 // src/client/aide-button.js
 var import_react4 = require("react");
-function AideButton({ label, className = "bt-round" }) {
+function AideButton({ label, className = "bt-round", actions }) {
   return (0, import_react4.createElement)("button", {
     type: "button",
     className,
     "aria-label": label,
     title: label,
     onClick: () => {
-      requestAideWorkbench();
+      actions?.openPanel?.(AIDE_PANEL_ID);
     }
   }, (0, import_react4.createElement)(AideIcon));
 }
-function AideFooterButton() {
-  return (0, import_react4.createElement)(AideButton, { label: t("AIDE workbench") });
+function AideFooterButton(props) {
+  return (0, import_react4.createElement)(AideButton, { label: t("AIDE workbench"), actions: props?.actions });
 }
 
 // src/client/agent-logos.js
@@ -28426,7 +28423,7 @@ function TeamSidebar(props) {
     title: t("Switch to classic Agent mode"),
     onClick: () => actions.setSurface("agent")
   }, (0, import_react35.createElement)(SwitchIcon));
-  const toAide = (0, import_react35.createElement)(AideButton, { label: t("AIDE workbench") });
+  const toAide = (0, import_react35.createElement)(AideButton, { label: t("AIDE workbench"), actions });
   const foot = wideContent ? (0, import_react35.createElement)("div", { className: "bt-leftcol-foot" }, toAgent, toAide, (0, import_react35.createElement)(AccountLauncher, { place: "column", useSurface: props.useSurface, actions }), (0, import_react35.createElement)(PluginsButton, { actions })) : (0, import_react35.createElement)(
     "div",
     { className: "bt-leftcol-foot bt-leftcol-foot-rail" },
@@ -41950,6 +41947,15 @@ function apply(ctx) {
     // Agent mode hands the surface back to the shell; everything open on the Bot
     // surface closes first so nothing stale reopens on the way back.
     surfaceMode: () => surface.getSnapshot().mode,
+    // Open a plugin's main panel the way the host's own panel list does. The layout service
+    // checks the id against the live panel registry, so an absent plugin is refused there
+    // rather than here; `false` says only that this host has no layout service at all.
+    openPanel: (id) => {
+      const layout = ctx.get("layout");
+      if (typeof layout?.selectPanel !== "function") return false;
+      layout.selectPanel(id);
+      return true;
+    },
     setSurface: (mode) => {
       if (mode !== "bot" && mode !== "agent") return;
       if (surface.getSnapshot().mode === mode) {

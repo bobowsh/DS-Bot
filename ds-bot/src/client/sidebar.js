@@ -820,11 +820,9 @@ export function TeamSidebar(props) {
     type: 'button', className: 'bt-round', 'aria-label': t('Switch to classic Agent mode'), title: t('Switch to classic Agent mode'),
     onClick: () => actions.setSurface('agent'),
   }, h(SwitchIcon))
-  // The AIDE workbench, opened from our own column. dsh-aide listens for this event
-  // and shows its workbench; the path through the host's panel list is deliberately
-  // not taken, because selecting a panel there replaces the main area and unloads
-  // the whole session view — opening the workbench would cost a full-screen rebuild.
-  const toAide = h(AideButton, { label: t('AIDE workbench') })
+  // The AIDE workbench, opened through the host's own panel navigation: dsh-aide registers a
+  // main panel under its own id, and `actions.openPanel` is how the host's panel list opens it.
+  const toAide = h(AideButton, { label: t('AIDE workbench'), actions })
   const foot = wideContent
     ? h('div', { className: 'bt-leftcol-foot' }, toAgent, toAide, h(AccountLauncher, { place: 'column', useSurface: props.useSurface, actions }), h(PluginsButton, { actions }))
     : h('div', { className: 'bt-leftcol-foot bt-leftcol-foot-rail' },

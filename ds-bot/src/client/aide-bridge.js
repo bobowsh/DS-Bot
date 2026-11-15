@@ -1,23 +1,20 @@
 // The bridge to the AIDE workbench plugin.
 //
-// dsh-aide owns the workbench; it listens for this event on the window and shows
-// it. The path through the host's panel list is deliberately not taken: selecting
-// a panel there replaces the main area and unloads the whole session view, so
-// opening the workbench would cost a full-screen rebuild.
+// dsh-aide owns the workbench, and it registers itself as a main panel under the id
+// `dsh-aide` (its client.js: `PANEL_ID = "dsh-aide"`, registered into `main` and into the
+// sidebar's own `sidebar.panellist`). The host's panel list opens it with
+// `layout.selectPanel(id)`, and our own button reaches the same call through
+// `actions.openPanel`.
 //
-// The name is a contract with dsh-aide: both sides must use the same string. The
-// test in ds-bot/test/ pins it, and dsh-aide's own copy of the listener uses it.
-export const AIDE_SHOW_EVENT = 'dvw-workbench-show'
+// This used to dispatch a window event instead (`dvw-workbench-show`), on the belief that
+// dsh-aide listened for one. It never did: the plugin has no such listener anywhere, and
+// the button's click went nowhere. The event, and the assumed contract with it, are gone.
+export const AIDE_PANEL_ID = 'dsh-aide'
 
 // The workbench's own root, as dsh-aide draws it. It stands in the host's main
 // area, so while it is up the main area belongs to the workbench and not to the
 // conversation — our own column has to step aside with it.
 export const AIDE_OVERLAY_SELECTOR = '.dvw-overlay'
-
-/** Ask the AIDE workbench to open. */
-export function requestAideWorkbench() {
-  window.dispatchEvent(new Event(AIDE_SHOW_EVENT))
-}
 
 /**
  * Whether the AIDE workbench is up right now.
