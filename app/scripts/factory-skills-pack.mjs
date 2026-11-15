@@ -1,8 +1,9 @@
-// The factory skills ship as plain directories under the data directory's skills/ folder:
-// <data>/skills/<slug>/SKILL.md, copied straight from the skills source folder the manifest
-// names. There is no repository, no first-start copy and no pull: the data tree the installer
-// carries already has them where the runtime reads them, and a newer installer replaces them
-// by the rule the installer implements (overwrite, keeping one .bak of the previous content).
+// The factory skills ship as plain directories under the shared agents root of the data
+// directory: <data>/.agents/skills/<slug>/SKILL.md, copied straight from the skills source
+// folder the manifest names. That is the root DSH scans as DSH_AGENTS_HOME (the Host is given
+// it beside DSH_HOME in src/main.mjs), so the skills land where DSH reads them. There is no
+// repository, no first-start copy and no pull: the data tree the installer carries already has
+// them where the runtime reads them, and a newer installer replaces them by overwriting.
 // The skills source is the environment's skills folder (DS_BOT_SKILLS_SRC, by default
 // <repo>/../skills); every slug the manifest promises must be there with its SKILL.md.
 import { cp, mkdir, rm } from 'node:fs/promises'
@@ -11,7 +12,7 @@ import { dirname, join } from 'node:path'
 import { publishedSkills, writeSkillhubMetadata } from './factory-skillhub-metadata.mjs'
 
 /** The folder inside the shipped data directory the factory skills are written to. */
-export const bundledSkillsDir = appDir => join(appDir, 'build', 'data', 'skills')
+export const bundledSkillsDir = appDir => join(appDir, 'build', 'data', '.agents', 'skills')
 
 /** The folder the skill source checkouts live in: the environment, else beside the repo. */
 export function defaultSkillsSrc(appDir) {

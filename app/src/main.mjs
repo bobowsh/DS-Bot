@@ -104,6 +104,22 @@ export function bundledDataHome(dataDir) {
   return dataDir
 }
 
+// The shared agents root of this install, handed to the Host as DSH_AGENTS_HOME the way DSH_HOME
+// is: DSH reads its user-global AGENTS.md and its user skill root from there
+// (@deepseek-ai/dsh-agent-instructions, @deepseek-ai/dsh-skill-filesystem). It sits beside the
+// data location rather than at the user's own ~/.agents, so the factory rules and skills travel
+// with one install and never mix with the other agent tools on the machine.
+export const AGENTS_HOME_DIR_NAME = '.agents'
+
+/**
+ * The shared agents root of a data location.
+ * @param {string} dataDir - the data directory that is the Host's DSH_HOME
+ * @returns {string} the directory the factory AGENTS.md and the factory skills live in
+ */
+export function agentsHomeOf(dataDir) {
+  return join(dataDir, AGENTS_HOME_DIR_NAME)
+}
+
 let mainWindow
 // Settles once the hidden team window exists.
 let mainCreated
@@ -511,7 +527,7 @@ async function boot(mine) {
   // version moved ahead of the last sync is downloaded over the local copy. It runs off the
   // ready path so a slow SkillHub can never hold the window back.
   setImmediate(() => {
-    watchFactorySkills({ dataDir: places.dataDir, repoDirOf: () => join(places.dataDir, 'skills') })
+    watchFactorySkills({ dataDir: places.dataDir, repoDirOf: () => join(agentsHomeOf(places.dataDir), 'skills') })
   })
   startWindow.done('data')
   const engine = await startEngine(mine)
@@ -697,7 +713,7 @@ function newHost() {
   return new HostProcess({
     entry: join(here, 'host.mjs'),
     cwd: profileDir(),
-    env: { ...process.env, PATH: hostPath(), DSH_HOME: places.dataDir, DS_BOT_PORT: String(port), DS_BOT_APP: '1', DS_BOT_USER_DSH_HOME: userDshHome(), DS_BOT_FACTORY_RESOURCES: resourcesDir(), DS_BOT_RUNTIME_DIR: runtimeDir(), ...(app.isPackaged && process.platform === 'darwin' ? { DS_BOT_COMPUTER_HELPER_HOME: join(app.getPath('userData'), 'computer-use') } : {}), ...(places.workspace ? { DS_BOT_WORKSPACE: places.workspace } : {}) },
+    env: { ...process.env, PATH: hostPath(), DSH_HOME: places.dataDir, DSH_AGENTS_HOME: agentsHomeOf(places.dataDir), DS_BOT_PORT: String(port), DS_BOT_APP: '1', DS_BOT_USER_DSH_HOME: userDshHome(), DS_BOT_FACTORY_RESOURCES: resourcesDir(), DS_BOT_RUNTIME_DIR: runtimeDir(), ...(app.isPackaged && process.platform === 'darwin' ? { DS_BOT_COMPUTER_HELPER_HOME: join(app.getPath('userData'), 'computer-use') } : {}), ...(places.workspace ? { DS_BOT_WORKSPACE: places.workspace } : {}) },
     pnpm: pnpmEntry(),
     onFailure: (error) => { if (mine === attempt) void fail(error) },
     output: hostOutput,
@@ -708,7 +724,7 @@ function newHost() {
 function newCheck(home, list) {
   const cwd = join(home, 'profiles', CHECK_PROFILE)
   mkdirSync(cwd, { recursive: true })
-  return new HostProcess({ entry: join(here, 'host.mjs'), cwd, env: { ...process.env, DSH_HOME: home, DS_BOT_CHECK: list, DS_BOT_RUNTIME_DIR: runtimeDir() }, pnpm: pnpmEntry(), onFailure: () => {}, output: hostOutput })
+  return new HostProcess({ entry: join(here, 'host.mjs'), cwd, env: { ...process.env, DSH_HOME: home, DSH_AGENTS_HOME: agentsHomeOf(home), DS_BOT_CHECK: list, DS_BOT_RUNTIME_DIR: runtimeDir() }, pnpm: pnpmEntry(), onFailure: () => {}, output: hostOutput })
 }
 
 /**

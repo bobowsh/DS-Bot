@@ -1,5 +1,5 @@
 // The factory resources: the seed team file lands under the data location on first launch.
-// The factory skills and plugins travel inside the data tree itself (data/skills/,
+// The factory skills and plugins travel inside the data tree itself (data/.agents/skills/,
 // data/profiles/), so the installer or the first start puts them in place; the seed below is
 // the only resource that is version-checked and copied. No Electron, and no network here.
 import assert from 'node:assert/strict'
@@ -76,6 +76,57 @@ describe('installFactoryResources', () => {
   })
 })
 
+// The factory rules land in the shared agents root the Host reads as DSH_AGENTS_HOME, and the
+// blank file that says where the user's own rules go is put in the harness home beside it.
+describe('the factory rules', () => {
+  const withRules = (name, rules) => {
+    const dir = join(root, 'resources', name)
+    write(join(dir, 'factory', 'AGENTS.md'), rules)
+    return dir
+  }
+
+  test('the shipped rules are written into the shared agents root', async () => {
+    const dataDir = join(root, 'data-rules-a')
+    const result = await installFactoryResources({ dataDir, resourcesDir: withRules('rules-a', 'write in the tmp folder\n') })
+    assert.equal(result.rulesWritten, true)
+    assert.equal(readFileSync(join(dataDir, '.agents', 'AGENTS.md'), 'utf8'), 'write in the tmp folder\n')
+  })
+
+  test('an upgrade replaces the factory rules, which belong to the package', async () => {
+    const dataDir = join(root, 'data-rules-b')
+    write(join(dataDir, '.agents', 'AGENTS.md'), 'an older factory copy\n')
+    await installFactoryResources({ dataDir, resourcesDir: withRules('rules-b', 'the newer factory copy\n') })
+    assert.equal(readFileSync(join(dataDir, '.agents', 'AGENTS.md'), 'utf8'), 'the newer factory copy\n')
+  })
+
+  test('a blank harness home file is put in place once', async () => {
+    const dataDir = join(root, 'data-rules-c')
+    const result = await installFactoryResources({ dataDir, resourcesDir: withRules('rules-c', 'factory\n') })
+    assert.equal(result.userRulesSeeded, true)
+    assert.ok(existsSync(join(dataDir, 'AGENTS.md')), 'the place to write the user rules is there')
+    // It carries no rule of its own: a blank file is dropped by the loader, so a comment says
+    // what the file is for.
+    assert.equal(readFileSync(join(dataDir, 'AGENTS.md'), 'utf8').trim().startsWith('<!--'), true)
+  })
+
+  test('the user rules are never overwritten', async () => {
+    const dataDir = join(root, 'data-rules-d')
+    write(join(dataDir, 'AGENTS.md'), 'my own rules\n')
+    const result = await installFactoryResources({ dataDir, resourcesDir: withRules('rules-d', 'factory\n') })
+    assert.equal(result.userRulesSeeded, false)
+    assert.equal(readFileSync(join(dataDir, 'AGENTS.md'), 'utf8'), 'my own rules\n')
+  })
+
+  test('rules the package does not carry leave the shared root alone', async () => {
+    const bare = join(root, 'resources-bare-rules')
+    mkdirSync(bare, { recursive: true })
+    const dataDir = join(root, 'data-rules-e')
+    const result = await installFactoryResources({ dataDir, resourcesDir: bare })
+    assert.equal(result.rulesWritten, false)
+    assert.equal(existsSync(join(dataDir, '.agents', 'AGENTS.md')), false)
+  })
+})
+
 // The seed that actually ships: it is a team for a stranger's machine, so it must carry no model
 // (a fresh install has no keys and would open on "model unavailable") and no path from the
 // developer's own box. These assertions guard the file itself, not a copy in a temporary directory.
@@ -116,8 +167,9 @@ describe('the shipped seed team', () => {
     for (const [name, item] of Object.entries(seed.capabilities?.items ?? {})) {
       if (item.kind === 'skill') {
         assert.ok(item.locator || item.content, `${name}: a skill needs a locator into the skills folder or inline content`)
-        // The locator is relative to the data directory; the skills live at data/skills/<slug>.
-        if (item.locator) assert.match(item.locator, /^skills\//u, `${name}: the skill locator points into data/skills/`)
+        // The locator is relative to the data directory; the skills live in the shared agents
+        // root the Host reads as DSH_AGENTS_HOME, so data/.agents/skills/<slug>.
+        if (item.locator) assert.match(item.locator, /^\.agents\/skills\//u, `${name}: the skill locator points into data/.agents/skills/`)
       } else if (item.kind === 'mcp') {
         const command = item.transport === 'stdio' ? String(item.command ?? '') : String(item.url ?? '')
         assert.ok(command.length > 0, `${name}: an MCP needs a command or a url`)
