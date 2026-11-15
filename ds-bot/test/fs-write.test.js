@@ -51,8 +51,8 @@ function fakeFs({ withBytes = true } = {}) {
 
 function start({ withBytes = true, hostWrites } = {}) {
   const home = mkdtempSync(join(tmpdir(), 'ds-bot-fswrite-'))
-  const ctx = fakeContext()
   const fs = fakeFs({ withBytes })
+  const ctx = fakeContext({ services: { fs } })
   Object.assign(ctx, {
     workspaceRegistry: {
       get: () => undefined,
@@ -61,7 +61,6 @@ function start({ withBytes = true, hostWrites } = {}) {
       create: async () => ({ id: 'w1', path: home }),
       archiveSession: async () => {},
     },
-    get: name => (name === 'fs' ? fs : undefined),
   })
   const rt = createRuntime(ctx, { home })
   // The host's own tools, registered globally the way the composition has them.
