@@ -8,6 +8,7 @@ import { preparePrimaryRuntime, runtimeTarget } from './prepare-runtime.mjs'
 import { prepareFactorySkills } from './factory-skills-pack.mjs'
 import { prepareBundledPlugins, packDataArchive } from './bundled-plugin.mjs'
 import { prepareLanguageServers } from './factory-lsp-pack.mjs'
+import { patchForPack } from './fs-writebytes-patch.mjs'
 
 const WHERE = {
   darwin: { x64: 'on an Intel Mac, or under Rosetta with an x64 Node', arm64: 'on a Mac with Apple silicon' },
@@ -53,14 +54,18 @@ export function factoryManifest(appDir) {
   return JSON.parse(readFileSync(join(appDir, 'factory.manifest.json'), 'utf8'))
 }
 
-export async function beforePack(context, prepare = preparePrimaryRuntime, prepareSkills = prepareFactorySkills, preparePlugins = prepareBundledPlugins, prepareServers = prepareLanguageServers, packData = packDataArchive) {
+export async function beforePack(context, prepare = preparePrimaryRuntime, prepareSkills = prepareFactorySkills, preparePlugins = prepareBundledPlugins, prepareServers = prepareLanguageServers, packData = packDataArchive, patchFs = patchForPack) {
   const targets = []
   for (const archToNames of context.packager?.packagerOptions?.targets?.values() ?? [])
     for (const arch of archToNames.keys()) targets.push(Arch[arch])
   const problem = archProblem({ target: Arch[context.arch], platform: context.electronPlatformName, targets })
   if (problem !== undefined) throw new Error(problem)
-  await prepare(officeRuntimeRequest(context))
   const appDir = context.packager.appDir ?? context.packager.projectDir
+  // The byte channel the shadow write/edit needs has to be in the Host before anything ships.
+  // Patching first means a moved anchor stops the build before the Office runtime is downloaded,
+  // rather than after a slow pack that then carries an unpatched Host.
+  patchFs(appDir)
+  await prepare(officeRuntimeRequest(context))
   const manifest = factoryManifest(appDir)
   // The factory skills travel as plain folders in the data tree; each slug the manifest names
   // must be in the skills source folder with its SKILL.md, or the build stops.

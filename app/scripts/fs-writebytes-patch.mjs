@@ -136,6 +136,52 @@ export function revert(root) {
   return report
 }
 
+/**
+ * The two node_modules roots the pack must carry the patch in: the app's own (it ships in the
+ * asar) and the harness test substitute. Exported so the pack and its tests name them alike.
+ * @param {string} appDir - the app directory electron-builder is packing
+ * @returns {string[]}
+ */
+export function defaultRoots(appDir) {
+  return [join(appDir, 'node_modules'), join(appDir, '..', 'ds-bot', 'dev', 'harness', 'node_modules')]
+}
+
+/**
+ * Apply the patch for a pack, and stop the pack when it cannot be applied.
+ *
+ * electron-builder runs this from its beforePack hook, so `npm run pack` and `npm run dist`
+ * carry the byte channel without anyone remembering to run the script first: a package built
+ * without it would ship a Host whose `writeBytes` is missing, and the shadow write/edit would
+ * then refuse every non-UTF-8 file — a working feature turned into a silent half-install.
+ *
+ * A failure here throws on purpose: `run()` raises when an anchor moved (the Host version
+ * changed under us), and a package that is simply not installed is reported as `absent`. Both
+ * must stop the build rather than let an unpatched Host into the asar. The harness tree is the
+ * test substitute and is skipped when absent; the app's own node_modules is not optional.
+ * @param {string} appDir - the app directory electron-builder is packing
+ * @param {string[]} [roots] - the node_modules roots to patch, defaultRoots(appDir) when omitted
+ * @returns {{ label: string, report: { pkg: string, state: string }[] }[]} what each root carries
+ */
+export function patchForPack(appDir, roots = defaultRoots(appDir)) {
+  const done = []
+  for (const root of roots) {
+    const label = root.includes('harness') ? 'harness' : 'app'
+    if (!existsSync(root)) {
+      if (label === 'app') throw new Error(`the pack needs ${root} to patch writeBytes into, and it is not there`)
+      console.log(`LinkHarness: the writeBytes patch skips the harness test tree: no ${root}`)
+      continue
+    }
+    const report = run(root) // throws when an anchor moved: the Host version changed, so stop the pack
+    for (const row of report) {
+      if (row.state === 'absent') throw new Error(`writeBytes could not reach ${row.pkg} in ${label}: the package is not installed`)
+    }
+    done.push({ label, report })
+  }
+  const landed = done.flatMap(({ label, report }) => report.filter(row => row.state === 'applied' || row.state === 'patched').map(row => `${label}/${row.pkg}`))
+  console.log(`LinkHarness: the writeBytes patch is in place for ${String(landed.length)} package trees`)
+  return done
+}
+
 const main = () => {
   const args = new Set(process.argv.slice(2))
   const check = args.has('--check')
