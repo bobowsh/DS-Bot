@@ -65,11 +65,17 @@ export async function beforePack(context, prepare = preparePrimaryRuntime, prepa
   // The factory skills travel as plain folders in the data tree; each slug the manifest names
   // must be in the skills source folder with its SKILL.md, or the build stops.
   await prepareSkills(appDir, manifest.skills)
-  // The plugins the app carries are resolved from the factory manifest: the intranet registry
-  // first, the local development folder when it cannot be reached, the build stops on neither.
-  // The plugins the manifest marks as shipped turned off travel as well, but the first start
-  // keeps them out of the bundle list.
-  await preparePlugins(appDir, manifest.plugins, undefined, manifest.disabledByDefault ?? [])
+  // The plugins the app carries are resolved from the factory manifest. Each one is pulled at the
+  // newest version its registry publishes, unless that version is older than the manifest's or
+  // declares itself incompatible with this app's DSH; those ship at the pinned version instead
+  // and the reason is logged. The plugins the manifest marks as shipped turned off travel as
+  // well, but the first start keeps them out of the bundle list.
+  const packed = await preparePlugins(appDir, manifest.plugins, undefined, manifest.disabledByDefault ?? [])
+  // What went out, in one line: the build log has to answer "which plugin versions does this
+  // package carry", and which of them the registry moved past what the manifest pinned.
+  const shipped = factoryManifest(appDir).plugins ?? []
+  const newer = (manifest.plugins ?? []).filter((entry, at) => shipped[at]?.name === entry.name && shipped[at].version !== entry.version)
+  console.log(`LinkHarness: the package carries ${Array.isArray(packed) ? packed.length : shipped.length} factory plugins; ${newer.length} were pulled newer than the manifest pinned${newer.length === 0 ? '' : ` (${newer.map(entry => `${entry.name}@${entry.version}`).join(', ')})`}`)
   // The language servers travel as plain files too: they are native programs, so they go on
   // the Host's PATH rather than into a plugin.
   await prepareServers(appDir, manifest.languageServers ?? [])
