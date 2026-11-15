@@ -10,6 +10,7 @@ import { NAME_MAX } from './requests.js'
 import { unquote } from './text.js'
 import { mentionSpans } from '../shared/mentions.js'
 import { readTool } from './fs-read-tool.js'
+import { editTool, writeTool } from './fs-write-tool.js'
 import { checkShownView, showViewDescription, showViewParameters } from 'deep-view/core'
 
 export const output = { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: String(value) }] }
@@ -77,15 +78,16 @@ export function install(rt) {
   // Main Bots see every group; other Bots see the groups they are in.
   const visibleRooms = self => Object.values(state.rooms).filter(room => rt.isMain(self) || room.members.includes(self))
 
-  // The Bot's own read: it shadows the host's UTF-8 one inside the Bot's scope and
-  // serves the encodings the host cannot decode. It delegates to the host first,
-  // so a plain UTF-8 file keeps the host's behaviour exactly.
+  // The Bot's own read, write and edit: they shadow the host's UTF-8 ones inside the
+  // Bot's scope and serve the encodings the host cannot decode or encode. Each
+  // delegates to the host first, so a plain UTF-8 file keeps the host's behaviour
+  // exactly.
   //
-  // It is not a team tool: it takes the name of a host tool on purpose, so it
-  // has to be scoped rather than pushed onto rt.teamTools — a team tool is
-  // listed by name in TEAM_TOOLS, and this one joins the Bot's scope beside
-  // them, shadowing the global read there.
-  rt.scopeShadows = [readTool(rt)]
+  // They are not team tools: they take the names of host tools on purpose, so they
+  // have to be scoped rather than pushed onto rt.teamTools — a team tool is listed by
+  // name in TEAM_TOOLS, and these join the Bot's scope beside them, shadowing the
+  // global ones there.
+  rt.scopeShadows = [readTool(rt), writeTool(rt), editTool(rt)]
 
   rt.teamTools.push(defineTool({
     name: 'list_bots',
