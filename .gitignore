@@ -16,6 +16,8 @@ node_modules/
 # every build (scripts/bundled-plugin.mjs, scripts/skills-repo-git.mjs), and the skills
 # repository carries a git dir of its own.
 /app/build/data/
+# The packed form of that same tree, made beside it for the installer (scripts/bundled-plugin.mjs).
+/app/build/data.7z
 # Some tests use a relative appDir ("app-dir"); its build output is test scratch, not source.
 /app/app-dir/
 

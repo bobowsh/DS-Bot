@@ -222,39 +222,61 @@
 !macroend
 
 ; The factory plugins (a DSH home tree: profiles/ds-bot/node_modules/<plugin>), the shared
-; agents root (skills and the factory AGENTS.md) and the factory list travel in <INSTDIR>\data
-; (extraFiles). The data home of an install is the folder beside the program, so the installer
-; moves them there after the install.
+; agents root (skills and the factory AGENTS.md) and the factory list travel beside the program
+; as ONE 7z archive, <INSTDIR>\data.7z (extraFiles). The data home of an install is the folder
+; beside the program, so the installer unpacks the archive there, once, and deletes it.
 ;
-; Only the two whitelisted folders are written, and inside profiles only the names on the
-; factory list: the data home holds the user's own data (bot/, profiles/, sessions/ ...), and
-; a plugin the user installed themselves must not be replaced or removed by an upgrade.
+; Why an archive: unpacked in the payload the same 11,583 files would be written three times —
+; electron-builder unpacks its own archive to a temp folder, copies that to $INSTDIR, and this
+; macro moved the tree again. As one archive the install carries a single file and creates each
+; file once.
 ;
-; The factory skills are the package's own copies and are replaced outright, with no previous
-; copy kept. A skill the package does not carry is the user's own and is left alone.
-;
-; The shared agents root is <data>\.agents: the app hands it to the Host as DSH_AGENTS_HOME.
-; The factory AGENTS.md there is the package's own and is replaced; the user's own rules live in
-; <data>\AGENTS.md (the harness home file), which this never writes.
+; The archive is unpacked into a temporary folder first and the two whitelisted subtrees are then
+; moved into place, rather than unpacking over the data home: the data home holds the user's own
+; data (bot/, profiles/, sessions/ ...), and a plugin the user installed themselves must not be
+; replaced or removed by an upgrade. Inside profiles only the names on the factory list are
+; written; a skill the package does not carry is the user's own and is left alone.
 ;
 ; A move that fails (the parent folder cannot be written, as under Program Files) does not stop
-; the install: the first start reads the tree from <INSTDIR>\data and copies it into the profile
-; from there (src/main.mjs bundledDataHome).
+; the install: the archive itself is kept and the first start unpacks the tree from it into the
+; profile (src/main.mjs bundledDataHome).
 !macro customInstall
   ${StdUtils.GetParentPath} $R0 "$INSTDIR"
   ${If} $R0 == ""
     Goto dsbDataDone
   ${EndIf}
-  ; The data home beside the program. $R7 stays 0 while every move succeeds; a failure keeps
-  ; the copy in <INSTDIR>\data so the first start can read it from there.
+  ; The data home beside the program. $R7 stays 0 while everything lands; a failure keeps
+  ; $INSTDIR\data.7z so the first start can unpack it from there.
   StrCpy $R1 "$R0\data"
   StrCpy $R7 0
 
-  ; The factory list: a plain-text name per line (build writes it in build/data/factory).
+  ${IfNot} ${FileExists} "$INSTDIR\data.7z"
+    DetailPrint "LinkHarness: the data archive is missing, so the factory tree is not installed."
+    Goto dsbDataDone
+  ${EndIf}
+
+  ; Unpack once into a scratch folder under the program folder, so both the unpack and the moves
+  ; stay on the same volume and a half-written tree never sits in the data home.
+  StrCpy $R8 "$INSTDIR\dsb-unpack"
+  RMDir /r "$R8"
+  CreateDirectory "$R8"
+  ClearErrors
+  SetOutPath "$R8"
+  Nsis7z::Extract "$INSTDIR\data.7z"
+  Pop $R9
+  SetOutPath "$INSTDIR"
+  ${If} $R9 != ""
+    DetailPrint "LinkHarness: the data archive could not be unpacked ($R9)."
+    RMDir /r "$R8"
+    StrCpy $R7 1
+    Goto dsbDataDone
+  ${EndIf}
+
+  ; The factory list: a plain-text name per line (build writes it in the data tree's factory).
   ; The first start reads the JSON copy from the same folder; both are build output.
-  ${If} ${FileExists} "$INSTDIR\data\factory\plugins.txt"
+  ${If} ${FileExists} "$R8\factory\plugins.txt"
     ClearErrors
-    FileOpen $R2 "$INSTDIR\data\factory\plugins.txt" r
+    FileOpen $R2 "$R8\factory\plugins.txt" r
     ${If} ${Errors}
       DetailPrint "LinkHarness: the factory plugin list could not be read."
       Goto dsbFactoryDone
@@ -269,7 +291,7 @@
       ${If} $4 == ""
         Goto dsbFactoryLoop
       ${EndIf}
-      StrCpy $5 "$INSTDIR\data\profiles\ds-bot\node_modules\$4"
+      StrCpy $5 "$R8\profiles\ds-bot\node_modules\$4"
       StrCpy $6 "$R1\profiles\ds-bot\node_modules\$4"
       ${If} ${FileExists} "$5\*.*"
         ClearErrors
@@ -288,17 +310,17 @@
   ${EndIf}
   ; The factory list itself travels as build output, so the first start can tell the factory
   ; plugins from the ones the user installed later.
-  ${If} ${FileExists} "$INSTDIR\data\factory\*.*"
+  ${If} ${FileExists} "$R8\factory\*.*"
     CreateDirectory "$R1\factory"
-    CopyFiles /SILENT "$INSTDIR\data\factory\*.*" "$R1\factory"
+    CopyFiles /SILENT "$R8\factory\*.*" "$R1\factory"
   ${EndIf}
   ; The language servers travel as plain files: they are native programs the Host finds on its
   ; PATH, so the whole folder is moved beside the data.
-  ${If} ${FileExists} "$INSTDIR\data\lsp\*.*"
+  ${If} ${FileExists} "$R8\lsp\*.*"
     ClearErrors
     RMDir /r "$R1\lsp"
     CreateDirectory "$R1\lsp"
-    CopyFiles /SILENT "$INSTDIR\data\lsp\*.*" "$R1\lsp"
+    CopyFiles /SILENT "$R8\lsp\*.*" "$R1\lsp"
     ${If} ${Errors}
       DetailPrint "LinkHarness: the language servers could not be moved to the data folder."
       StrCpy $R7 1
@@ -310,15 +332,15 @@
   ; the user's own and is left alone. The sync state file is dropped when the package carries
   ; skills, so the next start re-records versions instead of downloading what the package just
   ; put in place.
-  ${If} ${FileExists} "$INSTDIR\data\.agents\skills\*.*"
+  ${If} ${FileExists} "$R8\.agents\skills\*.*"
     Delete "$R1\skills-sync.json"
-    FindFirst $R2 $3 "$INSTDIR\data\.agents\skills\*.*"
+    FindFirst $R2 $3 "$R8\.agents\skills\*.*"
     dsbSkillsLoop:
       StrCmp $3 "" dsbSkillsEnd
       StrCmp $3 "." dsbSkillsNext
       StrCmp $3 ".." dsbSkillsNext
-      ${If} ${FileExists} "$INSTDIR\data\.agents\skills\$3\*.*"
-        StrCpy $5 "$INSTDIR\data\.agents\skills\$3"
+      ${If} ${FileExists} "$R8\.agents\skills\$3\*.*"
+        StrCpy $5 "$R8\.agents\skills\$3"
         StrCpy $6 "$R1\.agents\skills\$3"
         ClearErrors
         RMDir /r "$6"
@@ -338,14 +360,21 @@
   ; The factory rules go where the Host reads the shared root's AGENTS.md. They are the package's
   ; own, so an upgraded install takes the shipping ones. The user's own rules are in
   ; <data>\AGENTS.md, which this never writes.
-  ${If} ${FileExists} "$INSTDIR\data\.agents\AGENTS.md"
+  ${If} ${FileExists} "$R8\.agents\AGENTS.md"
     CreateDirectory "$R1\.agents"
-    CopyFiles /SILENT "$INSTDIR\data\.agents\AGENTS.md" "$R1\.agents\AGENTS.md"
+    CopyFiles /SILENT "$R8\.agents\AGENTS.md" "$R1\.agents\AGENTS.md"
   ${EndIf}
-  ; Only when everything was moved is the installer's own data tree removed. A failed move
-  ; leaves it in place: the first start reads the factory tree from <INSTDIR>\data instead.
+  ; A failure keeps the unpacked tree where the first start looks for it: <INSTDIR>\data
+  ; (src/main.mjs bundledDataHome reads the factory list from there when the data home has none).
+  ; Only a complete move is cleaned up.
   ${If} $R7 == 0
+    RMDir /r "$R8"
+    Delete "$INSTDIR\data.7z"
+  ${Else}
+    DetailPrint "LinkHarness: the factory tree stays in $INSTDIR\data for the first start."
     RMDir /r "$INSTDIR\data"
+    Rename "$R8" "$INSTDIR\data"
+    Delete "$INSTDIR\data.7z"
   ${EndIf}
   dsbDataDone:
 !macroend

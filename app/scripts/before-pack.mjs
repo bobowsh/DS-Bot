@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { preparePrimaryRuntime, runtimeTarget } from './prepare-runtime.mjs'
 import { prepareFactorySkills } from './factory-skills-pack.mjs'
-import { prepareBundledPlugins } from './bundled-plugin.mjs'
+import { prepareBundledPlugins, packDataArchive } from './bundled-plugin.mjs'
 import { prepareLanguageServers } from './factory-lsp-pack.mjs'
 
 const WHERE = {
@@ -53,7 +53,7 @@ export function factoryManifest(appDir) {
   return JSON.parse(readFileSync(join(appDir, 'factory.manifest.json'), 'utf8'))
 }
 
-export async function beforePack(context, prepare = preparePrimaryRuntime, prepareSkills = prepareFactorySkills, preparePlugins = prepareBundledPlugins, prepareServers = prepareLanguageServers) {
+export async function beforePack(context, prepare = preparePrimaryRuntime, prepareSkills = prepareFactorySkills, preparePlugins = prepareBundledPlugins, prepareServers = prepareLanguageServers, packData = packDataArchive) {
   const targets = []
   for (const archToNames of context.packager?.packagerOptions?.targets?.values() ?? [])
     for (const arch of archToNames.keys()) targets.push(Arch[arch])
@@ -79,4 +79,8 @@ export async function beforePack(context, prepare = preparePrimaryRuntime, prepa
   // The language servers travel as plain files too: they are native programs, so they go on
   // the Host's PATH rather than into a plugin.
   await prepareServers(appDir, manifest.languageServers ?? [])
+  // Every part of the data tree is written by now, so it leaves the build as one archive. Packing
+  // here and not inside preparePlugins is deliberate: the skills and the language servers are
+  // written after the plugins, and an archive made earlier would miss them.
+  await packData(appDir)
 }
