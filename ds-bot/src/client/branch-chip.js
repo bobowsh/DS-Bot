@@ -96,15 +96,21 @@ export const BRANCH_CSS = `
      above and read as a badge pinned to the border. The user asked for the top-right corner OF
      the input area. */
   top:4px!important;
-  right:10px!important;
+  /* Clear of the card's trailing buttons, not just of the card's edge: a right offset measured
+     from the card's right edge put the chip straight under the dictation and send buttons (real
+     app at 1280 wide: chip reached x=1251, the dictation button starts at 1190). The two buttons
+     plus their gap are all the space on the right of the row; 92px keeps 20px between the chip
+     and the nearest button (card right edge 1262 - dictation button left 1190 = 72). */
+  right:92px!important;
   display:inline-flex!important;
   align-items:center!important;
   gap:4px!important;
   /* border-box so the 220px cap covers the padding and border too: with the default
-     content-box the box measured 235px (220 + 13 padding + 2 border) and could still
-     reach past the card's edge on a narrow window. */
+     content-box the box measured 235px (220 + 13 padding + 2 border). The percentage cap is
+     for narrow windows, where 45% of the card grew wide enough to reach back over the
+     trailing buttons. */
   box-sizing:border-box!important;
-  max-width:min(220px,45%)!important;
+  max-width:min(220px,32%)!important;
   padding:1px 7px 1px 6px!important;
   border:1px solid var(--bt-line,currentColor)!important;
   border-radius:999px!important;
