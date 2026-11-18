@@ -97,7 +97,7 @@ function tempDirNoGit() {
 // The endpoint asks for a session, not a path: which folder that session works in is the
 // host's own answer (group folder → member pick → Bot folder → team workspace). Most Bots have
 // no folder of their own, and reading `bot.workDir` directly is what made the chip vanish.
-function endpointWith({ sessionFolder, folders }) {
+function endpointWith({ sessionFolder }) {
   const rt = { sessionFolder }
   install(rt)
   return async (body) => (await rt.branchEndpoint('branch', body)).branch
