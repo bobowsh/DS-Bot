@@ -557,6 +557,7 @@ export const FR = {
   "Permissions": "Autorisations",
   "Read only": "Lecture seule",
   "Workspace": "Espace de travail",
+  "Workspace branch": "Branche de l'espace de travail",
   "Full access": "Accès complet",
   "Same for every member": "Identique pour tous les membres",
   "Replaces each member's own permissions in this group.": "Remplace les autorisations individuelles de chaque membre dans ce groupe.",

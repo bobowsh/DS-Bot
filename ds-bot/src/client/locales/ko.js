@@ -574,6 +574,7 @@ export const KO = {
   'Permissions': '권한',
   'Read only': '읽기 전용',
   'Workspace': '작업 공간 내 수정',
+  'Workspace branch': '작업 공간 브랜치',
   'Full access': '전체 권한',
   'Same for every member': '모든 멤버에 동일 적용',
   "Replaces each member's own permissions in this group.": '이 그룹 내에서 각 멤버의 개별 권한을 대체합니다.',

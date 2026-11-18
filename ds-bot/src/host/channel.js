@@ -431,6 +431,8 @@ export function install(rt) {
         case 'folder-list':
           await rt.load()
           return ok(await rt.folderEndpoint(endpoint, body, signal))
+        case 'branch':
+          return ok(await rt.branchEndpoint(endpoint, body))
         case 'team-workspace':
           await rt.load()
           return ok({ team: await rt.setTeamWorkspace(String(body.path ?? '')) })

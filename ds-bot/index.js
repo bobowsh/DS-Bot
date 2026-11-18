@@ -43,6 +43,7 @@ import * as dshUpdate from './src/host/dsh-update.js'
 import * as thinking from './src/host/thinking.js'
 import * as phone from './src/host/phone.js'
 import * as channel from './src/host/channel.js'
+import * as workspaceBranch from './src/host/workspace-branch.js'
 import * as mobile from './src/host/mobile.js'
 import * as feed from './src/host/feed.js'
 import * as im from './src/host/im/index.js'
@@ -64,7 +65,7 @@ export const inject = ['llm', 'tools', 'systemPrompt', 'sessionController', 'ses
 // call before the hooks of tools do, so a closed call never reaches a card they show.
 // 上游把群消息的存储换成了账本（ledger.js），group-log.js 由它取代；
 // 我们自己的出厂种子与自动导入两个模块继续留在末尾。
-const MODULES = [diagnostics, store, ledger, models, providers, permissions, turns, steer, handoffs, requests, delivery, roster, folders, privacy, agents, prompt, timeContext, tools, chatIndex, groups, goals, approvals, resume, memory, parts, images, avatarLibrary, secrets, connectors, capabilities, learning, schedules, browser, browserPlugins, computer, usage, update, dshUpdate, thinking, mobile, feed, phone, im, channel, officeSkills, goalSkills, factorySeed, autoImport, localAgents]
+const MODULES = [diagnostics, store, ledger, models, providers, permissions, turns, steer, handoffs, requests, delivery, roster, folders, privacy, agents, prompt, timeContext, tools, chatIndex, groups, goals, approvals, resume, memory, parts, images, avatarLibrary, secrets, connectors, capabilities, learning, schedules, browser, browserPlugins, computer, usage, update, dshUpdate, thinking, mobile, feed, phone, im, channel, officeSkills, goalSkills, factorySeed, autoImport, localAgents, workspaceBranch]
 
 export function apply(ctx, config = {}) {
   createRuntime(ctx, config)

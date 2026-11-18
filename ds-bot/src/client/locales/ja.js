@@ -557,6 +557,7 @@ export const JA = {
   "Permissions": "権限",
   "Read only": "読み取り専用",
   "Workspace": "ワークスペース内で変更可",
+  "Workspace branch": "ワークスペースのブランチ",
   "Full access": "フルアクセス",
   "Same for every member": "メンバー全員に適用",
   "Replaces each member's own permissions in this group.": "このグループ内では各メンバー個別の権限より優先されます。",
