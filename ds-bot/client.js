@@ -36504,6 +36504,10 @@ var BRANCH_CSS = `
   display:inline-flex!important;
   align-items:center!important;
   gap:4px!important;
+  /* border-box so the 220px cap covers the padding and border too: with the default
+     content-box the box measured 235px (220 + 13 padding + 2 border) and could still
+     reach past the card's edge on a narrow window. */
+  box-sizing:border-box!important;
   max-width:min(220px,45%)!important;
   padding:1px 7px 1px 6px!important;
   border:1px solid var(--bt-line,currentColor)!important;
@@ -36522,7 +36526,10 @@ var BRANCH_CSS = `
   overflow:hidden!important;
   text-overflow:ellipsis!important;
   white-space:nowrap!important;
-  direction:rtl!important;
+  /* Ellipsis at the END, keeping the start. Branch names carry their meaning up front
+     (feat/, fix/, release/): an RTL ellipsis would show the tail instead and every long
+     branch would read as "...something-somewhere". */
+  direction:ltr!important;
   text-align:left!important;
 }
 `;
