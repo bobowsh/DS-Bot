@@ -574,6 +574,7 @@ export const ES = {
   'Permissions': 'Permisos',
   'Read only': 'Solo lectura',
   'Workspace': 'Espacio de trabajo',
+  'Workspace branch': 'Rama del espacio de trabajo',
   'Full access': 'Acceso total',
   'Same for every member': 'Igual para todos los miembros',
   "Replaces each member's own permissions in this group.": 'Reemplaza los permisos propios de cada miembro en este grupo.',

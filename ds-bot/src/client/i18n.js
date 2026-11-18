@@ -494,6 +494,9 @@ const ZH = {
   'Permissions': '权限',
   'Read only': '仅可查看',
   'Workspace': '工作区内修改',
+  // The branch chip's tooltip: the chip itself shows only the branch name, so this is the
+  // one place the words "git branch" reach the user.
+  'Workspace branch': '工作区分支',
   'Full access': '完全权限',
   'Same for every member': '全员统一',
   'The only Main Bot. To hand the role to another Bot, use Main Bot on the Bots page.': '这是唯一的主 Bot。要把主 Bot 交给别的 Bot，请到「Bot」页的主 Bot 里换。',
