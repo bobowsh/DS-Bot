@@ -36431,20 +36431,20 @@ function turnDetector({ loud = 0.12, quiet = 0.06, quietMs = 1200 } = {}) {
 // src/client/branch-chip.js
 var import_react54 = require("react");
 var REFRESH_MS = 15e3;
-function useBranch(path2) {
+function useBranch(sessionId) {
   const [branch, setBranch] = (0, import_react54.useState)(void 0);
   const latest = (0, import_react54.useRef)(void 0);
   (0, import_react54.useEffect)(() => {
-    latest.current = path2;
-    if (path2 === void 0 || path2 === "") {
+    latest.current = sessionId;
+    if (sessionId === void 0 || sessionId === "") {
       setBranch(void 0);
       return void 0;
     }
     let alive = true;
     let timer;
     const read = async () => {
-      const next = await call("branch", { path: path2 }).then((value) => value?.branch).catch(() => void 0);
-      if (alive && latest.current === path2) setBranch(next);
+      const next = await call("branch", { sessionId }).then((value) => value?.branch).catch(() => void 0);
+      if (alive && latest.current === sessionId) setBranch(next);
     };
     void read();
     const onFocus = () => {
@@ -36459,16 +36459,11 @@ function useBranch(path2) {
       clearInterval(timer);
       window.removeEventListener("focus", onFocus);
     };
-  }, [path2]);
+  }, [sessionId]);
   return branch;
 }
-function BranchChip({ sessionId, useRoster }) {
-  const path2 = useRoster((state) => {
-    const bot = state.byId?.[sessionId];
-    if (bot !== void 0) return bot.workDir;
-    return state.roomsById?.[sessionId]?.workDir;
-  });
-  const branch = useBranch(path2);
+function BranchChip({ sessionId }) {
+  const branch = useBranch(sessionId);
   if (branch === void 0) return null;
   return (0, import_react54.createElement)(
     "div",
@@ -36499,7 +36494,11 @@ var BRANCH_CSS = `
 [data-composer-card]{position:relative!important}
 .bt-branch-chip{
   position:absolute!important;
-  top:-9px!important;
+  /* Inside the card, not straddling its top edge. Measured in the real app: with top:-9px the
+     chip sat at y=734 while the card started at y=742, so half of it floated over the chat
+     above and read as a badge pinned to the border. The user asked for the top-right corner OF
+     the input area. */
+  top:4px!important;
   right:10px!important;
   display:inline-flex!important;
   align-items:center!important;

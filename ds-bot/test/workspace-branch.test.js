@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { branchOf } from '../src/host/workspace-branch.js'
+import { branchOf, install } from '../src/host/workspace-branch.js'
 
 /** A throwaway directory with the given files written into it. */
 function fixture(files) {
@@ -93,3 +93,70 @@ test('a very long branch name is shortened rather than overflowing the card', as
 function tempDirNoGit() {
   return mkdtempSync(join(tmpdir(), 'ds-branch-plain-'))
 }
+
+// The endpoint asks for a session, not a path: which folder that session works in is the
+// host's own answer (group folder → member pick → Bot folder → team workspace). Most Bots have
+// no folder of their own, and reading `bot.workDir` directly is what made the chip vanish.
+function endpointWith({ sessionFolder, folders }) {
+  const rt = { sessionFolder }
+  install(rt)
+  return async (body) => (await rt.branchEndpoint('branch', body)).branch
+}
+
+test('a Bot with no folder of its own shows the team workspace branch', async () => {
+  const team = fixture({ '.git/HEAD': 'ref: refs/heads/main\n' })
+  try {
+    // sessionFolder is what falls back to the team workspace; the Bot itself has no workDir.
+    const ask = endpointWith({ sessionFolder: () => team })
+    assert.equal(await ask({ sessionId: 's-no-folder' }), 'main')
+  } finally {
+    rmSync(team, { recursive: true, force: true })
+  }
+})
+
+test('a Bot with its own folder shows that folder branch', async () => {
+  const own = fixture({ '.git/HEAD': 'ref: refs/heads/feat/own\n' })
+  try {
+    const ask = endpointWith({ sessionFolder: ({ id }) => (id === 's-own' ? own : undefined) })
+    assert.equal(await ask({ sessionId: 's-own' }), 'feat/own')
+  } finally {
+    rmSync(own, { recursive: true, force: true })
+  }
+})
+
+test('a group shows the branch of the folder the group works in', async () => {
+  const group = fixture({ '.git/HEAD': 'ref: refs/heads/release/2.0\n' })
+  try {
+    const ask = endpointWith({ sessionFolder: () => group })
+    assert.equal(await ask({ sessionId: 'room-1' }), 'release/2.0')
+  } finally {
+    rmSync(group, { recursive: true, force: true })
+  }
+})
+
+test('a session whose folder is not a checkout shows nothing', async () => {
+  const plain = tempDirNoGit()
+  try {
+    const ask = endpointWith({ sessionFolder: () => plain })
+    assert.equal(await ask({ sessionId: 's-plain' }), undefined)
+  } finally {
+    rmSync(plain, { recursive: true, force: true })
+  }
+})
+
+test('no session and no path shows nothing', async () => {
+  const ask = endpointWith({ sessionFolder: () => '/never/asked' })
+  assert.equal(await ask({}), undefined)
+  assert.equal(await ask({ sessionId: '' }), undefined)
+})
+
+test('a path still works for direct callers', async () => {
+  const dir = fixture({ '.git/HEAD': 'ref: refs/heads/direct\n' })
+  try {
+    const ask = endpointWith({ sessionFolder: () => undefined })
+    assert.equal(await ask({ path: dir }), 'direct')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+

@@ -52,11 +52,26 @@ export async function branchOf(workDir) {
 
 export function install(rt) {
   /**
-   * The branch chip asks on mount and when the window regains focus: the branch can change
-   * in a terminal beside the app. `path` is the workspace the session runs in.
+   * The branch chip asks for a session, not a path: where that session actually works is
+   * `sessionFolder`'s answer — the group's folder, else this member's pick inside it, else the
+   * Bot's own folder, else the team workspace. Most Bots have no folder of their own, so a
+   * caller that read `bot.workDir` directly got undefined and rendered nothing.
+   *
+   * Resolving here rather than in the client keeps one copy of those rules; the client would
+   * otherwise have to mirror the fallbacks and drift from them.
    */
   rt.branchEndpoint = async (endpoint, body) => {
     if (endpoint !== 'branch') return { branch: undefined }
-    return { branch: await branchOf(String(body.path ?? '')) }
+    // `path` stays supported: it is what the unit tests and any direct caller use.
+    if (typeof body.path === 'string' && body.path !== '') {
+      return { branch: await branchOf(body.path) }
+    }
+    const sessionId = typeof body.sessionId === 'string' ? body.sessionId : ''
+    if (sessionId === '') return { branch: undefined }
+    // `sessionFolder` reads `session.id` (and `session.header`, which a bare id leaves
+    // undefined so the folder is resolved from the roster instead of a reported cwd).
+    const folder = rt.sessionFolder?.({ id: sessionId })
+    if (typeof folder !== 'string' || folder === '') return { branch: undefined }
+    return { branch: await branchOf(folder) }
   }
 }

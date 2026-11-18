@@ -13,22 +13,22 @@ import { t } from './i18n.js'
 const REFRESH_MS = 15_000
 
 /**
- * The branch of a workspace.
- * @param {string | undefined} path - the workspace directory
+ * The branch a session works on.
+ * @param {string | undefined} sessionId - the session whose folder is asked about
  * @returns {string | undefined}
  */
-function useBranch(path) {
+function useBranch(sessionId) {
   const [branch, setBranch] = useState(undefined)
   const latest = useRef(undefined)
   useEffect(() => {
-    latest.current = path
-    if (path === undefined || path === '') { setBranch(undefined); return undefined }
+    latest.current = sessionId
+    if (sessionId === undefined || sessionId === '') { setBranch(undefined); return undefined }
     let alive = true
     let timer
     const read = async () => {
-      const next = await call('branch', { path }).then(value => value?.branch).catch(() => undefined)
-      // A slow answer for the folder we have since left must not overwrite the new one.
-      if (alive && latest.current === path) setBranch(next)
+      const next = await call('branch', { sessionId }).then(value => value?.branch).catch(() => undefined)
+      // A slow answer for the session we have since left must not overwrite the new one.
+      if (alive && latest.current === sessionId) setBranch(next)
     }
     void read()
     // The branch can change in a terminal beside the app, and the window coming back into
@@ -41,22 +41,21 @@ function useBranch(path) {
       clearInterval(timer)
       window.removeEventListener('focus', onFocus)
     }
-  }, [path])
+  }, [sessionId])
   return branch
 }
 
 /**
  * The chip itself. The host draws the composer card; this sits in its trailing area, so
  * the styling lives here rather than in a slot the host owns.
+ *
+ * The host resolves which folder a session works in — a group's folder, a member's pick inside
+ * it, the Bot's own folder, or the team workspace. Asking for a session id rather than reading
+ * `bot.workDir` is what makes the chip appear for the Bots that have no folder of their own,
+ * which is most of them.
  */
-export function BranchChip({ sessionId, useRoster }) {
-  // Both a Bot chat and a group run in a workspace; the session id decides which one.
-  const path = useRoster(state => {
-    const bot = state.byId?.[sessionId]
-    if (bot !== undefined) return bot.workDir
-    return state.roomsById?.[sessionId]?.workDir
-  })
-  const branch = useBranch(path)
+export function BranchChip({ sessionId }) {
+  const branch = useBranch(sessionId)
   if (branch === undefined) return null
   return h('div', {
     className: 'bt-branch-chip',
@@ -92,7 +91,11 @@ export const BRANCH_CSS = `
 [data-composer-card]{position:relative!important}
 .bt-branch-chip{
   position:absolute!important;
-  top:-9px!important;
+  /* Inside the card, not straddling its top edge. Measured in the real app: with top:-9px the
+     chip sat at y=734 while the card started at y=742, so half of it floated over the chat
+     above and read as a badge pinned to the border. The user asked for the top-right corner OF
+     the input area. */
+  top:4px!important;
   right:10px!important;
   display:inline-flex!important;
   align-items:center!important;
