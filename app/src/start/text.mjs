@@ -586,6 +586,10 @@ export const TEXT = {
     'dialog.update.availableDetail': '這個版本不能自己更新。請到發布頁下載新版，再用它取代「應用程式」裡的 DS Bot。',
     'dialog.update.onFailure': 'DS Bot {version} 下載完會自動安裝，然後重新打開。',
     'dialog.update.onFailurePage': 'DS Bot {version} 已經發布。關掉這個對話方塊後，會打開它的下載頁面。',
+    'dialog.location.unreadable': '存的位置讀不出來。',
+    'dialog.location.unreadableDetail': '資料改到 {path}。原本那份檔案已改名留存，沒有丟掉。',
+    'dialog.plugin.updated': '{count} 個外掛已經更新：{names}。',
+    'dialog.plugin.updatedDetail': '這些外掛在 DeepSeek Harness 裡執行，重新啟動 LinkHarness 之後才會用上新版。',
   },
   ja: {
     // voice
@@ -771,6 +775,10 @@ export const TEXT = {
     'dialog.update.availableDetail': 'このバージョンは自動更新できません。リリースページから新しいバージョンをダウンロードし、「アプリケーション」内の DS Bot を置き換えてください。',
     'dialog.update.onFailure': 'DS Bot {version} はダウンロード完了後に自動インストールされ、再度開きます。',
     'dialog.update.onFailurePage': 'DS Bot {version} が公開されました。このダイアログを閉じるとダウンロードページが開きます。',
+    'dialog.location.unreadable': '保存されたデータの場所を読み取れませんでした。',
+    'dialog.location.unreadableDetail': 'データは {path} に移りました。元のファイルは名前を変えて残してあるので、失われていません。',
+    'dialog.plugin.updated': '{count} 個のプラグインを更新しました: {names}。',
+    'dialog.plugin.updatedDetail': 'これらのプラグインは DeepSeek Harness 内で動作するため、新しいバージョンは LinkHarness の再起動後に反映されます。',
   },
   ko: {
     // voice
@@ -956,6 +964,10 @@ export const TEXT = {
     'dialog.update.availableDetail': '이 버전은 자동 업데이트를 지원하지 않습니다. 릴리스 페이지에서 새 버전을 다운로드한 뒤 응용 프로그램의 DS Bot을 교체해 주세요.',
     'dialog.update.onFailure': 'DS Bot {version} 다운로드가 끝나면 자동으로 설치한 뒤 다시 열립니다.',
     'dialog.update.onFailurePage': 'DS Bot {version}이 출시되었습니다. 이 창을 닫으면 다운로드 페이지가 열립니다.',
+    'dialog.location.unreadable': '저장된 데이터 위치를 읽을 수 없습니다.',
+    'dialog.location.unreadableDetail': '데이터는 {path} 경로로 옮겨졌습니다. 기존 파일은 이름을 바꿔 보관했으므로 잃은 것은 없습니다.',
+    'dialog.plugin.updated': '{count}개의 플러그인이 업데이트되었습니다: {names}.',
+    'dialog.plugin.updatedDetail': '이 플러그인들은 DeepSeek Harness 안에서 실행되므로 새 버전은 LinkHarness를 다시 시작한 뒤에 적용됩니다.',
   },
   es: {
     // voice
@@ -1141,6 +1153,10 @@ export const TEXT = {
     'dialog.update.availableDetail': 'Esta versión no puede actualizarse sola. Descarga la nueva versión desde la página de lanzamientos y reemplaza DS Bot en Aplicaciones.',
     'dialog.update.onFailure': 'DS Bot {version} se instalará automáticamente cuando termine la descarga y volverá a abrirse.',
     'dialog.update.onFailurePage': 'DS Bot {version} ya está disponible. Al cerrar este cuadro se abrirá su página de descarga.',
+    'dialog.location.unreadable': 'No se pudo leer la ubicación de datos guardada.',
+    'dialog.location.unreadableDetail': 'Los datos pasaron a {path}. El archivo anterior se renombró y se conservó, así que no se perdió nada.',
+    'dialog.plugin.updated': 'Se actualizaron {count} complementos: {names}.',
+    'dialog.plugin.updatedDetail': 'Estos complementos se ejecutan dentro de DeepSeek Harness, así que las versiones nuevas se usan después de reiniciar LinkHarness.',
   },
   fr: {
     // voice
@@ -1326,6 +1342,10 @@ export const TEXT = {
     'dialog.update.availableDetail': 'Cette version ne peut pas se mettre à jour automatiquement. Téléchargez la nouvelle version sur la page des versions, puis remplacez DS Bot dans Applications.',
     'dialog.update.onFailure': 'DS Bot {version} s’installera automatiquement une fois téléchargé, puis se rouvrira.',
     'dialog.update.onFailurePage': 'DS Bot {version} est disponible. Une fois cette boîte fermée, sa page de téléchargement s’ouvrira.',
+    'dialog.location.unreadable': 'L\'emplacement de données enregistré n\'a pas pu être lu.',
+    'dialog.location.unreadableDetail': 'Les données sont allées dans {path}. L\'ancien fichier a été renommé et conservé, rien n\'a été perdu.',
+    'dialog.plugin.updated': '{count} extensions ont été mises à jour : {names}.',
+    'dialog.plugin.updatedDetail': 'Ces extensions s\'exécutent dans DeepSeek Harness, donc les nouvelles versions prennent effet après un redémarrage de LinkHarness.',
   },
   de: {
     // voice
@@ -1511,6 +1531,10 @@ export const TEXT = {
     'dialog.update.availableDetail': 'Diese Version kann sich nicht selbst aktualisieren. Lade die neue Version von der Release-Seite herunter und ersetze damit DS Bot im Programme-Ordner.',
     'dialog.update.onFailure': 'DS Bot {version} installiert sich nach Abschluss des Downloads automatisch und öffnet sich anschließend wieder.',
     'dialog.update.onFailurePage': 'DS Bot {version} ist verfügbar. Sobald dieses Fenster geschlossen wird, öffnet sich die Download-Seite.',
+    'dialog.location.unreadable': 'Der gespeicherte Datenort konnte nicht gelesen werden.',
+    'dialog.location.unreadableDetail': 'Die Daten liegen jetzt unter {path}. Die alte Datei wurde umbenannt und behalten, es ging nichts verloren.',
+    'dialog.plugin.updated': '{count} Plugins wurden aktualisiert: {names}.',
+    'dialog.plugin.updatedDetail': 'Diese Plugins laufen in DeepSeek Harness, die neuen Versionen greifen erst nach einem Neustart von LinkHarness.',
   },
 }
 
