@@ -76,6 +76,8 @@ function start(team, { models = [], reasoning = {}, archiveError, keys, selectio
     },
     sessionTitle: { rename: async () => {} },
     sessions: { flush: async () => {} },
+    // 我们这支分支的 inject 多声明了 fs（write/edit 的编码补丁要用），宿主会提供它。
+    fs: {},
   })
   let route
   const register = ctx.connection.fetch.register
