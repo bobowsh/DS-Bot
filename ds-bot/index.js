@@ -23,10 +23,13 @@ import * as chatIndex from './src/host/chat-index.js'
 import * as groups from './src/host/groups.js'
 import * as ledger from './src/host/ledger.js'
 import * as goals from './src/host/goals.js'
+import * as agentCommands from './src/host/agent-commands.js'
+import * as tasks from './src/host/tasks.js'
 import * as approvals from './src/host/approvals.js'
 import * as resume from './src/host/resume.js'
 import * as memory from './src/host/memory.js'
 import * as parts from './src/host/parts.js'
+import * as changes from './src/host/changes.js'
 import * as images from './src/host/images.js'
 import * as avatarLibrary from './src/host/avatar-library.js'
 import * as browser from './src/host/browser.js'
@@ -44,6 +47,7 @@ import * as thinking from './src/host/thinking.js'
 import * as phone from './src/host/phone.js'
 import * as channel from './src/host/channel.js'
 import * as workspaceBranch from './src/host/workspace-branch.js'
+import * as remote from './src/host/remote.js'
 import * as mobile from './src/host/mobile.js'
 import * as feed from './src/host/feed.js'
 import * as im from './src/host/im/index.js'
@@ -55,6 +59,9 @@ import * as localAgents from './src/host/local-agents/index.js'
 
 export { COLORS } from './src/host/constants.js'
 
+// Written out here rather than re-exported from entry.js: the tests read this list out of
+// index.js by name to check that a service the tools reach for is declared (test/fake-ctx.js),
+// and a re-export leaves nothing to read. entry.js is the plugin entry's copy for DSH.
 export const name = 'ds-bot'
 export const inject = ['llm', 'tools', 'systemPrompt', 'sessionController', 'sessions', 'sessionTitle', 'workspaceRegistry', 'connection', 'fs']
 
@@ -64,8 +71,9 @@ export const inject = ['llm', 'tools', 'systemPrompt', 'sessionController', 'ses
 // usage meters model requests after every listener that rewrites them. privacy checks a
 // call before the hooks of tools do, so a closed call never reaches a card they show.
 // 上游把群消息的存储换成了账本（ledger.js），group-log.js 由它取代；
-// 我们自己的出厂种子与自动导入两个模块继续留在末尾。
-const MODULES = [diagnostics, store, ledger, models, providers, permissions, turns, steer, handoffs, requests, delivery, roster, folders, privacy, agents, prompt, timeContext, tools, chatIndex, groups, goals, approvals, resume, memory, parts, images, avatarLibrary, secrets, connectors, capabilities, learning, schedules, browser, browserPlugins, computer, usage, update, dshUpdate, thinking, mobile, feed, phone, im, channel, officeSkills, goalSkills, factorySeed, autoImport, localAgents, workspaceBranch]
+// 上游新加 agentCommands、tasks、changes、remote 四个模块；
+// 我们自己的出厂种子、自动导入与工作区分支三个模块继续留在末尾。
+const MODULES = [diagnostics, store, ledger, models, providers, permissions, turns, steer, handoffs, requests, delivery, roster, folders, privacy, agents, prompt, timeContext, tools, chatIndex, groups, goals, agentCommands, tasks, approvals, resume, memory, parts, changes, images, avatarLibrary, secrets, connectors, capabilities, learning, schedules, browser, browserPlugins, computer, usage, update, dshUpdate, thinking, mobile, feed, phone, im, channel, remote, officeSkills, goalSkills, factorySeed, autoImport, localAgents, workspaceBranch]
 
 export function apply(ctx, config = {}) {
   createRuntime(ctx, config)

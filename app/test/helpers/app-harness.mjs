@@ -50,6 +50,12 @@ export const startApp = async ({ packaged = true, saved = {}, acknowledged = tru
   hold()
   // The flag comes before the app starts: a packaged install puts its data beside the program
   // folder, and that is the place the app picks when it boots.
+  // macOS asks GitHub Releases unless a feed is given, which a test must never fetch. Keep any
+  // feed a test set itself, and answer with an empty release list otherwise.
+  if (process.platform === 'darwin') process.env.DS_BOT_UPDATE_URL ??= 'data:application/json,%5B%5D'
+  await import('../../src/main.mjs')
+  // The app is a packaged one, so that it has an updater. The flag comes after the start,
+  // because a packaged app starts on the canonical path of its own.
   state.packaged = packaged
   // A Linux build updates itself only from inside an AppImage; outside one the app asks about
   // the newest GitHub release, which a test must never fetch. The faked electron-updater
