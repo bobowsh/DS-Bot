@@ -415,6 +415,9 @@ function stubCordisHost(ctx) {
     sessionTitle: { register: noop, setSource: noop },
     workspaceRegistry: { list: () => [], get: () => null },
     connection: { fetch: { register: noop }, ws: { register: noop } },
+    // 我们这支分支的插件额外声明了 fs（write/edit 的编码补丁要用），真实的宿主会提供它，
+    // 所以这个替身也要有。
+    fs: {},
   }
   for (const [key, service] of Object.entries(services)) ctx.provide(key, service)
 }
