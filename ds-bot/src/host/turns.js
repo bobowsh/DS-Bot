@@ -942,7 +942,6 @@ export function install(rt) {
         } else if (source?.kind === 'user' || source?.kind === SOURCE_KIND) {
           stoppedSubagentParents.delete(id)
         }
-          if (typeof source.senderSessionId === 'string') noteSubagentEnd(source.senderSessionId)
         // A result that came back counts as taken once a turn reads it.
         if (source?.kind === SOURCE_KIND && source.work !== undefined && source.replyTo !== undefined) rt.takenWork?.(source.work, source.replyTo)
         // A message that shares a step with a bare handoff package is what the turn

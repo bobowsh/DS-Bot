@@ -462,13 +462,15 @@ test('full ds-bot runtime serves real hello, state and live feed through TypertG
   })
   root.provide('sessionTitle', { rename: async () => {} })
   root.provide('sessions', { flush: async () => {} })
+  // 我们这支分支的 inject 多了 fs（write/edit 的编码补丁要用），宿主会提供它。
+  root.provide('fs', {})
 
   let rt
   // A real Cordis plugin declares the services its runtime reads, including work
   // scheduled after the RPC finishes. The production entry declares them too.
   await root.plugin(Object.assign((sub) => {
     rt = createRuntime(sub, { home })
-  }, { inject: ['events', 'tools', 'systemPrompt', 'connection', 'llm', 'workspaceRegistry', 'sessionController', 'sessionTitle', 'sessions'] }))
+  }, { inject: ['events', 'tools', 'systemPrompt', 'connection', 'llm', 'workspaceRegistry', 'sessionController', 'sessionTitle', 'sessions', 'fs'] }))
   await tick()
 
   const gateway = root.typertGateway
@@ -597,6 +599,8 @@ test('plugin entry tracks late TypertGatewayService mount and disposal in hello'
   root.provide('sessionController', { create: async () => ({ sessionId: 's1' }), resolveAgent: async id => ({ agent: { session: { id, seq: 1 }, followup() {} } }), selectModel: async () => {}, prompt: async () => {}, page: async () => ({ records: [], hasMore: false }) })
   root.provide('sessionTitle', { rename: async () => {} })
   root.provide('sessions', { flush: async () => {} })
+  // 同上：plugin.js 的 inject 来自 entry.js，我们这支分支多了 fs。
+  root.provide('fs', {})
   await root.plugin(pluginEntry, { home })
   for (let i = 0; i < 20 && !routes['/api/bot']; i += 1) await tick()
 
