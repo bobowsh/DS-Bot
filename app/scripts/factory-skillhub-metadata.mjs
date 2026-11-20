@@ -29,7 +29,9 @@ export async function publishedSkills(registry = SKILLHUB_REGISTRY, fetchImpl = 
     if (!response.ok) return published
     const body = await response.json()
     for (const item of body.data?.items ?? body.items ?? []) {
-      if (typeof item?.slug === 'string' && typeof item?.version === 'string') published.set(item.slug, item.version)
+      // The registry reports the newest version under `latestVersion`, not at the top level.
+      const version = item?.latestVersion?.version ?? item?.version
+      if (typeof item?.slug === 'string' && typeof version === 'string') published.set(item.slug, version)
     }
   } catch {
     // A registry that cannot be reached means no skill is known to be published.
