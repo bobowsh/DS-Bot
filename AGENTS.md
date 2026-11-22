@@ -46,7 +46,27 @@ dev/bench.sh smoke 3096 8796 stop
 
 `app/` 把 `ds-bot` 当 `file:` 依赖，npm 在安装时会把它**复制**进 `app/node_modules/ds-bot`：改 `ds-bot/` 永远不会更新那份副本。没重新安装就打出来的包，带的是旧插件，症状是打包后的应用能正常启动但缺少这次的改动。
 
-在 `app/` 里每次 `npm run pack` / `npm run dist` 之前：
+- Start work from the latest `dev` on a branch named `fix/<issue>-<name>`, `feat/<issue>-<name>`, `docs/<name>` or `chore/<name>`. Never start a branch name with `dev/`. Open the pull request into `dev`, not `main`; only releases and hotfixes go into `main`.
+- Bring a branch up to date with `scripts/merge-dev.sh`: it merges `origin/dev`, takes a conflicting `ds-bot/client.js` from dev and rebuilds it. Never rebase a pushed branch and never force-push.
+- Fill in the pull request template. Link the issue with `Fixes #<number>`; a bug fix names the bug it fixes. Write the user-visible change in the Changelog field, and do not edit `CHANGELOG.md`.
+- When opening a pull request as an AI agent:
+  - Write `Agent: <Agent> (<Model>)` in the PR body (for example, `Agent: Antigravity (Gemini 4 Neon)` or `Agent: Claude Code (Claude Opus 5.5)`).
+  - Always add the matching `agent/*` label (`agent/antigravity`, `agent/claude-code`, `agent/codex`, `agent/devin`, `agent/dsbot`, or `agent/other`).
+  - If a target release version has been decided (for example `v0.3.9` or `v0.4.0`), attach the matching GitHub Milestone.
+  - Still keep the human requester as the git commit author without `Co-authored-by`.
+- When completing an independent review on a pull request:
+  - Post a structured comment (or review) on the PR starting with:
+    ```
+    Review: approved | changes-requested | needs-decision
+    Reviewer: <Agent> (<Model>) @ <short-sha>
+    ```
+  - Immediately set the mutually-exclusive `review/*` label (`review/approved`, `review/changes-requested`, `review/needs-decision`, or `review/re-review`) and add the matching `reviewed-by/*` label (`reviewed-by/antigravity`, `reviewed-by/claude-code`, `reviewed-by/codex`, `reviewed-by/devin`, `reviewed-by/dsbot`, or `reviewed-by/other`).
+  - When new commits are pushed after `review/approved` or `review/changes-requested`, switch the review status label to `review/re-review` and remove stale `reviewed-by/*` labels until re-reviewed (also automated by `.github/workflows/pr-triage-labels.yml` once on the default branch).
+- Do not start work on an issue or pull request with the `maintainer` label; it waits for the maintainer. Do not take an issue that someone else is assigned to.
+- Before you change behavior, read the design for it in `docs/plans/` (and `docs/vision.md`); for interface work also `docs/design/ui-standard.md`. A change to a decided design needs the maintainer; a new large feature adds its design note to the same pull request.
+- Do not close an issue without evidence: the pull request or commit that fixed it, the issue it duplicates, or the reason it will not be fixed.
+- To triage issues, follow [.agents/skills/issue-triage/SKILL.md](.agents/skills/issue-triage/SKILL.md).
+- To record a demonstration GIF for an interface change, follow [.agents/skills/record-browser-gif/SKILL.md](.agents/skills/record-browser-gif/SKILL.md).
 
 ```sh
 npm ci                                                                          # 把 ds-bot/ 重新复制进 node_modules
