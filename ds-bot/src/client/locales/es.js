@@ -2,6 +2,7 @@
 
 export const ES = {
   "AIDE workbench": "Banco de trabajo de AIDE",
+  "The AIDE workbench is not available": "The AIDE workbench is not available",
   "Turn done": "Hecho",
   "Turn failed": "Error",
   "Turn stopped": "Detenido",

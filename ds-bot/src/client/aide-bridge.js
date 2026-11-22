@@ -1,15 +1,24 @@
 // The bridge to the AIDE workbench plugin.
 //
-// dsh-aide owns the workbench, and it registers itself as a main panel under the id
-// `dsh-aide` (its client.js: `PANEL_ID = "dsh-aide"`, registered into `main` and into the
-// sidebar's own `sidebar.panellist`). The host's panel list opens it with
-// `layout.selectPanel(id)`, and our own button reaches the same call through
-// `actions.openPanel`.
+// dsh-aide owns the workbench and publishes it two ways: a main panel under the id
+// `dsh-aide` (its client.js: `PANEL_ID = "dsh-aide"`, registered into `main` and into
+// the sidebar's own `sidebar.panellist`), and its workbench service as `vscodeWorkbench`
+// (`ctx.reflect.provide("vscodeWorkbench", service)`).
+//
+// Opening it through the panel id alone does not work, and that is how this button was
+// broken: the panel page dsh-aide registers there is deliberately empty
+// (`PanelPage` returns null — its overlay covers the main area), so `selectPanel` blanks
+// the conversation and draws nothing in its place. The workbench itself opens through
+// `service.show()`; the panel's own icon calls exactly that, one click away from the
+// panel row that selection sits on.
 //
 // This used to dispatch a window event instead (`dvw-workbench-show`), on the belief that
-// dsh-aide listened for one. It never did: the plugin has no such listener anywhere, and
-// the button's click went nowhere. The event, and the assumed contract with it, are gone.
+// dsh-aide listened for one. It never did: the plugin has no such listener anywhere.
 export const AIDE_PANEL_ID = 'dsh-aide'
+
+// The service dsh-aide publishes to open its workbench: `ctx.reflect.provide` names it in
+// the plugin's own apply(), and `show()` is the call its icon and its own shortcuts make.
+export const AIDE_SERVICE = 'vscodeWorkbench'
 
 // The workbench's own root, as dsh-aide draws it. It stands in the host's main
 // area, so while it is up the main area belongs to the workbench and not to the

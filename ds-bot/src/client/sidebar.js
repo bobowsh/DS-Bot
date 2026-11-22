@@ -827,8 +827,10 @@ export function TeamSidebar(props) {
     type: 'button', className: 'bt-round', 'aria-label': t('Switch to classic Agent mode'), title: t('Switch to classic Agent mode'),
     onClick: () => actions.setSurface('agent'),
   }, h(SwitchIcon))
-  // The AIDE workbench, opened through the host's own panel navigation: dsh-aide registers a
-  // main panel under its own id, and `actions.openPanel` is how the host's panel list opens it.
+  // The AIDE workbench. dsh-aide opens it through its own service (its workbench is an
+  // overlay, not the main area), and `actions.openPanel` knows that; it reports `false`
+  // when neither the service nor the panel is there, so the button says so instead of
+  // blanking the conversation.
   const toAide = h(AideButton, { label: t('AIDE workbench'), actions })
   const foot = wideContent
     ? h('div', { className: 'bt-leftcol-foot' }, toAgent, toAide, h(AccountLauncher, { place: 'column', useSurface: props.useSurface, actions }), h(PluginsButton, { actions }))

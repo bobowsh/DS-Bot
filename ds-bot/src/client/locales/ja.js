@@ -2,6 +2,7 @@
 
 export const JA = {
   "AIDE workbench": "AIDE ワークベンチ",
+  "The AIDE workbench is not available": "The AIDE workbench is not available",
   "Turn done": "完了",
   "Turn failed": "失敗",
   "Turn stopped": "停止しました",

@@ -125,6 +125,7 @@ function convertHostErrors(pairs) {
 // src/client/locales/ja.js
 var JA = {
   "AIDE workbench": "AIDE ワークベンチ",
+  "The AIDE workbench is not available": "The AIDE workbench is not available",
   "Turn done": "完了",
   "Turn failed": "失敗",
   "Turn stopped": "停止しました",
@@ -2529,6 +2530,7 @@ var DSH_JA = {
 // src/client/locales/ko.js
 var KO = {
   "AIDE workbench": "AIDE 워크벤치",
+  "The AIDE workbench is not available": "The AIDE workbench is not available",
   "Turn done": "완료",
   "Turn failed": "실패",
   "Turn stopped": "중지됨",
@@ -5050,6 +5052,7 @@ var DSH_KO = {
 // src/client/locales/es.js
 var ES = {
   "AIDE workbench": "Banco de trabajo de AIDE",
+  "The AIDE workbench is not available": "The AIDE workbench is not available",
   "Turn done": "Hecho",
   "Turn failed": "Error",
   "Turn stopped": "Detenido",
@@ -7571,6 +7574,7 @@ var DSH_ES = {
 // src/client/locales/fr.js
 var FR = {
   "AIDE workbench": "Atelier AIDE",
+  "The AIDE workbench is not available": "The AIDE workbench is not available",
   "Turn done": "Terminé",
   "Turn failed": "Échec",
   "Turn stopped": "Arrêté",
@@ -9975,6 +9979,7 @@ var DSH_FR = {
 // src/client/locales/de.js
 var DE = {
   "AIDE workbench": "AIDE-Arbeitsbereich",
+  "The AIDE workbench is not available": "The AIDE workbench is not available",
   "Turn done": "Fertig",
   "Turn failed": "Fehlgeschlagen",
   "Turn stopped": "Angehalten",
@@ -12706,6 +12711,7 @@ var ZH = {
   "Hide the work of this turn": "收起这一轮做过的事",
   "Switch to classic Agent mode": "切换经典 Agent 模式",
   "AIDE workbench": "AIDE 工作台",
+  "The AIDE workbench is not available": "AIDE 工作台不可用，未安装 dsh-aide 插件",
   "Back to the Bot team": "回到 Bot 团队界面",
   "Only “Full details” keeps the process rows of a finished turn.": "只有「完全展开」会保留已完成轮次的过程行。",
   "Bot mode": "Bot 模式",
@@ -18150,6 +18156,7 @@ var SETTINGS_ICONS = { general: GearIcon, bots: PeopleIcon, groups: ChatsIcon, i
 
 // src/client/aide-bridge.js
 var AIDE_PANEL_ID = "dsh-aide";
+var AIDE_SERVICE = "vscodeWorkbench";
 var AIDE_OVERLAY_SELECTOR = ".dvw-overlay";
 var aideWorkbenchOpen = (root = typeof document === "undefined" ? void 0 : document) => root !== void 0 && root.querySelector(AIDE_OVERLAY_SELECTOR) !== null;
 function watchAideWorkbench(onChange) {
@@ -46608,6 +46615,20 @@ function apply(ctx) {
     });
     return saved;
   };
+  const panelOpeners = /* @__PURE__ */ new Map();
+  panelOpeners.set(AIDE_PANEL_ID, () => {
+    const workbench = ctx.get(AIDE_SERVICE);
+    if (typeof workbench?.show === "function") {
+      workbench.show();
+      return true;
+    }
+    const layout = ctx.get("layout");
+    if (typeof layout?.selectPanel === "function") {
+      layout.selectPanel(AIDE_PANEL_ID);
+      return true;
+    }
+    return false;
+  });
   const homeToMainBot = () => {
     const snapshot = roster.getSnapshot();
     if (!snapshot.ready || !snapshot.mainBotId) return;
@@ -46769,8 +46790,20 @@ function apply(ctx) {
     // Open a plugin's main panel the way the host's own panel list does. The layout service
     // checks the id against the live panel registry, so an absent plugin is refused there
     // rather than here; `false` says only that this host has no layout service at all.
+    //
+    // A panel may draw nothing in the main area and put its content somewhere else — the AIDE
+    // workbench is one: its panel page is an empty placeholder and its overlay is the real
+    // workbench. Such a plugin publishes a service to open that overlay, so the id's own
+    // opener runs first and the panel selection only backs it up. Selecting alone would leave
+    // the main area blank with no way back.
     openPanel: (id) => {
       const layout = ctx.get("layout");
+      const opener = panelOpeners.get(id);
+      if (typeof opener === "function") {
+        if (opener()) return true;
+        actions.notice(t("The AIDE workbench is not available"));
+        return false;
+      }
       if (typeof layout?.selectPanel !== "function") return false;
       layout.selectPanel(id);
       return true;
