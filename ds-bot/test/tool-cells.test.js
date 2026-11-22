@@ -251,7 +251,7 @@ const TEAM = new Set([
   'create_group', 'update_group', 'delete_group', 'post_to_group', 'ask_user',
   'request_secret', 'request_connector', 'mail_send', 'ask_user_question',
   'show_view', 'browser_handoff', 'computer_handoff', 'read_group_chat',
-  'remember', 'forget',
+  'bot_remember', 'bot_forget', 'remember', 'forget',
 ])
 const nameOf = call => call?.name ?? call?.call?.name ?? ''
 const isTeam = call => TEAM.has(nameOf(call))
@@ -297,11 +297,13 @@ const BRANCHES = [
   ['read_group_chat', { args: { group: 'Ops' } }, /Read.*Ops/],
   ['remember', { args: { scope: 'Chief' }, content: 'Saved to Chief memory.' }, /Memory updated/],
   ['forget', { args: { scope: 'Chief' }, content: 'Removed from Chief memory.' }, /Memory updated/],
+  ['bot_remember', { args: { scope: 'Chief' }, content: 'Saved to Chief memory.' }, /Memory updated/],
+  ['bot_forget', { args: { scope: 'Chief' }, content: 'Removed from Chief memory.' }, /Memory updated/],
 ]
 const rosterFor = callId => team({ questions: { chief: question(callId) }, secretRequests: { chief: [request(callId)] } })
 
 test('every call ToolCell draws shows the same nested in a PTC program as on its own', () => {
-  assert.equal(BRANCHES.length, 15)
+  assert.equal(BRANCHES.length, 17)
   for (const [name, options, expected] of BRANCHES) {
     // group_relay 的成员气泡现在由轮次尾部画，别的工具仍在自己的行里。
     const render = name === 'group_relay' ? shownRelay : shown
@@ -524,11 +526,13 @@ test('a memory write that failed says so, and opens the memory it meant to chang
 })
 
 test('a removal that failed says it could not remove the entry, and why', () => {
-  const line = memoryLine(failedWrite('forget', {}, 'memory/no-match', 'No entry in your memory matches "tea".'), {})
-  assert.match(text(line), /Couldn't remove from memory/)
-  assert.match(text(line), /No saved entry matched/)
-  // The entry the call named is not repeated in the notice.
-  assert.doesNotMatch(text(line), /tea/)
+  for (const name of ['bot_forget', 'forget']) {
+    const line = memoryLine(failedWrite(name, {}, 'memory/no-match', 'No entry in your memory matches "tea".'), {})
+    assert.match(text(line), /Couldn't remove from memory/)
+    assert.match(text(line), /No saved entry matched/)
+    // The entry the call named is not repeated in the notice.
+    assert.doesNotMatch(text(line), /tea/)
+  }
 })
 
 test('the reason follows the kind of failure, not the words of the host', () => {
