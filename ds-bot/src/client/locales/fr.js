@@ -2,6 +2,7 @@
 
 export const FR = {
   "AIDE workbench": "Atelier AIDE",
+  "The AIDE workbench is not available": "The AIDE workbench is not available",
   "Turn done": "Terminé",
   "Turn failed": "Échec",
   "Turn stopped": "Arrêté",

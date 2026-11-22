@@ -11,6 +11,7 @@ import { BASE_CSS, SHELL_CSS, CONVERSATION_CSS, botOwnCss, installStyles, instal
 import { lookOf } from './mark.js'
 import { TeamSidebar, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, BotReturn, SIDEBAR_CSS, RETURN_CSS, FOOTER_CSS, holdShellShortcuts, openHarnessSettings, openHarnessOnboarding, MODELS_STEP, MODELS_STEP_ORDER, OpenModelsStep } from './sidebar.js'
 import { AideFooterButton } from './aide-button.js'
+import { AIDE_PANEL_ID, AIDE_SERVICE } from './aide-bridge.js'
 import { installSettingsShell, SETTINGS_SHELL_CSS } from './settings-shell.js'
 import { frameLayout, readSidebar, writeSidebar, toggledPref, DSH_NARROW } from './frame-layout.js'
 import { installFrameWatch } from './frame-watch.js'
@@ -611,6 +612,18 @@ export function apply(ctx) {
     void chatSettings?.set('transcriptView', mode).catch(() => {})
     return saved
   }
+  // Panels whose real content is not in the main area: the id maps to the call that opens the
+  // panel's own surface. Read from the service the plugin publishes, so an absent plugin
+  // reads `undefined` and falls back to selecting the panel. A host with neither says so:
+  // a button that does nothing is worse than one that reports why.
+  const panelOpeners = new Map()
+  panelOpeners.set(AIDE_PANEL_ID, () => {
+    const workbench = ctx.get(AIDE_SERVICE)
+    if (typeof workbench?.show === 'function') { workbench.show(); return true }
+    const layout = ctx.get('layout')
+    if (typeof layout?.selectPanel === 'function') { layout.selectPanel(AIDE_PANEL_ID); return true }
+    return false
+  })
   // Bot mode's view must hold a team conversation; an outside Session wears the
   // Bot skin without one. Runs whenever the surface is (or stays) Bot mode —
   // including a cold start, where no setSurface call ever fires.
@@ -763,8 +776,20 @@ export function apply(ctx) {
     // Open a plugin's main panel the way the host's own panel list does. The layout service
     // checks the id against the live panel registry, so an absent plugin is refused there
     // rather than here; `false` says only that this host has no layout service at all.
+    //
+    // A panel may draw nothing in the main area and put its content somewhere else — the AIDE
+    // workbench is one: its panel page is an empty placeholder and its overlay is the real
+    // workbench. Such a plugin publishes a service to open that overlay, so the id's own
+    // opener runs first and the panel selection only backs it up. Selecting alone would leave
+    // the main area blank with no way back.
     openPanel: (id) => {
       const layout = ctx.get('layout')
+      const opener = panelOpeners.get(id)
+      if (typeof opener === 'function') {
+        if (opener()) return true
+        actions.notice(t('The AIDE workbench is not available'))
+        return false
+      }
       if (typeof layout?.selectPanel !== 'function') return false
       layout.selectPanel(id)
       return true

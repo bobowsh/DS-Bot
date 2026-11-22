@@ -2,6 +2,7 @@
 
 export const KO = {
   "AIDE workbench": "AIDE 워크벤치",
+  "The AIDE workbench is not available": "The AIDE workbench is not available",
   "Turn done": "완료",
   "Turn failed": "실패",
   "Turn stopped": "중지됨",
