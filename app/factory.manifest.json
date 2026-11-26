@@ -3,15 +3,11 @@
   "plugins": [
     {
       "name": "dsh-chat-import",
-      "version": "0.26.7"
-    },
-    {
-      "name": "dsh-xdpool",
-      "version": "2.6.7"
+      "version": "0.26.9"
     },
     {
       "name": "dshmarket",
-      "version": "1.73.19"
+      "version": "1.84.1"
     },
     {
       "name": "@linxin666/dsh-client-ui-git-graph",
@@ -23,7 +19,7 @@
     },
     {
       "name": "@astron-team/skillhub-dsh",
-      "version": "0.6.3"
+      "version": "0.7.0"
     },
     {
       "name": "dsh-aide",
@@ -35,15 +31,15 @@
     },
     {
       "name": "ds-harness-remote",
-      "version": "0.6.5"
+      "version": "0.6.8"
     },
     {
       "name": "dsh-plugin-guide",
-      "version": "0.5.9"
+      "version": "0.5.12"
     },
     {
       "name": "dsh-codex-style-computer-use",
-      "version": "2.3.0"
+      "version": "2.3.5"
     }
   ],
   "skills": [

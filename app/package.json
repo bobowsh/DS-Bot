@@ -71,7 +71,6 @@
     "@deepseek-ai/libreoffice-kit": "0.1.5",
     "deep-view": "0.1.2",
     "ds-bot": "file:../ds-bot",
-    "dsh-xdpool": "2.6.7",
     "electron-updater": "6.8.10",
     "js-yaml": "4.3.2",
     "pnpm": "11.7.0",
@@ -103,14 +102,6 @@
       "@deepseek-ai/dsh-client-locale": "0.2.2-rc.1",
       "@deepseek-ai/schemastery": "3.19.0",
       "react": "19.3.0"
-    },
-    "dsh-xdpool": {
-      "@deepseek-ai/cordis": "4.1.0",
-      "@deepseek-ai/dsh-credentials": "0.2.2-rc.1",
-      "@deepseek-ai/dsh-llm": "0.2.2-rc.1",
-      "@deepseek-ai/dsh-llm-pi-ai": "0.2.2-rc.1",
-      "@deepseek-ai/dsh-settings": "0.2.2-rc.1",
-      "@deepseek-ai/schemastery": "3.19.0"
     }
   },
   "optionalDependencies": {
