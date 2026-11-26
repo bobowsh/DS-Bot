@@ -34,6 +34,8 @@ export { clockLabel }
 // Chat cells
 
 
+const useNullUi = () => null
+
 // `lead` (a sender avatar in group chats) sits beside the last bubble, in the same
 // row, so it lines up with the bubble whether or not reactions hang below it.
 // `fold`: past what a bubble folds (fold.js); `whole`: the last text is only the start
@@ -48,7 +50,8 @@ export function Bubbles({ texts, roster, selfId, actions, streaming, sessionId, 
     actions.openSession(target)
   }
   const cleaned = texts.map(stripToolCallTags).filter(text => text.trim() !== '')
-  const reactions = useUi ? useUi(state => (msgKey ? state.reactions?.[msgKey] ?? null : null)) : null
+  const useReadUi = useUi ?? useNullUi
+  const reactions = useReadUi(state => (msgKey ? state.reactions?.[msgKey] ?? null : null))
   return h('div', { className: 'bt-astack', 'data-lead': lead ? '' : undefined, onClickCapture: onClick },
     cleaned.map((text, index) => {
       const last = index === cleaned.length - 1
@@ -153,7 +156,7 @@ function MessageTools({ text, name, sessionId, react, actions, open: tapped }) {
   const [copied, setCopied] = useState(false)
   const tools = useRef(null)
   const pop = useRef(null)
-  const tick = useViewport()
+  const tick = useViewport(panel !== null)
   const close = () => setPanel(null)
   useDismiss(panel !== null, close, [tools, pop])
   const open = (kind, event) => { if (panel?.kind === kind) { close(); return } setPanel({ kind, node: event.currentTarget }) }
@@ -730,8 +733,8 @@ export function TriggerCell({ node, sessionId, useRoster, useSessions, useTurnCl
       // A part opens with its handoff package, so the earlier parts go right above it.
       if (source.handoff === true) return h(EarlierParts, { sessionId, roster, actions })
       // Group turns belong to the group chat; the member's own chat stays one-to-one.
-      // Background task handoff notices are model-only context injected before the user's message.
-      if (source.role === 'kickoff' || source.role === 'room' || source.role === 'goal' || source.role === 'task-handoff') return null
+      // Background task handoff notices and computer handback notices are model-only context.
+      if (source.role === 'kickoff' || source.role === 'room' || source.role === 'goal' || source.role === 'task-handoff' || source.role === 'handback') return null
       // The secret card itself shows what the user did; the note to the Bot stays out.
       if (source.role === 'secret' || deferred) return null
       // A profile notice is the user's edit landing in the Bot's chat, not a peer
@@ -794,8 +797,27 @@ export function TriggerCell({ node, sessionId, useRoster, useSessions, useTurnCl
   }
 }
 
-function NewDivider() {
-  return h('div', { className: 'bt-new-sep', role: 'separator', 'aria-label': t('New messages') }, h('span', null, t('New')))
+// The header's new-message pills look for the divider every frame; a query for it
+// walks the whole transcript whenever there is none, so the dividers register here.
+const newDividers = new Set()
+
+export function newDividerIn(scroller) {
+  let first = null
+  for (const node of newDividers) {
+    if (!scroller.contains(node)) continue
+    if (first === null || first.compareDocumentPosition(node) & first.DOCUMENT_POSITION_PRECEDING) first = node
+  }
+  return first
+}
+
+export function NewDivider() {
+  const ref = useRef(null)
+  useLayoutEffect(() => {
+    const node = ref.current
+    newDividers.add(node)
+    return () => { newDividers.delete(node) }
+  }, [])
+  return h('div', { ref, className: 'bt-new-sep', role: 'separator', 'aria-label': t('New messages') }, h('span', null, t('New')))
 }
 
 
@@ -1209,29 +1231,27 @@ const blockOf = props => props.block
 
 // One team tool's row. The host owns the row's shape; the team owns what the
 // row says. `env` carries the session, the roster and the actions the row reads.
-export function renderTeamCall(call, env) {
+function TeamCallRow({ call, env }) {
   const { sessionId, roster, actions, useUi, useWork, heldCards, hooks } = env
-  // A Bot-to-Bot turn is the team's own business: it shows nowhere — except a
-  // question or view card the user dismissed or answered by message, which
-  // settles in the transcript where the call was made.
-  if (roster === undefined) return h(CellEmpty)
-  if (isHiddenTurn(roster, sessionId, call.turn)) {
-    const name = toolName(call)
-    const closed = roster.closedCards?.[sessionId]?.[call.callId]
-    const settles = (name === 'ask_user' || name === 'show_view') && call.callId && closed !== undefined
-    if (!settles) return h(CellEmpty)
-  }
   const tool = toolName(call)
   const done = call.kind === 'tool-result'
   const { text: arg, value: argValue } = toolArgs(call)
-  const self = roster.byId[sessionId]
-  const findBot = nameOrId => roster.byId[nameOrId] ?? roster.bots.find(bot => bot.name.toLowerCase() === String(nameOrId ?? '').toLowerCase())
+  const self = roster?.byId[sessionId]
+  const findBot = nameOrId => roster?.byId[nameOrId] ?? roster?.bots.find(bot => bot.name.toLowerCase() === String(nameOrId ?? '').toLowerCase())
+  // A Bot-to-Bot turn is the team's own business: it shows nowhere — except a
+  // question or view card the user dismissed or answered by message, which
+  // settles in the transcript where the call was made.
+  const closed = roster?.closedCards?.[sessionId]?.[call.callId]
+  const settles = (tool === 'ask_user' || tool === 'show_view') && call.callId && closed !== undefined
+  const hidden = roster !== undefined && isHiddenTurn(roster, sessionId, call.turn)
+  const drawn = roster !== undefined && (!hidden || settles)
   // The dock above the composer carries a card the transcript does not draw, so
-  // the card shows in one place only.
-  useShownCards(actions, sessionId, CARDS.has(tool) && call.callId ? [call.callId] : [])
-  // A running tool names the work in the one activity row at the tail.
-  const note = done ? null : toolActivity(tool, key => arg(key), findBot, self)
-  useLiveNote(actions, sessionId, `tool:${tool}`, note)
+  // the card shows in one place only. A running tool names the work in the one
+  // activity row at the tail. Both read the row, so both run on every path; a
+  // row that draws nothing passes them nothing.
+  useShownCards(actions, sessionId, drawn && CARDS.has(tool) && call.callId ? [call.callId] : [])
+  useLiveNote(actions, sessionId, `tool:${tool}`, drawn && !done ? toolActivity(tool, key => arg(key), findBot, self) : null)
+  if (!drawn) return h(CellEmpty)
   switch (tool) {
     case 'message_bot': {
       const target = findBot(arg('to')) ?? { name: arg('to') ?? '…', color: 'gray' }
@@ -1314,6 +1334,12 @@ export function renderTeamCall(call, env) {
       }
       return h(CellEmpty)
   }
+}
+
+// The row of one team tool. It is a component because it reads the activity row
+// and the card dock through hooks, and a hook may only be called from a component.
+export function renderTeamCall(call, env) {
+  return TeamCallRow({ call, env })
 }
 
 // The team's own tool seat: the team draws the tool rows itself, so a plain tool

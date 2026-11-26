@@ -226,6 +226,7 @@ export function install(rt) {
         // The skills a Bot starts with: a seeded Bot gets the ones its seed names, a Bot the user
         // makes starts bare and is given skills later.
         capabilities: Array.isArray(capabilities) ? [...capabilities] : [],
+        packs: [],
         ...(factoryId ? { factoryId: String(factoryId) } : {}),
       }
       if (main) state.mainBotIds.push(id)
@@ -260,9 +261,16 @@ export function install(rt) {
       await rt.save()
       await scopeTools()
       // The greeting runs on the Bot's own model, once its provider is registered.
+      // Reading the model catalog can throw: the greeting then goes out on the model
+      // the Bot has, as a released greeting does. Nothing awaits this chain, so an
+      // uncaught rejection here would end the host.
       void rt.waitForModel(bot)
-        .then(() => rt.applyModel(bot).catch(error => rt.warn('ds-bot: model for %s not applied: %s', cleanName, error)))
+        .then(
+          () => rt.applyModel(bot).catch(error => rt.warn('ds-bot: model for %s not applied: %s', cleanName, error)),
+          error => rt.warn('ds-bot: model for %s not ready, greeting on its current model: %s', cleanName, error),
+        )
         .then(() => sendKickoff(bot, greeting))
+        .catch(error => rt.warn('ds-bot: greeting for %s not sent: %s', cleanName, error))
       return bot
     } catch (error) {
       // The Bot's Session was already made: archive it instead of leaving an orphan.
@@ -1033,7 +1041,12 @@ export function install(rt) {
     // The factory seed runs before the default-Chief check: a shipped team fills mainBotIds
     // so no default Chief is made, and an existing team gets its seed Bots refreshed to
     // factory values on an upgrade. With no seed file this is a no-op.
-    await rt.applySeed()
+    //
+    // The check comes first on purpose: awaiting the seed would hand the event loop a
+    // turn even when there is nothing to seed, and that extra turn moves the start
+    // past the point where the state is written, so a request answered in that window
+    // is not on disk yet.
+    if (rt.seedPresent?.() === true) await rt.applySeed()
     if (state.mainBotIds.some(id => rt.botOf(id))) return
     // Only the team's first Main Bot is stored as the DeepSeek whale; other Bots get a
     // look from their id, and a Bot made Main Bot later keeps its own.
