@@ -115,6 +115,12 @@ export function install(rt) {
     return rt.createBot(options)
   }
 
+  // Whether a seed file is there at all. The caller asks first, so a start without a
+  // seed does not wait on a promise that has nothing to do.
+  function seedPresent() {
+    return readSeed() !== undefined
+  }
+
   // Apply the factory seed. First launch (empty team) creates every seed Bot; an upgrade
   // (version moved) refreshes seed Bots by factoryId, adds any new ones, and leaves user Bots
   // (no factoryId) untouched. A same version on a non-empty team is a no-op (idempotent).
@@ -157,5 +163,5 @@ export function install(rt) {
     }
   }
 
-  Object.assign(rt, { applySeed })
+  Object.assign(rt, { applySeed, seedPresent })
 }
